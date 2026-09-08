@@ -30,6 +30,20 @@ Projektversion. `npm run dev` startet eine Browser-Vorschau. Dort funktionieren
 Dateidialog und Rendering, während Dateibeobachtung, lokale Bildpfade und
 Systemintegration die Desktop-App voraussetzen.
 
+Für den direkten Desktop-Test mit Beispieldokument:
+
+```sh
+npm run dev:demo
+# Oder eine eigene Datei:
+npm run desktop -- --file ./README.md
+```
+
+Der Befehl startet Vite und das native Fenster gemeinsam. CSS und React nutzen
+Live-Updates; Rust-Änderungen bauen die App neu und starten sie erneut. Änderungen
+am geöffneten Markdown lädt der Dateiwatcher automatisch. `npm run dev:doctor`
+prüft die Build-Werkzeuge. Weitere Details zu Reloads, Inspector und lokalen
+Werkzeugpfaden stehen in [docs/development.md](docs/development.md).
+
 ## Prüfen und paketieren
 
 ```sh

@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DocumentGateway, FileDocument, OpenRequest } from './gateway';
 
 class TauriGateway implements DocumentGateway {
+  private restoredDevFile = false;
   choose = (): Promise<string[]> => invoke('choose_file');
   read = (path: string): Promise<FileDocument> =>
     invoke('read_document', { path });
@@ -53,7 +54,21 @@ class TauriGateway implements DocumentGateway {
     const stop = await listen('open-request', () => {
       void drain();
     });
-    await drain();
+    // A full Vite reload keeps the native process but consumes no new CLI request.
+    // Native authorization still validates this path; no access is granted here.
+    if (import.meta.env.DEV && !this.restoredDevFile) {
+      this.restoredDevFile = true;
+      const paths = await invoke<string[]>('take_open_requests');
+      if (paths.length) callback({ paths });
+      else {
+        try {
+          const path = sessionStorage.getItem('hashline.dev.file');
+          if (path) callback({ paths: [path] });
+        } catch {
+          /* Optional storage. */
+        }
+      }
+    } else await drain();
     return stop;
   }
 }
