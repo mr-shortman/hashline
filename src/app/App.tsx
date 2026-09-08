@@ -21,6 +21,7 @@ import {
 } from '../features/preferences/preferences';
 import type { DocumentGateway } from '../platform/gateway';
 import { Icon } from '../ui/Icon';
+import { Titlebar } from '../ui/Titlebar';
 
 export function App({
   controller,
@@ -209,9 +210,10 @@ export function App({
 
   return (
     <div className="app">
-      <header className="toolbar">
+      <Titlebar onError={controller.notice}>
         <button
           className="open-button"
+          aria-label="Öffnen"
           title="Datei öffnen (Strg+O)"
           onClick={() => {
             void controller.choose();
@@ -262,7 +264,7 @@ export function App({
             <Icon name="menu" />
           </button>
         </div>
-      </header>
+      </Titlebar>
       {menu && (
         <div
           className="settings"

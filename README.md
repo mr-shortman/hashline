@@ -69,6 +69,13 @@ Integrationstests und Messabläufe beschreibt [docs/testing.md](docs/testing.md)
 
 ## Bedienung
 
+Die Desktop-App vereint Werkzeuge und Fenstersteuerung in einer selbst gestalteten
+Titelleiste: flache Knöpfe rechts unter Windows, Ampelknöpfe links unter macOS und
+runde Knöpfe rechts unter Linux. Dateiname und freie Flächen lassen sich zum
+Verschieben ziehen; ein Doppelklick maximiert das Fenster oder stellt es wieder her.
+Der grüne macOS-Knopf schaltet Vollbild um. Die Leiste folgt dem gewählten Theme.
+In der Browser-Vorschau werden keine Fensterknöpfe eingeblendet.
+
 | Aktion                                       | Tastatur                           |
 | -------------------------------------------- | ---------------------------------- |
 | Öffnen                                       | Strg+O                             |

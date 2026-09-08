@@ -1,0 +1,204 @@
+.toolbar.titlebar {
+  gap: 12px;
+  padding-right: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.titlebar .file-title {
+  align-self: stretch;
+  align-content: center;
+  min-width: 36px;
+  cursor: default;
+}
+.titlebar .open-button {
+  flex: none;
+}
+.titlebar[data-focused='false'] .file-title,
+.titlebar[data-focused='false'] .window-controls {
+  color: var(--muted);
+}
+.window-controls {
+  display: flex;
+  align-items: center;
+  flex: none;
+  align-self: stretch;
+}
+.window-control {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  flex: none;
+  cursor: default;
+}
+.window-control:focus-visible {
+  outline-offset: -3px;
+}
+.window-control-disc {
+  display: grid;
+  place-items: center;
+}
+.titlebar[data-platform='windows'] .window-control {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.titlebar[data-platform='windows'] .window-close:hover {
+  background: #c42b1c;
+  color: white;
+}
+.titlebar[data-platform='linux'] .window-controls {
+  gap: 4px;
+  padding: 0 10px 0 8px;
+  position: relative;
+}
+.titlebar[data-platform='linux'] .window-controls::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--border);
+}
+.titlebar[data-platform='linux'] .window-control {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.titlebar[data-platform='linux'] .window-close {
+  background: var(--subtle);
+}
+.titlebar[data-platform='linux'] .window-close:hover {
+  background: var(--border);
+}
+.toolbar.titlebar[data-platform='macos'] {
+  padding-inline: 12px;
+}
+.titlebar[data-platform='macos'] .window-controls {
+  gap: 0;
+  margin-right: 6px;
+}
+.titlebar[data-platform='macos'] .window-control {
+  width: 22px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+}
+.titlebar[data-platform='macos'] .window-control-disc {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #00000020;
+  border-radius: 50%;
+  color: #000000a6;
+}
+.titlebar[data-platform='macos'] .window-close .window-control-disc {
+  background: #ff5f57;
+}
+.titlebar[data-platform='macos'] .window-minimize .window-control-disc {
+  background: #febc2e;
+}
+.titlebar[data-platform='macos'] .window-maximize .window-control-disc {
+  background: #28c840;
+}
+.titlebar[data-platform='macos'] .window-control svg {
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  stroke-width: 1.5;
+}
+.titlebar[data-platform='macos'] .window-controls:hover svg,
+.titlebar[data-platform='macos'] .window-control:focus-visible svg {
+  opacity: 1;
+}
+.titlebar[data-platform='macos'][data-focused='false']
+  .window-controls:not(:hover)
+  .window-control-disc {
+  background: var(--border);
+}
+.window-resize-handles {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+.window-resize-handle {
+  position: absolute;
+  pointer-events: auto;
+}
+.resize-north,
+.resize-south {
+  left: 10px;
+  right: 10px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.resize-north {
+  top: 0;
+}
+.resize-south {
+  bottom: 0;
+}
+.resize-east,
+.resize-west {
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.resize-east {
+  right: 0;
+}
+.resize-west {
+  left: 0;
+}
+.resize-northeast,
+.resize-northwest,
+.resize-southeast,
+.resize-southwest {
+  width: 10px;
+  height: 10px;
+}
+.resize-northeast {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.resize-northwest {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.resize-southeast {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+.resize-southwest {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+@media (max-width: 550px) {
+  .toolbar.titlebar,
+  .toolbar.titlebar[data-platform='macos'] {
+    gap: 4px;
+    padding-left: 6px;
+  }
+  .titlebar .toolbar-actions {
+    gap: 0;
+  }
+  .titlebar .open-button {
+    padding-inline: 7px;
+  }
+  .titlebar[data-platform='windows'] .window-control {
+    width: 36px;
+  }
+  .titlebar[data-platform='linux'] .window-controls {
+    gap: 0;
+    padding-inline: 4px;
+  }
+  .titlebar[data-platform='macos'] .window-controls {
+    margin-right: 2px;
+  }
+}
