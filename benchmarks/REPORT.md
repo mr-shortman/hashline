@@ -371,3 +371,12 @@ TypeScript-Tests, alle 18 Browser-Tests und native Verträge bestehen.
 [Öffnungen](results/phase1-p12-open.json),
 [Suchinteraktion](results/phase1-p12-interaction.json),
 [Suchspeicher vor P1.3](results/phase1-p12-search-memory.json).
+
+P1.3: Treffer werden als Knotenreferenzen und UTF-16-Offsets gespeichert. Nur
+sichtbare und aktive Treffer erzeugen Ranges; der Fallback erzeugt ausschließlich
+die aktive Range. Beim Suchwechsel werden alte Offsets vor erneutem Highlighting
+verworfen. Indexinvalidierung nach Highlighting und `textVersion` bleiben erhalten.
+`findRanges` bleibt Testadapter. Browser-Suchtests und native Navigation bis zum
+letzten Treffer bestehen. [Öffnungen](results/phase1-p13-open.json),
+[Suchinteraktion](results/phase1-p13-interaction.json),
+[Suchspeicher](results/phase1-p13-search-memory.json).

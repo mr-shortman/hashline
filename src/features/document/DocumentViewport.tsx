@@ -3,7 +3,9 @@ import type { RenderDocument } from './controller';
 import type { DocumentGateway } from '../../platform/gateway';
 import type { ReadingPosition } from '../preferences/preferences';
 import {
-  findRanges,
+  findMatches,
+  toRange,
+  type Match,
   hasHighlights,
   indexText,
   paintRanges,
@@ -42,9 +44,9 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
   const position = useRef<ReadingPosition | undefined>(undefined);
   const retainedSections = useRef<{ html: string; shell: HTMLElement }[]>([]);
   const indexes = useRef(new WeakMap<HTMLElement, TextIndex>());
-  const ranges = useRef<Range[]>([]);
+  const ranges = useRef<Match[]>([]);
   const visibleSections = useRef(new Set<Element>());
-  const sectionRanges = useRef(new Map<Element, Range[]>());
+  const sectionRanges = useRef(new Map<Element, Match[]>());
   const current = useRef(0);
   const forcedSection = useRef<HTMLElement | null>(null);
   const [textVersion, setTextVersion] = useState(0);
@@ -633,7 +635,8 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
 
   function paintVisible() {
     cleanupPaint.current();
-    const visible: Range[] = [];
+    if (!hasHighlights()) return;
+    const visible: Match[] = [];
     for (const shell of visibleSections.current) {
       for (const range of sectionRanges.current.get(shell) || [])
         visible.push(range);
@@ -641,7 +644,7 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
     const active = ranges.current[current.current];
     if (active && !visible.includes(active)) visible.push(active);
     cleanupPaint.current = paintRanges(
-      visible,
+      visible.map(toRange),
       active ? visible.indexOf(active) : 0,
     );
   }
@@ -651,8 +654,9 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
     if (!layer || hasHighlights()) return;
     if (!layer.hasChildNodes() && !ranges.current.length) return;
     layer.replaceChildren();
-    const range = ranges.current[current.current];
-    if (!range || !scroll.current) return;
+    const match = ranges.current[current.current];
+    if (!match || !scroll.current) return;
+    const range = toRange(match);
     const base = scroll.current.getBoundingClientRect();
     for (const rect of range.getClientRects()) {
       const mark = document.createElement('span');
@@ -667,6 +671,11 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
   }
 
   useEffect(() => {
+    // Drop node offsets before highlighting can replace their text nodes.
+    cleanupPaint.current();
+    ranges.current = [];
+    sectionRanges.current.clear();
+    drawFallback();
     if (!query) resumeHighlight.current();
     const abort = new AbortController();
     const start = performance.now();
@@ -677,8 +686,8 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
     async function search() {
       if (query && root.current?.dataset.renderState !== 'complete') return;
       if (!root.current) return;
-      const found: Range[] = [];
-      const bySection = new Map<Element, Range[]>();
+      const found: Match[] = [];
+      const bySection = new Map<Element, Match[]>();
       let slice = performance.now();
       if (query) {
         for (const shell of root.current.querySelectorAll<HTMLElement>(
@@ -689,7 +698,7 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
             index = indexText(shell);
             indexes.current.set(shell, index);
           }
-          const matches = findRanges(index, query);
+          const matches = findMatches(index, query);
           bySection.set(shell, matches);
           for (const range of matches) found.push(range);
           if (performance.now() - slice >= 6) {
@@ -705,9 +714,10 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
       current.current = 0;
       paintVisible();
       latest.current.onMatches(found.length, 0);
-      const range = found[0];
-      if (range && scroll.current) {
-        reveal(range.startContainer.parentElement);
+      const match = found[0];
+      if (match && scroll.current) {
+        reveal(match.startNode.parentElement);
+        const range = toRange(match);
         navigation.current++;
         scroll.current.scrollTop +=
           range.getBoundingClientRect().top -
@@ -744,9 +754,10 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
       ranges.current.length;
     cleanupPaint.current();
     paintVisible();
-    const range = ranges.current[current.current];
+    const match = ranges.current[current.current];
     const viewport = scroll.current!;
-    reveal(range.startContainer.parentElement);
+    reveal(match.startNode.parentElement);
+    const range = toRange(match);
     navigation.current++;
     viewport.scrollTop +=
       range.getBoundingClientRect().top -

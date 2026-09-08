@@ -84,14 +84,21 @@ export function indexText(root: HTMLElement): TextIndex {
   return { text, parts };
 }
 
-export function findRanges(index: TextIndex, query: string): Range[] {
+export interface Match {
+  startNode: Text;
+  startOffset: number;
+  endNode: Text;
+  endOffset: number;
+}
+
+export function findMatches(index: TextIndex, query: string): Match[] {
   if (!query) return [];
   // Escaped literal regex preserves original UTF-16 offsets, including case mappings.
   const pattern = new RegExp(
     query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
     'giu',
   );
-  const ranges: Range[] = [];
+  const matches: Match[] = [];
   let partIndex = 0;
   for (const match of index.text.matchAll(pattern)) {
     const start = match.index;
@@ -107,12 +114,26 @@ export function findRanges(index: TextIndex, query: string): Range[] {
       endIndex++;
     const last = index.parts[endIndex];
     if (!first || !last) continue;
-    const range = document.createRange();
-    range.setStart(first.node, Math.max(0, start - first.start));
-    range.setEnd(last.node, end - last.start);
-    ranges.push(range);
+    matches.push({
+      startNode: first.node,
+      startOffset: Math.max(0, start - first.start),
+      endNode: last.node,
+      endOffset: end - last.start,
+    });
   }
-  return ranges;
+  return matches;
+}
+
+export function toRange(match: Match): Range {
+  const range = match.startNode.ownerDocument.createRange();
+  range.setStart(match.startNode, match.startOffset);
+  range.setEnd(match.endNode, match.endOffset);
+  return range;
+}
+
+// Compatibility adapter; the viewport retains offsets and paints visible matches.
+export function findRanges(index: TextIndex, query: string): Range[] {
+  return findMatches(index, query).map(toRange);
 }
 
 interface NativeHighlight {

@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { parseMarkdown } from '../src/core/markdown/parser';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { validatePreferences } from '../src/features/preferences/preferences';
-import { findRanges, indexText } from '../src/features/search';
+import {
+  findRanges,
+  findMatches,
+  toRange,
+  indexText,
+} from '../src/features/search';
 
 describe('preferences', () => {
   it('recovers from invalid versions and validates stored values and LRU bound', () => {
@@ -91,4 +96,27 @@ describe('search traversal contract', () => {
     root.hidden = true;
     expect(indexText(root).parts).toEqual([]);
   });
+});
+
+it('keeps matches as offsets until paint, including cross-node Unicode matches', () => {
+  const root = document.createElement('section');
+  root.innerHTML = '<p>İ 🐈 Na<strong>del</strong> a.b NADEL</p>';
+  const index = indexText(root);
+  const createRange = vi.spyOn(document, 'createRange');
+  const matches = findMatches(index, 'nadel');
+  expect(createRange).not.toHaveBeenCalled();
+  expect(matches).toHaveLength(2);
+  expect(matches[0]).toEqual({
+    startNode: root.querySelector('p')!.firstChild,
+    startOffset: 5,
+    endNode: root.querySelector('strong')!.firstChild,
+    endOffset: 3,
+  });
+  expect(matches.map(toRange).map((range) => range.toString())).toEqual([
+    'Nadel',
+    'NADEL',
+  ]);
+  createRange.mockRestore();
+  expect(findMatches(index, '')).toEqual([]);
+  expect(findMatches(index, 'a.b').map(toRange)[0].toString()).toBe('a.b');
 });
