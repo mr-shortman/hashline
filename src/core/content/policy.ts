@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import { ALLOWED_ATTR, ALLOWED_TAGS } from '../markdown/opbuffer';
 import type { ParsedMarkdown } from '../markdown/types';
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
 
@@ -72,65 +73,10 @@ export function sanitizeFragment(
 ): SanitizedFragment {
   const fragment = DOMPurify.sanitize(parsed.html, {
     RETURN_DOM_FRAGMENT: true,
-    ALLOWED_TAGS: [
-      'p',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'em',
-      'strong',
-      'del',
-      's',
-      'code',
-      'pre',
-      'blockquote',
-      'ul',
-      'ol',
-      'li',
-      'hr',
-      'br',
-      'a',
-      'img',
-      'table',
-      'thead',
-      'tbody',
-      'tfoot',
-      'tr',
-      'th',
-      'td',
-      'input',
-      'sup',
-      'sub',
-      'kbd',
-      'details',
-      'summary',
-      'div',
-      'span',
-      'dl',
-      'dt',
-      'dd',
-    ],
-    ALLOWED_ATTR: [
-      'id',
-      'href',
-      'src',
-      'alt',
-      'title',
-      'class',
-      'start',
-      'type',
-      'checked',
-      'disabled',
-      'colspan',
-      'rowspan',
-      'align',
-      'width',
-      'height',
-      'open',
-    ],
+    // The op buffer encodes exactly these tables; a tag or attribute name
+    // outside them is not expressible there at all (docs/decisions/007).
+    ALLOWED_TAGS: [...ALLOWED_TAGS],
+    ALLOWED_ATTR: [...ALLOWED_ATTR],
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
     FORBID_CONTENTS: [
@@ -165,7 +111,9 @@ export function sanitizeFragment(
     if (
       element.tagName === 'INPUT' ||
       (element.hasAttributes() &&
-        element.matches('[id], [class], [width], [height], [colspan], [rowspan]'))
+        element.matches(
+          '[id], [class], [width], [height], [colspan], [rowspan]',
+        ))
     ) {
       const id = element.getAttribute('id');
       if (id) {
