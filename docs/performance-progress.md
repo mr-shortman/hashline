@@ -1,9 +1,9 @@
 # Performanceoptimierung – Übergabestand
 
-Stand: 8. September 2026, nach dem Release-Build und der Messreihe zu **P2.2**.
-Auftragsgrundlage: [007 – Performancepfad](decisions/007-performance-path.md).
-Der frühere Übergabestand (Parser-/Abschnittsarbeit vor Phase 1) liegt im Commit
-`aec9605`; er wird hier nicht wiederholt.
+Stand: 8. September 2026, nach Abschluss von **Phase 2** und der Messreihe
+`phase2-final`. Auftragsgrundlage: [007 – Performancepfad](decisions/007-performance-path.md),
+[008 – Parserreferenz](decisions/008-parser-reference.md).
+Der Übergabestand nach P2.2 liegt im Commit `b016892`; er wird hier nicht wiederholt.
 
 ## Was umgesetzt ist
 
@@ -18,181 +18,179 @@ Der frühere Übergabestand (Parser-/Abschnittsarbeit vor Phase 1) liegt im Comm
 | P1.7  | Startpfad                                           | –         | **offen, nicht begonnen** |
 | P2.1  | Op-Buffer-Format, Enkoder, Dekoder                  | `7641453` | erledigt                  |
 | P2.2  | Replay statt DOMPurify auf dem heißen Pfad          | `7171211` | erledigt, vermessen       |
-| P2.3  | Parser nach Rust                                    | –         | **offen, nicht begonnen** |
-| P2.4  | Suchindex ohne DOM                                  | –         | **offen, nicht begonnen** |
-| P2.5  | React entfernen                                     | –         | **offen, nicht begonnen** |
+| P2.5  | React entfernt                                      | `a212efc` | erledigt                  |
+| P2.3  | Parser nach Rust                                    | `38fc52f` | erledigt                  |
+| P2.4  | Suche ohne DOM                                      | `2d11fde` | erledigt                  |
 
-Phase 1 wurde auf ausdrückliche Weisung bei P1.4 angehalten. P1.5–P1.7 sind
-**nicht** umgesetzt; 007 führt P1.6 als Voraussetzung für Phase 2 auf, diese
-Reihenfolge wurde auf Weisung übersprungen. Die Speicherfrage aus 007 Abschnitt 1
-ist damit weiterhin unbeantwortet — siehe „Offene Punkte“.
+Phase 2 ist damit abgeschlossen. P1.5–P1.7 sind weiterhin **nicht** umgesetzt;
+007 führt P1.6 als Voraussetzung für Phase 2 auf, diese Reihenfolge wurde auf
+Weisung übersprungen. Die Speicherfrage aus 007 Abschnitt 1 ist unbeantwortet —
+siehe „Offene Punkte".
 
-## P1.4 als Befund, nicht als Gewinn
+## Der Stand der Architektur in einem Absatz
 
-P1.4 legte die sieben Traversierungen pro Abschnitt zu einer zusammen. Wirkung
-auf `hashline.sanitize` bei 10 MiB: 3.292 → 3.224 ms, also im Rauschen. Damit war
-belegt, dass nicht die eigenen Durchläufe teuer waren, sondern DOMPurify selbst:
-ein HTML-Reparse je Abschnitt in ein Fremddokument mit anschließender Adoption.
-Genau das entfernt P2.2.
+Der Parser ist eine eigenständige Rust-Bibliothek (`src-tauri/markdown`,
+`pulldown-cmark`) ohne Tauri- oder Plattformabhängigkeit. Sie liest das Dokument
+einmal und erzeugt den Op-Buffer; ein HTML-String entsteht nur noch für
+Abschnitte mit rohem HTML. Der Desktop bekommt den Puffer über `read_document`,
+der Markdowntext überquert die IPC-Grenze nicht mehr. Dieselbe Bibliothek wird
+nach WebAssembly übersetzt und bedient Browser-Vorschau und Testlauf, damit es
+**eine** Parserimplementierung gibt. Der Renderer erzeugt Knoten direkt aus den
+Operationen. Die Suche liest den Textblob des Puffers. Die Oberfläche ist
+imperativ und ohne Framework. Damit ist der Renderer das austauschbare Modul,
+das 007 Abschnitt 1 als Ziel der Phase nennt.
 
-## Aktueller Implementierungsstand von Phase 2
+## Messreihe `phase2-final`
 
-- `src/core/markdown/opbuffer.ts` — Format aus 007 Abschnitt 4: `ops`, `attrs`,
-  `strings`, `sections`, `headings` als übertragbare typisierte Arrays.
-  **Offsetentscheidung:** `strings` bleibt ein UTF-8-Blob, aber alle Offsets und
-  Längen in TEXT-Ops, Attributen und Überschriften sind **UTF-16-Code-Unit-Offsets**
-  in den einmal pro Dokument dekodierten JS-String. Der Enkoder führt die
-  UTF-16-Länge inkrementell mit; der Replay nutzt `substring` ohne
-  Umrechnungstabelle, und ein Rust-Enkoder (P2.3) kann die Einheiten im ohnehin
-  nötigen Durchlauf mitzählen. Die Begründung steht im Modulkopf.
-- **Abweichung vom Format in 007:** `sections` trägt ein drittes Wort `flags`.
-  Ein nicht kodierbarer Abschnitt muss von einem Abschnitt ohne Operationen
-  unterscheidbar sein; `[opStart, opCount]` kann das nicht ausdrücken.
-- Die Tag-Tabelle ist exakt `ALLOWED_TAGS`, die Attributnamentabelle exakt
-  `ALLOWED_ATTR`; `policy.ts` importiert beide aus dem Formatmodul, damit sie
-  nicht auseinanderlaufen können.
-- Textläufe werden **im Enkoder** verschmolzen, wie der HTML-Parser es tut. Das
-  macht `isEqualNode` als Vertrag benutzbar und spart Knoten zur Laufzeit.
-- `parser.ts` erzeugt den Puffer zusätzlich zu `sections[].html`. Ein Abschnitt
-  gilt als **roh**, sobald einer seiner Tokens ein `html`-Token enthält; solche
-  Abschnitte behalten den DOMPurify-Pfad. Ohne diese Regel wichen fünf
-  CommonMark-Beispiele ab — rohe HTML-Tabellen (implizites `<tbody>`) und ein
-  rohes `<pre>` (verschlucktes erstes `\n`).
-- `markdown.worker.ts` übergibt die fünf Puffer in der Transfer-Liste statt sie
-  zu kopieren.
-- `policy.ts` enthält `replayFragment`. Die Attributpolitik ist inhaltlich
-  unverändert: `classifyUrl` für `href`/`src`, Zahlenprüfung für
-  `width`/`height`/`colspan`/`rowspan`, Sprachklassenregel für `code`,
-  Checkbox-Regel für `input`, und nur parsergenerierte Überschriften-IDs
-  überleben. **Zwei DOMPurify-Verhalten mussten mitwandern**, sonst wäre der
-  Op-Pfad laxer als der HTML-Pfad: die Attributwert-URI-Prüfung
-  (`allowedAttributeValue`, zeichengleich aus DOMPurify übernommen) und die
-  Tatsache, dass DOMPurify jeden behaltenen Attributwert trimmt.
-- `sanitizeFragment` und `sanitizeContent` bleiben unverändert bestehen. Sie sind
-  der Vergleichsmaßstab der Verträge, kein Altpfad.
+Build eingefroren unter `benchmarks/generated/phase2-final/hashline`,
+SHA-256 `57b085e237da869e5e561c94519e5872b8f8ca628abe16ebdb656d6b2e23f1ee`,
+[Quellmanifest](../benchmarks/results/phase2-final-source.json) über 251
+versionierte Dateien. Dieselbe Maschine wie alle Vorreihen (Ubuntu 26.04,
+Ryzen 9 9900X, RTX 3060, Wayland, WebKitGTK 2.52.6). Während der Reihe liefen
+keine Builds, UI- oder Desktoptests.
 
-## Messreihe P2.2
+Rohdaten: [open](../benchmarks/results/phase2-final-open.json),
+[startup](../benchmarks/results/phase2-final-startup.json),
+[interaction 10 MiB](../benchmarks/results/phase2-final-interaction.json),
+[interaction 1 MiB](../benchmarks/results/phase2-final-interaction-medium.json),
+[Abschnittsverträge](../benchmarks/results/phase2-final-contracts.json).
 
-Build eingefroren unter `benchmarks/generated/phase2-p22/hashline`,
-SHA-256 `7b17a4550a28584336e6e79ddb7e3a2c018b11bc77e37e183b972b11cee292c0`,
-[Quellmanifest](../benchmarks/results/phase2-p22-source.json) über 152 Quelldateien.
-Rohdaten: [phase2-p22-open.json](../benchmarks/results/phase2-p22-open.json),
-Vergleich gegen [phase1-p14-open.json](../benchmarks/results/phase1-p14-open.json).
-Beides `--mode open --repetitions 30 --distinct-content`, dieselbe Maschine
-(Ubuntu 26.04, Ryzen 9 9900X, RTX 3060, Wayland, WebKitGTK 2.52.6). Während der
-Reihe liefen keine Builds, UI- oder Desktoptests.
+### Öffnen, je 30 Wiederholungen mit `--distinct-content`
 
-Mediane in Millisekunden, in Klammern p95:
+Mediane in Millisekunden, in Klammern p95. „P1.4" ist der Stand vor Phase 2,
+„P2.2" der Stand nach dem Op-Buffer-Replay.
 
-| Fixture | Metrik                      |            P1.4 |            P2.2 |  Änderung |
-| ------- | --------------------------- | --------------: | --------------: | --------: |
-| 10 MiB  | `hashline.sanitize`         | 3.224,5 (3.292) |   559,0 (621,0) | **−83 %** |
-| 10 MiB  | `hashline.insert`           |   240,5 (263,0) |   139,0 (157,0) |     −42 % |
-| 10 MiB  | `hashline.parse`            |   878,0 (907,0) | 1.061,5 (1.162) |     +21 % |
-| 10 MiB  | `hashline.open-to-complete` | 11.350 (12.144) | 4.920,5 (5.511) | **−57 %** |
-| 10 MiB  | `hashline.max-render-task`  |     67,0 (87,0) |     19,0 (20,0) |     −72 % |
-| 10 MiB  | Öffnung inkl. Treiber       | 1.852,5 (1.907) | 1.906,2 (2.071) |      +3 % |
-| 1 MiB   | `hashline.sanitize`         |   308,0 (335,0) |     45,5 (61,0) | **−85 %** |
-| 1 MiB   | `hashline.insert`           |     23,0 (35,0) |     14,0 (17,0) |     −39 % |
-| 1 MiB   | `hashline.parse`            |     85,0 (88,0) |   107,0 (111,0) |     +26 % |
-| 1 MiB   | `hashline.open-to-complete` |   741,0 (785,0) |   432,0 (469,0) | **−42 %** |
-| 1 MiB   | Öffnung inkl. Treiber       |   270,0 (296,0) |   314,4 (379,7) |     +16 % |
-| 100 KiB | `hashline.sanitize`         |     27,0 (31,0) |       4,5 (6,0) | **−83 %** |
-| 100 KiB | `hashline.insert`           |       3,0 (6,0) |       1,5 (2,0) |     −50 % |
-| 100 KiB | `hashline.open-to-complete` |     72,5 (78,0) |     46,5 (51,0) |     −36 % |
-| 100 KiB | Öffnung inkl. Treiber       |   115,7 (124,2) |     91,5 (96,8) |     −21 % |
+| Fixture | Metrik                      |            P1.4 |            P2.2 |    phase2-final | zu P1.4   |
+| ------- | --------------------------- | --------------: | --------------: | --------------: | --------- |
+| 10 MiB  | `hashline.parse`            |     878,0 (907) | 1.061,5 (1.162) |     132,9 (145) | **−85 %** |
+| 10 MiB  | `hashline.sanitize`         | 3.224,5 (3.292) |     559,0 (621) |     416,0 (434) | **−87 %** |
+| 10 MiB  | `hashline.insert`           |     240,5 (263) |     139,0 (157) |     137,0 (155) | −43 %     |
+| 10 MiB  | `hashline.open-to-complete` | 11.350 (12.144) | 4.920,5 (5.511) | 3.495,5 (3.756) | **−69 %** |
+| 10 MiB  | `hashline.max-render-task`  |       67,0 (87) |       19,0 (20) |       19,0 (20) | −72 %     |
+| 10 MiB  | Öffnung inkl. Treiber       | 1.852,5 (1.907) | 1.906,2 (2.071) |   897,7 (1.038) | **−52 %** |
+| 1 MiB   | `hashline.parse`            |       85,0 (88) |     107,0 (111) |       12,0 (14) | **−86 %** |
+| 1 MiB   | `hashline.sanitize`         |     308,0 (335) |       45,5 (61) |       34,0 (44) | **−89 %** |
+| 1 MiB   | `hashline.insert`           |       23,0 (35) |       14,0 (17) |       11,0 (15) | −52 %     |
+| 1 MiB   | `hashline.open-to-complete` |     741,0 (785) |     432,0 (469) |     303,5 (324) | **−59 %** |
+| 1 MiB   | Öffnung inkl. Treiber       |     270,0 (296) |     314,4 (380) |     214,5 (239) | −21 %     |
+| 100 KiB | `hashline.parse`            |        9,0 (12) |       10,0 (12) |       1,1 (1,2) | −88 %     |
+| 100 KiB | `hashline.sanitize`         |       27,0 (31) |         4,5 (6) |         4,0 (5) | −85 %     |
+| 100 KiB | `hashline.open-to-complete` |       72,5 (78) |       46,5 (51) |       34,0 (46) | −53 %     |
+| 100 KiB | Öffnung inkl. Treiber       |     115,7 (124) |       91,5 (97) |       81,6 (92) | −29 %     |
 
-### Ehrliche Bewertung
+**Der Zielkonflikt aus P2.2 ist aufgelöst.** Dort stieg die vom Treiber
+beobachtete Öffnung bei 10 MiB auf p95 2.071 ms und verfehlte damit das
+2-s-Budget, weil der Worker erst antwortete, wenn das gesamte Dokument kodiert
+war. Der native Parser liefert den Puffer in 133 ms; der erste Textframe liegt
+jetzt bei 728 ms (Median) gegenüber 1.677,5 ms nach P2.2. Alle drei Budgets aus
+SPEC Abschnitt 9 sind eingehalten: p95 92 ms (≤ 150), 239 ms (≤ 500), 1.038 ms
+(≤ 2.000).
 
-**Das Zielmaß ist erreicht.** `hashline.sanitize` fällt auf allen drei Fixtures
-um 83–85 %. Der vollständige Aufbau bei 10 MiB sinkt von 11,35 s auf 4,92 s.
-`hashline.max-render-task` fällt bei 10 MiB von 67 auf 19 ms und hält damit
-erstmals das 50-ms-Budget aus SPEC Abschnitt 9 für Renderaufgaben.
+### Start, `--mode startup`, n=30
 
-**Zwei Verschlechterungen gehören dazu und werden nicht kaschiert:**
+| Metrik                                | Basis (`final-startup`) |    phase2-final |
+| ------------------------------------- | ----------------------: | --------------: |
+| `hashline.native-main-to-frontend`    |      731,6 ms (p95 776) |   712,6 (742,6) |
+| `hashline.native-main-to-first-frame` |  1.219,1 ms (p95 1.270) | 1.145,7 (1.171) |
+| Treiber bis beobachteter erster Frame |  1.256,1 ms (p95 1.309) | 1.181,9 (1.206) |
 
-1. `hashline.parse` steigt um 183 ms (10 MiB) beziehungsweise 22 ms (1 MiB). Der
-   Enkoder läuft im Worker innerhalb des Parse-Timers. Die Kosten liegen im
-   linearen HTML-Scan, im `slice()` der gewachsenen Wortarrays, im `join()` der
-   Stringstücke und in `TextEncoder.encode`. Das ist **keine** Parserregression,
-   sondern neue Arbeit an anderer Stelle, und sie ist um Faktor 17 kleiner als
-   das, was sie auf dem Hauptthread einspart.
-2. Die vom Treiber beobachtete Öffnung wird bei 1 und 10 MiB langsamer:
-   Median +44 ms (1 MiB) und +54 ms (10 MiB), p95 +84 beziehungsweise +164 ms.
-   Über die fünf Phase-1-Reihen lagen diese Mediane bei 264–274 (1 MiB) und
-   1.851–1.883 ms (10 MiB); die Verschiebung liegt außerhalb dieser Streuung und
-   ist damit real, nicht Rauschen. Ursache: der Worker antwortet erst, wenn das
-   **gesamte** Dokument kodiert ist, während der erste Frame nur den ersten
-   Abschnitt braucht.
-   **Folge für das Budget:** „Große Datei lesbar innerhalb 2 s“ wurde mit P1.4
-   knapp gehalten (p95 1.907 ms) und wird jetzt knapp verfehlt (p95 2.071 ms).
-   Bei 100 KiB und 1 MiB bleiben die Budgets (≤ 150 / ≤ 500 ms) eingehalten.
+**Ehrlich bewertet: hier ist fast nichts passiert.** Der Wegfall von React —
+191 KB weniger Bundle, ein Chunk weniger — bringt am Start **19 ms**, also
+2,6 %. Der erste Textframe sinkt um 73 ms (6 %), und der größere Teil davon
+stammt aus dem schnelleren Parser, nicht aus dem Bundle. Die 731 ms bis zum
+bereiten Frontend sind damit weiterhin fast vollständig WebView-Boot und nicht
+Anwendungscode. Die Erwartung aus 007 P2.5 („entsprechend weniger Parse-,
+Compile- und Initialisierungszeit im Start") hat sich **nicht** bestätigt; das
+ist ein Befund, kein Fehlschlag der Umsetzung, und macht P1.7 (Startpfad) zum
+nächsten sinnvollen Paket.
 
-Der Op-Buffer hat also den erwarteten Effekt gehabt und zusätzlich einen
-Zielkonflikt sichtbar gemacht: schnellerer Gesamtaufbau gegen etwas späteren
-ersten Frame bei großen Dateien. Die Auflösung — Kodierung abschnittsweise
-streamen oder in Rust erledigen — gehört nach P2.3 und wurde hier bewusst nicht
-vorweggenommen.
+### Interaktion, n=30
 
-**Speicher:** Der Puffer für 10 MiB umfasst rund 46,7 MB (ops 35,2 MB, strings
-10,5 MB, attrs) und wird über die Lebensdauer des Dokuments gehalten, zusätzlich
-zu den weiterhin gehaltenen `sections[].html`. Das ist ein Zuwachs gegenüber
-P1.4 und wurde in dieser Reihe **nicht** gemessen. Die 4-Wort-Ops aus 007 sind
-dafür die Hauptursache (CLOSE nutzt eines von vier Wörtern). P1.6 ist damit
-dringlicher geworden, nicht weniger dringlich.
+| Fixture | Metrik                  |             P1.3 | phase2-final |
+| ------- | ----------------------- | ---------------: | -----------: |
+| 1 MiB   | `hashline.search`       | 32,0 ms (p95 33) |  32,0 (32,0) |
+| 1 MiB   | Ergebnis bis Hilfsframe | 54,5 ms (p95 70) |    48,0 (60) |
+| 10 MiB  | `hashline.search`       |   keine Vorreihe |    48,0 (51) |
+| 10 MiB  | Ergebnis bis Hilfsframe |   keine Vorreihe |    78,0 (84) |
+
+Die Abnahme aus 007 P2.4 — „Volltextsuche auf 10 MiB unter 150 ms ab letzter
+Eingabe" — ist mit 48 ms Median und 51 ms p95 erfüllt. In beiden Werten stecken
+30 ms Eingabeentprellung; die eigentliche Arbeit sind rund 2 ms bei 1 MiB und
+rund 18 ms bei 10 MiB.
+
+**Die eigentliche Änderung steht nicht in dieser Tabelle.** Bei 1 MiB ist die
+Suchzeit identisch geblieben. Was sich geändert hat, ist der Zeitpunkt: die
+Suche wartete bisher auf `renderState === 'complete'`, also bei 10 MiB auf
+11,35 s (P1.4) beziehungsweise 4,92 s (P2.2). Jetzt ist das vollständige
+Ergebnis verfügbar, während der Aufbau noch läuft. Der siebte native
+Abschnittsvertrag prüft genau das und schlägt fehl, wenn die Kopplung
+zurückkehrt.
+
+### Bundle
+
+| Stand                | Eintrittschunk | Worker-Chunk |
+| -------------------- | -------------: | -----------: |
+| vor P2.5             |      279.392 B |     51.406 B |
+| nach P2.5            |       88.080 B |     51.406 B |
+| nach P2.3            |       88.780 B |            – |
+| nach P2.4 (Endstand) |   **90.602 B** |            – |
+
+Dazu `hashline-markdown.wasm` mit 450.450 B. Diese Datei wird **nur** von der
+Browser-Vorschau über einen dynamischen Import geladen; der Desktop fordert sie
+nie an, weil er seinen Puffer über IPC bekommt.
 
 ## Tests
 
 - `npm run lint`, `npm run typecheck`, `npm run build`: bestanden.
-- **2.036 Unit-Tests bestanden** (vorher 1.369). Neu: 11 Rundlauftests des
-  Formats inklusive Zeichen jenseits der BMP, leeres Dokument, verschachtelte
-  Listen, Tabellen, Codeblöcke; der Replay-Vergleich über alle
-  652 CommonMark-Beispiele (`isEqualNode` gegen den bereinigten HTML-Pfad,
-  Abschnitt für Abschnitt); eine Schranke für die Fallback-Rate; ein
-  Politiktest des Replays parallel zu `tests/policy-fragment.test.ts`.
-- **18 Playwright-Tests bestanden**, einschließlich des echten Workers mit
-  Transfer-Liste.
-- **Sechs native Abschnittsverträge bestanden** mit genau diesem Build:
-  [phase2-p22-contracts.json](../benchmarks/results/phase2-p22-contracts.json).
-- `npm run check` bricht vor den Tests ab, weil `prettier --check` 22 bereits
-  vor Phase 1 unformatierte Dateien meldet (Benchmark-Rohdaten und
-  `benchmarks/REPORT.md`). Diese Rohdaten dürfen nicht umgeschrieben werden;
-  die vier Einzelschritte wurden deshalb getrennt ausgeführt. `policy.ts` war
-  ebenfalls betroffen und ist jetzt formatiert.
+- **713 Unit-Tests**, darunter alle 652 CommonMark-Beispiele — jetzt gegen die
+  **Spezifikation** statt gegen marked, mit `isEqualNode` statt Stringvergleich
+  (siehe [008](decisions/008-parser-reference.md)). Die Zahl ist niedriger als
+  die 2.036 nach P2.2, weil dieselben 652 Beispiele dort in drei `it.each`-Blöcken
+  dreifach gezählt wurden; abgedeckt ist mehr, nicht weniger.
+- **19 Playwright-Tests** bestanden.
+- **Sieben native Abschnittsverträge** mit dem eingefrorenen Build bestanden,
+  einer davon neu: „Full search result before the document is built".
+- `npm run check` bricht weiterhin vor den Tests ab, weil `prettier --check`
+  Benchmark-Rohdaten und `benchmarks/REPORT.md` als unformatiert meldet. Diese
+  Rohdaten dürfen nicht umgeschrieben werden; die vier Einzelschritte wurden
+  deshalb getrennt ausgeführt.
 
-### Fallback-Rate des Enkoders
+## Was bewusst nicht so umgesetzt wurde wie beschrieben
 
-| Korpus                           | Abschnitte | über Op-Buffer | Fallback |
-| -------------------------------- | ---------: | -------------: | -------: |
-| 652 CommonMark-Beispiele         |        651 |            573 |       78 |
-| `benchmarks/generated/small.md`  |         10 |             10 |        0 |
-| `benchmarks/generated/medium.md` |        100 |            100 |        0 |
-| `benchmarks/generated/large.md`  |        995 |            995 |        0 |
-| `tests/fixtures/reader.md`       |          1 |              0 |        1 |
-
-Die 78 Fallbacks sind rohes HTML und Zeichenreferenzen außerhalb der
-unterstützten Menge (`&ouml;`, `&MadeUpEntity;`, `&#0;`). Beides ist gewollt:
-eine unvollständige Entitätentabelle würde stillschweigend anderen Text
-erzeugen als der HTML-Parser. `reader.md` besteht aus einem einzigen Abschnitt
-mit `<details>`/`<summary>` und fällt deshalb vollständig zurück.
+- **`indexText` ist nicht verschwunden.** 007 P2.4 erwartet das. Abschnitte mit
+  rohem HTML haben keine Operationen, auf die sich ein Textoffset abbilden
+  ließe; für sie bleibt ein DOM-Durchlauf die einzige Möglichkeit, einen Treffer
+  zu einem Knoten zu machen. Dasselbe gilt für Abschnitte, deren Textknoten das
+  Syntax-Highlighting ersetzt hat. Beide Fälle sind selten (0 von 995
+  Abschnitten in `large.md`), und die WeakMap ist auf sie beschränkt.
+- **Die Testreferenz wurde gewechselt, nicht nur die Vergleichsform.** Das ist
+  Gegenstand von 008 und war vor dem Code zu entscheiden.
+- **Der Parser läuft zusätzlich als WebAssembly.** 007 sieht nur den nativen Weg
+  vor. Ohne das zweite Ziel hätten Browser-Vorschau und Playwright-Suite keinen
+  Parser mehr gehabt, und der Spezifikationsvergleich hätte einen zweiten
+  HTML-Baum (html5ever) als Schiedsrichter gebraucht. Begründung in 008
+  Abschnitt 3.
+- **`src/generated/hashline-markdown.wasm` ist eingecheckt.** Sonst brauchte
+  `npm test` und `npm run build` eine Rust-Toolchain. Neu gebaut wird sie mit
+  `npm run wasm`, nötig nur nach Änderungen an `src-tauri/markdown`.
 
 ## Offene Punkte
 
-1. **P1.6 (Speicherdiagnose) ist unbeantwortet** und durch den Op-Buffer
-   wichtiger geworden. Die +70 bis +100 MiB über dem Plattformboden aus 007
-   Abschnitt 1 sind weiterhin nicht aufgeschlüsselt; die rund 46,7 MB
-   Pufferspeicher bei 10 MiB kommen ungemessen hinzu.
-2. **Erster Frame bei 10 MiB.** p95 der vom Treiber beobachteten Öffnung liegt
-   mit 2.071 ms über dem 2-s-Budget. Vor weiteren Paketen entscheiden, ob das
-   akzeptiert wird oder ob die Kodierung abschnittsweise geliefert werden muss.
-3. **P2.3 zuerst vermessen, nicht umbauen.** 007 verlangt einen
-   20-Zeilen-Benchmark von `pulldown-cmark` gegen `benchmarks/generated/*.md`,
-   bevor Code entsteht. Fällt er schlechter aus als erwartet, bleibt P2.2 der
-   Endstand. Die Umstellung der Testreferenz von „marked“ auf
-   „CommonMark-Spezifikation“ gehört vorher in eine eigene Entscheidung 008.
-4. `benchmarks/REPORT.md` und Entscheidung 004 sind **nicht** auf diese Reihe
-   fortgeschrieben worden; sie beziehen sich weiterhin auf ältere Builds.
-5. Die lokalen Doppel-rAF-Hilfsframes bleiben kein Nachweis präsentierter Pixel
+1. **P1.6 (Speicherdiagnose) ist unbeantwortet.** Die +70 bis +100 MiB über dem
+   Plattformboden aus 007 Abschnitt 1 sind weiterhin nicht aufgeschlüsselt. Der
+   Op-Buffer hält jetzt zwei Blobs statt eines HTML-Strings je Abschnitt; ob das
+   netto mehr oder weniger ist als der Zustand vor Phase 2, wurde **nicht**
+   gemessen. Das ist die größte offene Zahl.
+2. **P1.7 (Startpfad) ist nach dieser Reihe das nächste Paket.** Der Start ist
+   der einzige Wert, den Phase 2 praktisch nicht bewegt hat.
+3. **`benchmarks/REPORT.md` und Entscheidung 004 sind nicht fortgeschrieben.**
+   Sie beziehen sich weiterhin auf ältere Builds.
+4. **`SPEC.md` beschreibt in Abschnitt 6/7 weiterhin marked und einen Worker.**
+   Die Budgets sind unverändert und wurden nicht angefasst; die
+   Architekturbeschreibung ist überholt und braucht eine eigene Entscheidung.
+5. **Fußnotennummern in Fallback-Abschnitten** beginnen je Abschnitt neu; siehe
+   008 Abschnitt 7. Betrifft nur Dokumente mit rohem HTML _und_ Fußnoten.
+6. Die lokalen Doppel-rAF-Hilfsframes bleiben kein Nachweis präsentierter Pixel
    und keine Referenzabnahme. Die Maschine hat eine diskrete GPU und ist nicht
    die SPEC-Referenz.
 
@@ -201,10 +199,11 @@ mit `<details>`/`<summary>` und fällt deshalb vollständig zurück.
 - Builds und native Tests **immer** über `resolveDesktopEnvironment` aus
   `scripts/desktop-env.mjs`; Rust-Toolchain (`/tmp/hashline-cargo`) und
   WebKit-Sysroot (`/tmp/hashline-sysroot`) liegen unter `/tmp` und überleben
-  einen Neustart nicht.
+  einen Neustart nicht. Für die WebAssembly-Ausgabe wird zusätzlich das Target
+  `wasm32-unknown-unknown` gebraucht (`rustup target add`).
 - Release-Build dieser Reihe: `npx tauri build --no-bundle` mit dieser Umgebung.
 - Native Tests liefen über einen eigenen Session-Bus, eigene XDG-Verzeichnisse
-  unter `/tmp/hashline-p22/` und die Ports 4565 (tauri-driver) / 4566
+  unter `/tmp/hashline-p23/` und die Ports 4565 (tauri-driver) / 4566
   (`WebKitWebDriver` aus dem Sysroot), mit
   `HASHLINE_WEBDRIVER_URL=http://127.0.0.1:4565`. Treiber und Bus wurden nach
   der Reihe beendet; fremde App- oder Treiberprozesse wurden nicht angefasst.
@@ -212,6 +211,7 @@ mit `<details>`/`<summary>` und fällt deshalb vollständig zurück.
   Identität steht ausschließlich in den `*-source.json`-Manifesten.
 
 Weiterführend: [007 – Performancepfad](decisions/007-performance-path.md),
+[008 – Parserreferenz](decisions/008-parser-reference.md),
 [Benchmarkbericht](../benchmarks/REPORT.md),
 [Rendererentscheidung](decisions/004-rendering-gate.md),
 [Architektur](architecture.md).
