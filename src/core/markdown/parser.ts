@@ -2,6 +2,7 @@ import { Marked, Parser } from 'marked';
 import type { Heading, MarkdownSection, ParsedMarkdown } from './types';
 import { BoundedTokenizer } from './tokenizer';
 import { isClosedHtml } from './html-boundary';
+import { encodeDocument } from './opbuffer';
 
 export function slugBase(text: string): string {
   return (
@@ -64,28 +65,50 @@ export function parseMarkdown(
     // Lex the entire source first: reference definitions are document-wide.
     const tokens = parser.lexer(source);
     const sections: MarkdownSection[] = [];
+    const raws: boolean[] = [];
     let html = '';
     let headingStart = 0;
+    let sectionRaw = false;
     const flush = () => {
       if (!html) return;
       sections.push({ html, headings: headings.slice(headingStart) });
+      raws.push(sectionRaw);
       html = '';
+      sectionRaw = false;
       headingStart = headings.length;
     };
     // Raw HTML can span Markdown tokens. Keep that document in one semantic
     // fragment rather than changing the HTML tree at an artificial boundary.
     let rawHtml = false;
+    // Sections carrying raw HTML also keep the DOMPurify path: only the HTML
+    // parser knows where such markup implies end tags, inserts <tbody> or
+    // foster-parents content. The op encoder must not guess (007, P2.1).
+    const rawTokens = new Set<number>();
     if (source.includes('<'))
-      parser.walkTokens(tokens, (token) => {
-        if (token.type === 'html' && !isClosedHtml(token.text)) rawHtml = true;
-      });
+      tokens.forEach((token, index) =>
+        parser.walkTokens([token], (inner) => {
+          if (inner.type !== 'html') return;
+          rawTokens.add(index);
+          if (!isClosedHtml(inner.text)) rawHtml = true;
+        }),
+      );
     const renderer = new Parser(parser.defaults);
-    for (const token of tokens) {
+    tokens.forEach((token, index) => {
+      if (rawTokens.has(index)) sectionRaw = true;
       html += renderer.parse([token]);
       if (!rawHtml && html.length >= 16_384) flush();
-    }
+    });
     flush();
-    return { html: '', sections, headings, parseMs: performance.now() - start };
+    return {
+      html: '',
+      sections,
+      ops: encodeDocument(
+        sections.map((section, index) => ({ ...section, raw: raws[index] })),
+        headings,
+      ),
+      headings,
+      parseMs: performance.now() - start,
+    };
   }
   return {
     html: parser.parse(source) as string,

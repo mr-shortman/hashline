@@ -1,10 +1,14 @@
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
 import type { MarkdownService } from '../../core/markdown/service';
+import type { OpBuffer } from '../../core/markdown/opbuffer';
 import type { Heading, MarkdownSection } from '../../core/markdown/types';
 
 export interface RenderDocument {
   readonly file: FileDocument;
   readonly sections: readonly MarkdownSection[];
+  // Replay operations for the same sections; the viewport falls back to the
+  // sanitized HTML path per section where they are missing.
+  readonly ops?: OpBuffer;
   readonly openedAt: number;
   readonly headings: readonly Heading[];
   readonly revision: number;
@@ -110,6 +114,7 @@ export class DocumentController {
         sections: parsed.sections || [
           { html: parsed.html, headings: parsed.headings },
         ],
+        ops: parsed.ops,
         openedAt: start,
         headings: parsed.headings,
         revision: request,

@@ -12,7 +12,12 @@ import {
   type TextIndex,
 } from '../search';
 import { highlightCode } from './highlight';
-import { sanitizeFragment, unavailableImage } from '../../core/content/policy';
+import {
+  replayFragment,
+  sanitizeFragment,
+  unavailableImage,
+} from '../../core/content/policy';
+import { decodeStrings, sectionEncoded } from '../../core/markdown/opbuffer';
 import { nextTask, retireContent } from './schedule';
 
 export interface ViewportActions {
@@ -207,17 +212,32 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         selection?.removeAllRanges();
         selection?.addRange(range);
       };
+      // The string blob is decoded once per document, on first use, so its cost
+      // lands in the same window the HTML parse it replaces used to occupy.
+      let opsText: string | undefined;
       const insert = (i: number) => {
         if (rendered.has(i) || cancelled) return;
         const start = performance.now();
         const section = doc.sections[i];
+        // Replay creates the nodes directly in this document: no HTML parse,
+        // no foreign document, no adoption, no sanitizing walk. Sections the
+        // encoder refused keep the DOMPurify path (docs/decisions/007, P2.2).
         const {
           fragment,
           remoteImages: count,
           hasImages,
           tables,
           pres,
-        } = sanitizeFragment({ ...section, parseMs: 0 }, doc.file, gateway);
+        } = doc.ops && sectionEncoded(doc.ops, i)
+          ? replayFragment(
+              doc.ops,
+              (opsText ??= decodeStrings(doc.ops)),
+              i,
+              section.headings,
+              doc.file,
+              gateway,
+            )
+          : sanitizeFragment({ ...section, parseMs: 0 }, doc.file, gateway);
         if (count) {
           setRemoteState((state) => ({ ...state, count: state.count + count }));
           if (

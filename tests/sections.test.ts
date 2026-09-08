@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { parseMarkdown } from '../src/core/markdown/parser';
-import { sanitizeContent, sanitizeFragment } from '../src/core/content/policy';
+import {
+  replayFragment,
+  sanitizeContent,
+  sanitizeFragment,
+} from '../src/core/content/policy';
+import {
+  decodeStrings,
+  sectionCount,
+  sectionEncoded,
+} from '../src/core/markdown/opbuffer';
+import type { ParsedMarkdown } from '../src/core/markdown/types';
 import type { DocumentGateway, FileDocument } from '../src/platform/gateway';
 
 const examples = JSON.parse(
@@ -40,6 +50,96 @@ it('does not share reference definitions between document parses', () => {
     ).toBe(parseMarkdown(source).html);
   }
 });
+// Both section paths, section by section: the op buffer replay against the
+// sanitized HTML it replaces. Sections the encoder refused use the HTML path on
+// both sides, which is exactly what the renderer does for them.
+function compareSectionPaths(parsed: ParsedMarkdown): {
+  encoded: number;
+  fallback: number;
+} {
+  const sections = parsed.sections!;
+  const buffer = parsed.ops!;
+  const text = decodeStrings(buffer);
+  let encoded = 0;
+  let fallback = 0;
+  expect(sectionCount(buffer)).toBe(sections.length);
+  sections.forEach((section, i) => {
+    const expected = document.createElement('div');
+    expected.append(
+      sanitizeFragment({ ...section, parseMs: 0 }, file, gateway).fragment,
+    );
+    expected.normalize();
+    const actual = document.createElement('div');
+    if (sectionEncoded(buffer, i)) {
+      encoded++;
+      actual.append(
+        replayFragment(buffer, text, i, section.headings, file, gateway)
+          .fragment,
+      );
+    } else {
+      fallback++;
+      actual.append(
+        sanitizeFragment({ ...section, parseMs: 0 }, file, gateway).fragment,
+      );
+    }
+    actual.normalize();
+    expect(actual.isEqualNode(expected)).toBe(true);
+  });
+  return { encoded, fallback };
+}
+
+it.each(examples)(
+  'op buffer replay matches the sanitized section path for CommonMark $example',
+  ({ markdown }) => {
+    compareSectionPaths(parseMarkdown(markdown, true));
+  },
+);
+
+it('replays the great majority of CommonMark sections from the op buffer', () => {
+  // Guards the fallback rate: raw HTML and character references outside the
+  // supported set stay on the DOMPurify path by design, everything else must
+  // not silently drift back onto it.
+  let encoded = 0;
+  let fallback = 0;
+  for (const { markdown } of examples) {
+    const counts = compareSectionPaths(parseMarkdown(markdown, true));
+    encoded += counts.encoded;
+    fallback += counts.fallback;
+  }
+  expect(fallback).toBeLessThan(encoded / 6);
+  expect(encoded).toBeGreaterThan(550);
+});
+
+it('replays a multi-section Markdown document without falling back', () => {
+  const parsed = parseMarkdown(
+    (
+      '## Abschnitt **eins**\n\n' +
+      'Ein Absatz mit [Link](other.md), `code`, *kursiv* und ![Bild](a.png).\n\n' +
+      '- Punkt eins\n  - verschachtelt\n- [x] erledigt\n- [ ] offen\n\n' +
+      '> Zitat mit &amp; und <https://example.com/>\n\n' +
+      '| A | B |\n| :-- | --: |\n| 1 | 2 |\n\n' +
+      '```js\nconst a = 1 < 2 && "x";\n```\n\n' +
+      '1. eins\n2. zwei\n\n---\n\n'
+    ).repeat(40),
+    true,
+  );
+  const { encoded, fallback } = compareSectionPaths(parsed);
+  expect(parsed.sections!.length).toBeGreaterThan(1);
+  expect(encoded).toBe(parsed.sections!.length);
+  expect(fallback).toBe(0);
+});
+
+it('keeps raw HTML sections on the sanitized HTML path', () => {
+  // The reader fixture carries <details>/<summary> and a literal angle bracket.
+  const parsed = parseMarkdown(
+    readFileSync('tests/fixtures/reader.md', 'utf8'),
+    true,
+  );
+  const { encoded, fallback } = compareSectionPaths(parsed);
+  expect(encoded).toBe(0);
+  expect(fallback).toBe(parsed.sections!.length);
+});
+
 it.each(examples)(
   'section rendering preserves CommonMark $example',
   ({ markdown }) => {
