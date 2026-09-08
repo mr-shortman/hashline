@@ -6,5 +6,6 @@
 
 pub mod app;
 pub mod layout;
+pub mod outline;
 pub mod theme;
 pub mod view;

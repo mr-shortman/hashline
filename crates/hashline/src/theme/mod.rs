@@ -151,6 +151,37 @@ pub mod document {
     pub const INLINE_CODE_EM: f64 = 0.85;
     pub const TABLE_EM: f64 = 0.92;
 
+    // The block decoration, transcribed from `docs/design/styles.css`. Values
+    // in em are relative to the size the block itself is set at, matching how
+    // CSS resolves them.
+    /// `ul, ol { padding-left: 1.6em }`
+    pub const LIST_INDENT_EM: f64 = 1.6;
+    /// `input[type=checkbox] { margin-right: 0.45em }`
+    pub const MARKER_GAP_EM: f64 = 0.45;
+    /// `blockquote { border-left: 3px; padding: 0.15em 1.2em }`
+    pub const QUOTE_BAR_PX: f64 = 3.0;
+    pub const QUOTE_PAD_X_EM: f64 = 1.2;
+    pub const QUOTE_PAD_Y_EM: f64 = 0.15;
+    /// `hr { border-top: 1px }`
+    pub const RULE_PX: f64 = 1.0;
+    /// `pre { padding: 42px 18px 18px; line-height: 1.55; margin: 1.3em 0 }`
+    /// The generous top padding is where the copy-code control sits.
+    pub const CODE_PAD_TOP: f64 = 42.0;
+    pub const CODE_PAD_X: f64 = 18.0;
+    pub const CODE_PAD_BOTTOM: f64 = 18.0;
+    pub const CODE_LINE_HEIGHT: f64 = 1.55;
+    pub const CODE_SPACING_EM: f64 = 1.3;
+    /// `:not(pre) > code { border-radius: 4px; padding: 0.15em 0.35em }`
+    pub const INLINE_CODE_RADIUS: f32 = 4.0;
+    /// `th, td { padding: 0.6em 0.9em; border: 1px }`
+    pub const CELL_PAD_X_EM: f64 = 0.9;
+    pub const CELL_PAD_Y_EM: f64 = 0.6;
+    pub const CELL_BORDER_PX: f64 = 1.0;
+    /// `.table-scroll { margin: 1.2em 0 }`
+    pub const TABLE_SPACING_EM: f64 = 1.2;
+    /// `a { text-underline-offset: 3px }`
+    pub const LINK_UNDERLINE_OFFSET_PX: f64 = 3.0;
+
     /// Zoom is 80..=200 % in steps of ten (SPEC.md, section 3, "Bedienung").
     pub const ZOOM_MIN: i32 = 80;
     pub const ZOOM_MAX: i32 = 200;

@@ -14,7 +14,7 @@
 //! fixture its own run when the number matters — an allocator does not return
 //! everything between them.
 
-use hashline::layout::{set_block, BlockPlan, Metrics, Style};
+use hashline::layout::{set_block, BlockPlan, Metrics, NoImages, Style};
 use hashline::theme::{document as tokens, LIGHT};
 use pango::prelude::*;
 
@@ -78,7 +78,7 @@ fn main() {
                 break;
             }
             let block = *plan.block(index);
-            let laid = set_block(&context, &document, &block, &style, column);
+            let laid = set_block(&context, &document, &block, &style, column, &NoImages);
             let height = laid.height();
             plan.set_measured(index, height);
             y += height;

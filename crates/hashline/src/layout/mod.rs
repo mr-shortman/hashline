@@ -12,9 +12,11 @@
 
 mod offsets;
 mod text;
+mod textmap;
 
 pub use offsets::Offsets;
-pub use text::{set_block, BlockLayout, Style};
+pub use text::{set_block, BlockLayout, Decoration, ImageSource, Link, NoImages, Piece, Style};
+pub use textmap::TextMap;
 
 use hashline_markdown::{OpDocument, BLOCK_WORDS};
 

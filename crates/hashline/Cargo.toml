@@ -16,6 +16,7 @@ hashline-markdown = { path = "../markdown" }
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 pango = "0.22"
 pangocairo = "0.22"
+async-channel = "2"
 
 [dev-dependencies]
 cairo-rs = { version = "0.22", features = ["png"] }

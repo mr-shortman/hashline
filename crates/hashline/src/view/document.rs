@@ -15,8 +15,10 @@ use gtk::subclass::prelude::*;
 
 use hashline_markdown::OpDocument;
 
-use crate::layout::{set_block, BlockLayout, BlockPlan, Metrics, Style};
+use crate::layout::{set_block, BlockLayout, BlockPlan, Decoration, Metrics, Style};
+use crate::outline::Outline;
 use crate::theme::{document as tokens, Palette, LIGHT};
+use crate::view::images::ImageCache;
 use crate::view::{Position, Selection};
 
 /// Everything the view owns. The layout cache lives here and nowhere else
@@ -32,10 +34,18 @@ pub(crate) struct State {
     palette: Palette,
     zoom: i32,
     selection: Option<Selection>,
+    outline: Outline,
+    images: Rc<ImageCache>,
+    /// Called when a link is clicked. The view resolves nothing itself: what a
+    /// relative path or a fragment means is the document controller's business.
+    on_link: Option<LinkHandler>,
     /// Set while the widget itself is moving the adjustment, so that the
     /// resulting notification is not mistaken for the user scrolling.
     adjusting: bool,
 }
+
+/// The handler a clicked link is passed to.
+type LinkHandler = Rc<dyn Fn(&str)>;
 
 /// How many set blocks to keep. A block that is evicted keeps its measured
 /// height in the plan, so eviction costs re-setting, never a jump.
@@ -57,6 +67,9 @@ impl State {
             palette: LIGHT,
             zoom: 100,
             selection: None,
+            outline: Outline::default(),
+            images: Rc::new(ImageCache::default()),
+            on_link: None,
             adjusting: false,
         }
     }
@@ -207,6 +220,16 @@ impl DocumentView {
         self.queue_draw();
     }
 
+    /// The directory relative picture paths resolve against. Setting it clears
+    /// what was cached for the previous document.
+    pub fn set_base_directory(&self, directory: Option<std::path::PathBuf>) {
+        let images = self.imp().state.borrow().images.clone();
+        images.set_base(directory);
+        let mut state = self.imp().state.borrow_mut();
+        state.cache.clear();
+        state.recent.clear();
+    }
+
     pub fn set_palette(&self, palette: Palette) {
         self.imp().state.borrow_mut().palette = palette;
         self.rebuild_style();
@@ -333,7 +356,8 @@ impl DocumentView {
                 let state = self.imp().state.borrow();
                 (state.document.clone(), state.style.clone())
             };
-            let set = set_block(&context, &document, &block, &style, width);
+            let images = self.imp().state.borrow().images.clone();
+            let set = set_block(&context, &document, &block, &style, width, images.as_ref());
             let measured = set.height();
             let mut state = self.imp().state.borrow_mut();
             let was_above = state.plan.y_of(index) + block.height <= top;
@@ -366,7 +390,6 @@ impl DocumentView {
 
         let state = self.imp().state.borrow();
         let palette = state.palette;
-        // The page itself.
         snapshot.append_color(
             &palette.bg.to_gdk(),
             &gtk::graphene::Rect::new(0.0, 0.0, width as f32, height as f32),
@@ -387,25 +410,108 @@ impl DocumentView {
             let Some(set) = state.cache.get(&index) else {
                 continue;
             };
-            let y = state.plan.y_of(index) - top + set.baseline_offset();
-            let (_, logical) = set.layout.pixel_extents();
-            if y > height || y + (logical.height() as f64) < 0.0 {
+            let block_top = state.plan.y_of(index) - top + set.baseline_offset();
+            if block_top > height || block_top + set.content_height < 0.0 {
                 continue;
             }
             let block = state.plan.block(index);
+            // Content wider than the column — a code block, a wide table —
+            // scrolls inside its own block, so it is clipped to the column
+            // instead of spilling into the margins (SPEC.md, section 3).
+            let clipped = set.content_width > column + 0.5;
+            if clipped {
+                snapshot.push_clip(&gtk::graphene::Rect::new(
+                    left as f32,
+                    block_top as f32,
+                    column as f32,
+                    set.content_height as f32,
+                ));
+            }
 
-            // The selection wash goes under the type, per line, so that a
-            // selection spanning wrapped lines reads as one shape.
-            if let Some(selection) = state.selection {
-                if let Some((from, to)) = selection.in_block(index, block.text_len) {
-                    draw_selection(snapshot, set, left, y, from, to, &palette);
+            for decoration in &set.decorations {
+                match decoration {
+                    Decoration::Fill {
+                        x,
+                        y,
+                        width: w,
+                        height: h,
+                        radius,
+                        color,
+                    } => {
+                        let rect = gtk::graphene::Rect::new(
+                            (left + x) as f32,
+                            (block_top + y) as f32,
+                            *w as f32,
+                            *h as f32,
+                        );
+                        if *radius > 0.0 {
+                            let rounded = gtk::gsk::RoundedRect::from_rect(rect, *radius);
+                            snapshot.push_rounded_clip(&rounded);
+                            snapshot.append_color(&color.to_gdk(), &rect);
+                            snapshot.pop();
+                        } else {
+                            snapshot.append_color(&color.to_gdk(), &rect);
+                        }
+                    }
+                    Decoration::Image {
+                        x,
+                        y,
+                        width: w,
+                        height: h,
+                        source,
+                    } => {
+                        if let Some(texture) = state.images.texture(source) {
+                            snapshot.append_texture(
+                                &texture,
+                                &gtk::graphene::Rect::new(
+                                    (left + x) as f32,
+                                    (block_top + y) as f32,
+                                    *w as f32,
+                                    *h as f32,
+                                ),
+                            );
+                        }
+                    }
+                    Decoration::Line {
+                        x,
+                        y,
+                        width: w,
+                        height: h,
+                        color,
+                    } => snapshot.append_color(
+                        &color.to_gdk(),
+                        &gtk::graphene::Rect::new(
+                            (left + x) as f32,
+                            (block_top + y) as f32,
+                            *w as f32,
+                            *h as f32,
+                        ),
+                    ),
                 }
             }
 
-            snapshot.save();
-            snapshot.translate(&gtk::graphene::Point::new(left as f32, y as f32));
-            snapshot.append_layout(&set.layout, &palette.text.to_gdk());
-            snapshot.restore();
+            for piece in &set.pieces {
+                let x = left + piece.x;
+                let y = block_top + piece.y;
+                // The selection wash goes under the type, per line, so a
+                // selection across wrapped lines reads as one shape.
+                if let Some(selection) = state.selection {
+                    if let Some((from, to)) = selection.in_block(index, block.text_len) {
+                        let base = block.text_start;
+                        if let Some((lo, hi)) = piece.map.clip(base + from, base + to) {
+                            draw_selection(snapshot, piece, x, y, lo, hi, &palette);
+                        }
+                    }
+                }
+                snapshot.save();
+                snapshot.translate(&gtk::graphene::Point::new(x as f32, y as f32));
+                snapshot.append_layout(&piece.layout, &piece.color.to_gdk());
+                snapshot.restore();
+            }
+
+            if clipped {
+                snapshot.pop();
+            }
         }
     }
 
@@ -423,18 +529,41 @@ impl DocumentView {
         let left = ((width - column) / 2.0).max(tokens::PAD_SIDE);
         let index = state.plan.block_at(top + y);
         let set = state.cache.get(&index)?;
-        let local_x = ((x - left) * pango::SCALE as f64) as i32;
-        let local_y = ((top + y - state.plan.y_of(index) - set.baseline_offset())
-            * pango::SCALE as f64) as i32;
-        let (_, offset, trailing) = set.layout.xy_to_index(local_x, local_y);
-        let text = set.layout.text();
+        let block_top = state.plan.y_of(index) - top + set.baseline_offset();
+        let local_x = x - left;
+        let local_y = y - block_top;
+
+        // The nearest piece, preferring the right row over the right column:
+        // a click in the gutter beside a list item belongs to that item, not
+        // to whatever happens to be horizontally closest.
+        let mut best: Option<(f64, &crate::layout::Piece)> = None;
+        for piece in &set.pieces {
+            let (_, logical) = piece.layout.pixel_extents();
+            let x0 = piece.x;
+            let y0 = piece.y;
+            let x1 = x0 + logical.width() as f64;
+            let y1 = y0 + logical.height() as f64;
+            let dx = (x0 - local_x).max(local_x - x1).max(0.0);
+            let dy = (y0 - local_y).max(local_y - y1).max(0.0);
+            let distance = dy * 4096.0 + dx;
+            if best.is_none_or(|(previous, _)| distance < previous) {
+                best = Some((distance, piece));
+            }
+        }
+        let piece = best?.1;
+        let layout_x = ((local_x - piece.x) * pango::SCALE as f64) as i32;
+        let layout_y = ((local_y - piece.y) * pango::SCALE as f64) as i32;
+        let (_, offset, trailing) = piece.layout.xy_to_index(layout_x, layout_y);
+        let text = piece.layout.text();
         let mut offset = offset as usize;
         // `trailing` counts characters past the reported index, which is how
         // Pango says "the caret belongs after this glyph".
         for _ in 0..trailing {
             offset = next_boundary(text.as_str(), offset);
         }
-        Some(Position::new(index, offset as u32))
+        let in_document = piece.map.to_document(offset as u32)?;
+        let start = state.plan.block(index).text_start;
+        Some(Position::new(index, in_document.saturating_sub(start)))
     }
 
     fn setup_gestures(&self) {
@@ -442,8 +571,20 @@ impl DocumentView {
         click.connect_pressed(glib::clone!(
             #[weak(rename_to = widget)]
             self,
-            move |_, _, x, y| {
+            move |_, clicks, x, y| {
                 widget.grab_focus();
+                // A link is followed rather than selected — but only on a
+                // single click, so that double-clicking to select a word
+                // inside a link still works.
+                if clicks == 1 {
+                    if let Some(href) = widget.link_at(x, y) {
+                        let handler = widget.imp().state.borrow().on_link.clone();
+                        if let Some(handler) = handler {
+                            handler(&href);
+                            return;
+                        }
+                    }
+                }
                 if let Some(position) = widget.position_at(x, y) {
                     widget.imp().state.borrow_mut().selection = Some(Selection::at(position));
                     widget.queue_draw();
@@ -471,6 +612,50 @@ impl DocumentView {
             }
         ));
         self.add_controller(drag);
+
+        // The pointer says what is clickable, which is the only affordance a
+        // link has in a document that renders no controls of its own.
+        let motion = gtk::EventControllerMotion::new();
+        motion.connect_motion(glib::clone!(
+            #[weak(rename_to = widget)]
+            self,
+            move |_, x, y| {
+                let over_link = widget.link_at(x, y).is_some();
+                widget.set_cursor_from_name(Some(if over_link { "pointer" } else { "text" }));
+            }
+        ));
+        self.add_controller(motion);
+    }
+
+    pub fn outline(&self) -> Outline {
+        self.imp().state.borrow().outline.clone()
+    }
+
+    /// Registers the handler for a clicked link.
+    pub fn connect_link_activated(&self, handler: impl Fn(&str) + 'static) {
+        self.imp().state.borrow_mut().on_link = Some(Rc::new(handler));
+    }
+
+    /// Jumps to a heading by its generated id, for a `#fragment` link.
+    pub fn scroll_to_anchor(&self, id: &str) -> bool {
+        let target = self.imp().state.borrow().outline.block_for_id(id);
+        match target {
+            Some(block) => {
+                self.scroll_to_block(block);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The link under a point, if there is one.
+    fn link_at(&self, x: f64, y: f64) -> Option<String> {
+        let position = self.position_at(x, y)?;
+        let state = self.imp().state.borrow();
+        let block = state.plan.block(position.block);
+        let set = state.cache.get(&position.block)?;
+        set.link_at(block.text_start + position.offset)
+            .map(|link| link.href.clone())
     }
 
     /// Selects the whole document.
@@ -531,8 +716,8 @@ fn next_boundary(text: &str, from: usize) -> usize {
 
 fn draw_selection(
     snapshot: &gtk::Snapshot,
-    set: &BlockLayout,
-    left: f64,
+    piece: &crate::layout::Piece,
+    x: f64,
     y: f64,
     from: u32,
     to: u32,
@@ -540,7 +725,7 @@ fn draw_selection(
 ) {
     let colour = palette.selection().to_gdk();
     let mut line_index = 0;
-    while let Some(line) = set.layout.line(line_index) {
+    while let Some(line) = piece.layout.line(line_index) {
         let start = line.start_index() as u32;
         let end = start + line.length() as u32;
         let overlap_from = from.max(start);
@@ -549,15 +734,15 @@ fn draw_selection(
             let (_, extents) = line.extents();
             let x0 = line.index_to_x(overlap_from as i32, false) as f64 / pango::SCALE as f64;
             let x1 = line.index_to_x(overlap_to as i32, false) as f64 / pango::SCALE as f64;
-            let top = extents.y() as f64 / pango::SCALE as f64;
-            let bottom = top + extents.height() as f64 / pango::SCALE as f64;
+            let line_top = extents.y() as f64 / pango::SCALE as f64;
+            let line_height = extents.height() as f64 / pango::SCALE as f64;
             snapshot.append_color(
                 &colour,
                 &gtk::graphene::Rect::new(
-                    (left + x0.min(x1)) as f32,
-                    (y + top) as f32,
+                    (x + x0.min(x1)) as f32,
+                    (y + line_top) as f32,
                     (x1 - x0).abs().max(1.0) as f32,
-                    (bottom - top) as f32,
+                    line_height as f32,
                 ),
             );
         }
