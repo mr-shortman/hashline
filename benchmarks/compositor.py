@@ -1,7 +1,10 @@
 """Capture GNOME Shell's Sysprof stream during real 60/120 Hz scroll runs.
 
-Uses the current desktop bus for the compositor and a separate bus for the app.
-A requested display-mode change is temporary and restored in finally.
+The stimulus comes from `scroll-native.py`, which drives the native reader with
+real Mutter input. Both run on the desktop session bus: the earlier separate
+test bus existed to isolate a WebDriver, and the native application has no
+script bridge to isolate. A requested display-mode change is temporary and
+restored in finally.
 """
 import argparse
 import json
@@ -16,9 +19,9 @@ from gi.repository import Gio, GLib
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary')
+    parser.add_argument('fixture')
     parser.add_argument('--refresh-hz', type=float, required=True)
-    parser.add_argument('--test-bus-file', type=Path, required=True)
-    parser.add_argument('--driver-url', default='http://127.0.0.1:4545')
+    parser.add_argument('--seconds', type=float, default=12.0)
     parser.add_argument('--output-prefix', type=Path, required=True)
     args = parser.parse_args()
     prefix = args.output_prefix
@@ -67,10 +70,9 @@ def main():
             'org.gnome.Sysprof3.Profiler', 'Start', GLib.Variant('(a{sv}h)', ({}, index)),
             None, Gio.DBusCallFlags.NONE, 10000, fds, None)
         started = True
-        env = {**os.environ, 'DBUS_SESSION_BUS_ADDRESS': args.test_bus_file.read_text().strip(),
-               'HASHLINE_WEBDRIVER_URL': args.driver_url}
-        result = subprocess.run([sys.executable, 'benchmarks/scroll-profile.py', args.binary,
-            '--refresh-hz', str(chosen[3]), '--output', str(scroll_file)], env=env)
+        result = subprocess.run([sys.executable, 'benchmarks/scroll-native.py', args.binary,
+            args.fixture, '--connector', primary, '--refresh-hz', str(chosen[3]),
+            '--seconds', str(args.seconds), '--output', str(scroll_file)])
         output['scrollExitCode'] = result.returncode
         output['complete'] = result.returncode == 0
     except Exception as error:

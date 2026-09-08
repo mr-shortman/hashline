@@ -1,0 +1,42 @@
+{
+  "capture": "benchmarks/results/native-m0/scroll-60.syscap",
+  "captureSha256": "dbfb4dc76f7ff72ed67c65104cec7ec674abb062f16448bb00b360ff54576c57",
+  "source": "https://github.com/GNOME/mutter/blob/50.4/clutter/clutter/clutter-frame-clock.c",
+  "method": "Monitor-wide presentation-time bounds inferred from scoped mark and presentation delay; interval pairs overlap each 10-second interior window. Includes all clients; no app surface/frame identifiers. Not an application presentation acceptance.",
+  "applicationFramesVerified": false,
+  "connector": "DP-3",
+  "budgetMs": 16.7,
+  "raw": [
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 1,
+      "startMonotonicNs": 85475443137890,
+      "endMonotonicNs": 85485443137890,
+      "n": 598,
+      "definitelyWithinBudgetPercent": 98.16053511705685,
+      "possiblyWithinBudgetPercent": 98.16053511705685,
+      "maximumGapUpperBoundMs": 33.354
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 2,
+      "startMonotonicNs": 85488443495283,
+      "endMonotonicNs": 85498443495283,
+      "n": 601,
+      "definitelyWithinBudgetPercent": 97.17138103161398,
+      "possiblyWithinBudgetPercent": 97.17138103161398,
+      "maximumGapUpperBoundMs": 16.758
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 3,
+      "startMonotonicNs": 85501443863703,
+      "endMonotonicNs": 85511443863703,
+      "n": 601,
+      "definitelyWithinBudgetPercent": 98.33610648918469,
+      "possiblyWithinBudgetPercent": 98.33610648918469,
+      "maximumGapUpperBoundMs": 16.838
+    }
+  ],
+  "markCount": 2431
+}

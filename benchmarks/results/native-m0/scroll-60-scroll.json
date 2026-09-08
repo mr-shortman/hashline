@@ -1,0 +1,49 @@
+{
+  "binary": "./target/release/hashline",
+  "fixture": "benchmarks/generated/large.md",
+  "connector": "DP-3",
+  "refreshHz": 60.0,
+  "requestedSeconds": 12.0,
+  "stepPx": 8.0,
+  "reverseAfterSeconds": 2.0,
+  "method": "Real Mutter RemoteDesktop axis events at the monitor centre; monotonic boundaries bound an interior window in an external compositor trace. Nothing in the application is instrumented.",
+  "probedPoints": 10,
+  "pointer": {
+    "x": 960.0,
+    "y": 540.0
+  },
+  "raw": [
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 1,
+      "commandStartMonotonicNs": 85474443137890,
+      "observedEndMonotonicNs": 85486443194102,
+      "events": 720,
+      "appCpuShare": 0.09999953156886095,
+      "reachedApplication": true,
+      "alive": true
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 2,
+      "commandStartMonotonicNs": 85487443495283,
+      "observedEndMonotonicNs": 85499443553841,
+      "events": 720,
+      "appCpuShare": 0.09916618275222254,
+      "reachedApplication": true,
+      "alive": true
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "iteration": 3,
+      "commandStartMonotonicNs": 85500443863703,
+      "observedEndMonotonicNs": 85512443918983,
+      "events": 720,
+      "appCpuShare": 0.09833288034653126,
+      "reachedApplication": true,
+      "alive": true
+    }
+  ],
+  "refreshHzDeclared": 60.0,
+  "complete": true
+}
