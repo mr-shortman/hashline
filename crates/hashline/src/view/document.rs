@@ -15,8 +15,11 @@ use gtk::subclass::prelude::*;
 
 use hashline_markdown::OpDocument;
 
+use crate::document::Anchor;
+use crate::highlight::{self, Kind, Span};
 use crate::layout::{set_block, BlockLayout, BlockPlan, Decoration, Metrics, Style};
 use crate::outline::Outline;
+use crate::search::{self, Hit, Query};
 use crate::theme::{document as tokens, Palette, LIGHT};
 use crate::view::images::ImageCache;
 use crate::view::{Position, Selection};
@@ -36,6 +39,15 @@ pub(crate) struct State {
     selection: Option<Selection>,
     outline: Outline,
     images: Rc<ImageCache>,
+    /// Search hits over the whole document, in document order, and which of
+    /// them is the current one.
+    hits: Vec<Hit>,
+    current_hit: Option<usize>,
+    /// Syntax colours per code block, and which blocks have been asked for.
+    /// Cached by block so scrolling back does not re-parse
+    /// (SPEC.md, section 10).
+    highlights: std::collections::HashMap<usize, Vec<Span>>,
+    requested: std::collections::HashSet<usize>,
     /// Called when a link is clicked. The view resolves nothing itself: what a
     /// relative path or a fragment means is the document controller's business.
     on_link: Option<LinkHandler>,
@@ -69,6 +81,10 @@ impl State {
             selection: None,
             outline: Outline::default(),
             images: Rc::new(ImageCache::default()),
+            hits: Vec::new(),
+            current_hit: None,
+            highlights: std::collections::HashMap::new(),
+            requested: std::collections::HashSet::new(),
             on_link: None,
             adjusting: false,
         }
@@ -211,6 +227,10 @@ impl DocumentView {
             state.cache.clear();
             state.recent.clear();
             state.selection = None;
+            state.hits.clear();
+            state.current_hit = None;
+            state.highlights.clear();
+            state.requested.clear();
         }
         let width = self.view_width().max(1.0);
         self.reflow_for(width);
@@ -358,6 +378,9 @@ impl DocumentView {
             };
             let images = self.imp().state.borrow().images.clone();
             let set = set_block(&context, &document, &block, &style, width, images.as_ref());
+            if block.kind == crate::layout::BlockKind::Code {
+                self.colour_code(index, &block, &document, &set);
+            }
             let measured = set.height();
             let mut state = self.imp().state.borrow_mut();
             let was_above = state.plan.y_of(index) + block.height <= top;
@@ -377,6 +400,63 @@ impl DocumentView {
                 state.adjusting = false;
             }
         }
+    }
+
+    /// Applies the colours a code block already has, or asks for them.
+    ///
+    /// The request runs on a worker thread, and the answer is applied to the
+    /// layout that is already cached rather than re-setting the block: the
+    /// attributes change, the type does not.
+    fn colour_code(
+        &self,
+        index: usize,
+        block: &crate::layout::Block,
+        document: &Rc<OpDocument>,
+        set: &BlockLayout,
+    ) {
+        let palette = self.imp().state.borrow().palette;
+        if let Some(spans) = self.imp().state.borrow().highlights.get(&index) {
+            apply_highlight(set, spans, palette);
+            return;
+        }
+        if self.imp().state.borrow().requested.contains(&index) {
+            return;
+        }
+        let language = crate::layout::code_language(document, block);
+        if !highlight::is_supported(&language) {
+            return;
+        }
+        let Some((from, to)) = set.content_range() else {
+            return;
+        };
+        if (to - from) as usize > highlight::MAX_CODE_BYTES {
+            return;
+        }
+        self.imp().state.borrow_mut().requested.insert(index);
+        let code = document.text[from as usize..to as usize].to_string();
+        let (sender, receiver) = async_channel::bounded(1);
+        std::thread::spawn(move || {
+            let _ = sender.send_blocking(highlight::spans(&language, &code, from));
+        });
+        let widget = self.clone();
+        glib::spawn_future_local(async move {
+            let Ok(spans) = receiver.recv().await else {
+                return;
+            };
+            let palette = widget.imp().state.borrow().palette;
+            {
+                let mut state = widget.imp().state.borrow_mut();
+                state.highlights.insert(index, spans);
+            }
+            let state = widget.imp().state.borrow();
+            if let (Some(set), Some(spans)) =
+                (state.cache.get(&index), state.highlights.get(&index))
+            {
+                apply_highlight(set, spans, palette);
+            }
+            drop(state);
+            widget.queue_draw();
+        });
     }
 
     fn draw(&self, snapshot: &gtk::Snapshot) {
@@ -495,11 +575,24 @@ impl DocumentView {
                 let y = block_top + piece.y;
                 // The selection wash goes under the type, per line, so a
                 // selection across wrapped lines reads as one shape.
+                // Search hits sit under the selection wash: a hit that is also
+                // selected should still read as selected.
+                for (position, hit) in state.hits.iter().enumerate() {
+                    if let Some((lo, hi)) = piece.map.clip(hit.start, hit.end) {
+                        let current = state.current_hit == Some(position);
+                        let colour = if current {
+                            palette.accent.with_alpha(0.45)
+                        } else {
+                            palette.accent.with_alpha(0.18)
+                        };
+                        draw_ranges(snapshot, piece, x, y, lo, hi, colour);
+                    }
+                }
                 if let Some(selection) = state.selection {
                     if let Some((from, to)) = selection.in_block(index, block.text_len) {
                         let base = block.text_start;
                         if let Some((lo, hi)) = piece.map.clip(base + from, base + to) {
-                            draw_selection(snapshot, piece, x, y, lo, hi, &palette);
+                            draw_ranges(snapshot, piece, x, y, lo, hi, palette.selection());
                         }
                     }
                 }
@@ -537,7 +630,7 @@ impl DocumentView {
         // a click in the gutter beside a list item belongs to that item, not
         // to whatever happens to be horizontally closest.
         let mut best: Option<(f64, &crate::layout::Piece)> = None;
-        for piece in &set.pieces {
+        for piece in set.pieces.iter().filter(|piece| !piece.control) {
             let (_, logical) = piece.layout.pixel_extents();
             let x0 = piece.x;
             let y0 = piece.y;
@@ -577,6 +670,9 @@ impl DocumentView {
                 // single click, so that double-clicking to select a word
                 // inside a link still works.
                 if clicks == 1 {
+                    if widget.copy_code_at(x, y) {
+                        return;
+                    }
                     if let Some(href) = widget.link_at(x, y) {
                         let handler = widget.imp().state.borrow().on_link.clone();
                         if let Some(handler) = handler {
@@ -658,6 +754,192 @@ impl DocumentView {
             .map(|link| link.href.clone())
     }
 
+    /// Where the reader is, in terms that survive a reparse.
+    pub fn reading_anchor(&self) -> Anchor {
+        let state = self.imp().state.borrow();
+        if state.plan.is_empty() {
+            return Anchor::default();
+        }
+        let top = self.scroll_top();
+        let block = state.plan.block_at(top);
+        let heading = state
+            .outline
+            .active_for_block(block)
+            .and_then(|index| state.outline.entries().get(index))
+            .map(|entry| entry.id.clone());
+        // Measured from the anchor itself, so the same line stays at the same
+        // height even when the blocks above it changed size.
+        let from = match (&heading, &state.outline) {
+            (Some(id), outline) => outline
+                .block_for_id(id)
+                .map(|block| state.plan.y_of(block))
+                .unwrap_or(0.0),
+            _ => state.plan.y_of(block),
+        };
+        Anchor {
+            heading,
+            block,
+            distance: top - from,
+        }
+    }
+
+    /// Puts the reader back where the anchor says, after a reload.
+    pub fn restore_anchor(&self, anchor: &Anchor) {
+        let target = {
+            let state = self.imp().state.borrow();
+            if state.plan.is_empty() {
+                return;
+            }
+            let block = anchor
+                .heading
+                .as_deref()
+                .and_then(|id| state.outline.block_for_id(id))
+                .unwrap_or_else(|| anchor.block.min(state.plan.len() - 1));
+            state.plan.y_of(block) + anchor.distance
+        };
+        if let Some(adjustment) = self.vadjustment() {
+            adjustment.set_value(target.max(0.0));
+        }
+        self.queue_draw();
+    }
+
+    /// Copies the code block under a point, if the copy control was hit.
+    fn copy_code_at(&self, x: f64, y: f64) -> bool {
+        let text = {
+            let state = self.imp().state.borrow();
+            if state.plan.is_empty() {
+                return false;
+            }
+            let top = self.scroll_top();
+            let width = self.view_width();
+            let column = state.plan.width();
+            let left = ((width - column) / 2.0).max(tokens::PAD_SIDE);
+            let index = state.plan.block_at(top + y);
+            let Some(set) = state.cache.get(&index) else {
+                return false;
+            };
+            let block_top = state.plan.y_of(index) - top + set.baseline_offset();
+            if !set.control_at(x - left, y - block_top) {
+                return false;
+            }
+            // The original code text, without the control's own label
+            // (SPEC.md, section 8).
+            set.content_range()
+                .map(|(from, to)| state.document.text[from as usize..to as usize].to_string())
+        };
+        match text {
+            Some(text) if !text.is_empty() => {
+                gtk::prelude::WidgetExt::clipboard(self).set_text(&text);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Runs a search over the whole document text and returns the number of
+    /// hits. Nothing is re-parsed and no layout is discarded: typing in the
+    /// search field must not cost a re-set (SPEC.md, sections 5 and 8).
+    pub fn search(&self, needle: &str) -> usize {
+        let hits = match Query::new(needle) {
+            Some(query) => {
+                let text = self.imp().state.borrow().document.clone();
+                query.matches(&text.text)
+            }
+            None => Vec::new(),
+        };
+        let count = hits.len();
+        {
+            let mut state = self.imp().state.borrow_mut();
+            state.hits = hits;
+            state.current_hit = None;
+        }
+        // Land on the first hit at or after where the reader is.
+        if count > 0 {
+            self.step_hit(true);
+        } else {
+            self.queue_draw();
+        }
+        count
+    }
+
+    pub fn clear_search(&self) {
+        let mut state = self.imp().state.borrow_mut();
+        state.hits.clear();
+        state.current_hit = None;
+        drop(state);
+        self.queue_draw();
+    }
+
+    /// `(current, total)`, one-based for display.
+    pub fn search_position(&self) -> (usize, usize) {
+        let state = self.imp().state.borrow();
+        (
+            state.current_hit.map(|index| index + 1).unwrap_or(0),
+            state.hits.len(),
+        )
+    }
+
+    pub fn search_next(&self) {
+        self.step_hit(true);
+    }
+    pub fn search_previous(&self) {
+        self.step_hit(false);
+    }
+
+    fn step_hit(&self, forward: bool) {
+        let target = {
+            let state = self.imp().state.borrow();
+            if state.hits.is_empty() {
+                None
+            } else {
+                // Without a current hit, step relative to the reading
+                // position, so the first Enter goes to the nearest one below.
+                let from = match state.current_hit {
+                    Some(index) => state.hits[index].start,
+                    None => {
+                        let block = state.plan.block_at(self.scroll_top());
+                        state.plan.block(block).text_start
+                    }
+                };
+                if forward {
+                    search::next_from(&state.hits, from)
+                } else {
+                    search::previous_from(&state.hits, from)
+                }
+            }
+        };
+        let Some(index) = target else {
+            self.queue_draw();
+            return;
+        };
+        let block = {
+            let mut state = self.imp().state.borrow_mut();
+            state.current_hit = Some(index);
+            let offset = state.hits[index].start;
+            state.plan.block_for_text(offset)
+        };
+        // The jump goes through the plan, so the target need never have been
+        // set before (SPEC.md, section 8).
+        if let Some(block) = block {
+            self.scroll_to_block_centred(block);
+        }
+        self.queue_draw();
+    }
+
+    fn scroll_to_block_centred(&self, index: usize) {
+        let (y, height) = {
+            let state = self.imp().state.borrow();
+            if index >= state.plan.len() {
+                return;
+            }
+            (state.plan.y_of(index), self.view_height())
+        };
+        if let Some(adjustment) = self.vadjustment() {
+            let value = (y - height / 3.0).max(0.0);
+            adjustment.set_value(value);
+        }
+    }
+
     /// Selects the whole document.
     pub fn select_all(&self) {
         let mut state = self.imp().state.borrow_mut();
@@ -714,16 +996,45 @@ fn next_boundary(text: &str, from: usize) -> usize {
     index.min(text.len())
 }
 
-fn draw_selection(
+/// Puts syntax colours onto a code block's layout as Pango attributes.
+fn apply_highlight(set: &BlockLayout, spans: &[Span], palette: Palette) {
+    for piece in set.pieces.iter().filter(|piece| !piece.control) {
+        let attributes = piece.layout.attributes().unwrap_or_default();
+        for span in spans {
+            let Some((from, to)) = piece.map.clip(span.start, span.end) else {
+                continue;
+            };
+            let colour = match span.kind {
+                Kind::Keyword => palette.syntax_keyword,
+                Kind::Literal => palette.syntax_string,
+                Kind::Number => palette.syntax_number,
+            };
+            let mut attribute = pango::AttrColor::new_foreground(
+                (colour.red * 65535.0) as u16,
+                (colour.green * 65535.0) as u16,
+                (colour.blue * 65535.0) as u16,
+            )
+            .upcast();
+            attribute.set_start_index(from);
+            attribute.set_end_index(to);
+            attributes.insert(attribute);
+        }
+        piece.layout.set_attributes(Some(&attributes));
+    }
+}
+
+/// Paints a byte range of a piece, line by line, so that a range spanning
+/// wrapped lines reads as one shape.
+fn draw_ranges(
     snapshot: &gtk::Snapshot,
     piece: &crate::layout::Piece,
     x: f64,
     y: f64,
     from: u32,
     to: u32,
-    palette: &Palette,
+    colour: crate::theme::Color,
 ) {
-    let colour = palette.selection().to_gdk();
+    let colour = colour.to_gdk();
     let mut line_index = 0;
     while let Some(line) = piece.layout.line(line_index) {
         let start = line.start_index() as u32;

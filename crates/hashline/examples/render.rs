@@ -91,6 +91,37 @@ fn main() {
         }
         let block = *plan.block(index);
         let set = set_block(&context, &document, &block, &style, column, &pictures);
+        // The same colours the view applies, so the picture is the real one.
+        if block.kind == hashline::layout::BlockKind::Code {
+            let language = hashline::layout::code_language(&document, &block);
+            if let Some((from, to)) = set.content_range() {
+                let code = &document.text[from as usize..to as usize];
+                let spans = hashline::highlight::spans(&language, code, from);
+                for piece in set.pieces.iter().filter(|piece| !piece.control) {
+                    let attributes = piece.layout.attributes().unwrap_or_default();
+                    for span in &spans {
+                        let Some((lo, hi)) = piece.map.clip(span.start, span.end) else {
+                            continue;
+                        };
+                        let colour = match span.kind {
+                            hashline::highlight::Kind::Keyword => palette.syntax_keyword,
+                            hashline::highlight::Kind::Literal => palette.syntax_string,
+                            hashline::highlight::Kind::Number => palette.syntax_number,
+                        };
+                        let mut attribute = pango::AttrColor::new_foreground(
+                            (colour.red * 65535.0) as u16,
+                            (colour.green * 65535.0) as u16,
+                            (colour.blue * 65535.0) as u16,
+                        )
+                        .upcast();
+                        attribute.set_start_index(lo);
+                        attribute.set_end_index(hi);
+                        attributes.insert(attribute);
+                    }
+                    piece.layout.set_attributes(Some(&attributes));
+                }
+            }
+        }
         let block_top = y + set.baseline_offset();
 
         for decoration in &set.decorations {

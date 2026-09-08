@@ -39,7 +39,9 @@ fn every_laid_out_byte_still_names_a_byte_of_the_document() {
     for index in 0..plan.len() {
         let block = *plan.block(index);
         let set = set_block(&context, &document, &block, &style(), 640.0, &NoImages);
-        for piece in &set.pieces {
+        // Controls — the copy affordance on a code block — are not document
+        // text and deliberately map nowhere.
+        for piece in set.pieces.iter().filter(|piece| !piece.control) {
             let text = piece.layout.text();
             for (offset, _) in text.char_indices() {
                 let mapped = piece

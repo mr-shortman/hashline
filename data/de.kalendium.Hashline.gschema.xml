@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="de.kalendium.Hashline" path="/de/kalendium/Hashline/">
+    <key name="zoom" type="i">
+      <default>100</default>
+      <range min="80" max="200"/>
+      <summary>Text zoom in percent</summary>
+      <description>
+        Applies to the document only, in steps of ten (SPEC.md, section 3).
+      </description>
+    </key>
+    <key name="outline-visible" type="b">
+      <default>false</default>
+      <summary>Whether the table of contents is shown</summary>
+    </key>
+    <key name="window-width" type="i">
+      <default>900</default>
+      <summary>Window width in logical pixels</summary>
+    </key>
+    <key name="window-height" type="i">
+      <default>700</default>
+      <summary>Window height in logical pixels</summary>
+    </key>
+    <key name="window-maximized" type="b">
+      <default>false</default>
+      <summary>Whether the window is maximized</summary>
+    </key>
+    <key name="reading-positions" type="a(sst)">
+      <default>[]</default>
+      <summary>Recently read files and where reading stopped</summary>
+      <description>
+        Path, anchor heading id, and the distance from it to the top of the
+        viewport. At most 100 entries are kept (SPEC.md, section 7).
+      </description>
+    </key>
+  </schema>
+</schemalist>

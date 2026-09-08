@@ -89,6 +89,11 @@ pub struct Piece {
     pub color: Color,
     pub map: TextMap,
     pub links: Vec<Link>,
+    /// A control the view draws, not document text — the copy affordance on a
+    /// code block. It is never a selection or hit-test target, because
+    /// document content must not be able to imitate one either
+    /// (SPEC.md, section 11).
+    pub control: bool,
 }
 
 /// What the layout may ask about a picture. The layout itself never touches
@@ -159,6 +164,33 @@ impl BlockLayout {
     pub fn baseline_offset(&self) -> f64 {
         self.space_before
     }
+    /// The document range of the block's own text, ignoring controls — what
+    /// "copy this code block" copies.
+    pub fn content_range(&self) -> Option<(u32, u32)> {
+        self.pieces
+            .iter()
+            .filter(|piece| !piece.control)
+            .filter_map(|piece| piece.map.document_range())
+            .reduce(|(a, b), (c, d)| (a.min(c), b.max(d)))
+    }
+
+    /// Whether a point inside the block, relative to its content, lands on a
+    /// control.
+    pub fn control_at(&self, x: f64, y: f64) -> bool {
+        self.pieces
+            .iter()
+            .filter(|piece| piece.control)
+            .any(|piece| {
+                let (_, logical) = piece.layout.pixel_extents();
+                // A little slack, because an 11px label is a small target.
+                let pad = 4.0;
+                x >= piece.x - pad
+                    && x <= piece.x + logical.width() as f64 + pad
+                    && y >= piece.y - pad
+                    && y <= piece.y + logical.height() as f64 + pad
+            })
+    }
+
     /// The link covering a document offset, if any.
     pub fn link_at(&self, offset: u32) -> Option<&Link> {
         self.pieces
@@ -430,6 +462,7 @@ impl Compose {
             color,
             map: self.map,
             links,
+            control: false,
         }
     }
 }
@@ -494,6 +527,24 @@ fn attribute(document: &OpDocument, attrs: u32, count: u32, name: u32) -> Option
 
 fn has_class(document: &OpDocument, attrs: u32, count: u32, value: &str) -> bool {
     attribute(document, attrs, count, ATTR_CLASS) == Some(value)
+}
+
+/// The language of a fenced code block, from the `language-…` class the
+/// parser puts on its `code` element. Empty for an indented or unlabelled
+/// block.
+pub fn code_language(document: &OpDocument, block: &Block) -> String {
+    for op in ops_of(document, block) {
+        if let Op::Open { tag, attrs, count } = op {
+            if tag == TAG_CODE {
+                if let Some(class) = attribute(document, attrs, count, ATTR_CLASS) {
+                    if let Some(language) = class.strip_prefix("language-") {
+                        return language.to_string();
+                    }
+                }
+            }
+        }
+    }
+    String::new()
 }
 
 /// Sets one block. `width` is the reading column in logical pixels.
@@ -737,6 +788,26 @@ fn code(
     let (_, logical) = piece.layout.pixel_extents();
     let content_height =
         document::CODE_PAD_TOP + logical.height() as f64 + document::CODE_PAD_BOTTOM;
+
+    // `.copy-code { top: 6px; right: 8px; font: 11px }` — the generous top
+    // padding of a code block exists for exactly this.
+    let mut control = Compose::new();
+    control.insert("Kopieren");
+    let mut label_font = style.body.clone();
+    label_font.set_absolute_size(11.0 * pango::SCALE as f64);
+    let mut label = control.finish(
+        context,
+        &label_font,
+        style,
+        11.0,
+        1.0,
+        None,
+        style.palette.muted,
+    );
+    let (_, label_extents) = label.layout.pixel_extents();
+    label.x = width - label_extents.width() as f64 - 8.0;
+    label.y = 6.0;
+    label.control = true;
     let content_width = (logical.width() as f64 + 2.0 * document::CODE_PAD_X).max(width);
     BlockLayout {
         decorations: vec![
@@ -763,7 +834,7 @@ fn code(
                 color: style.palette.border,
             },
         ],
-        pieces: vec![piece],
+        pieces: vec![piece, label],
         space_before: 0.0,
         space_after: 0.0,
         content_height,

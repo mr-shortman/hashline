@@ -5,7 +5,11 @@
 //! tested without one (SPEC.md, section 12).
 
 pub mod app;
+pub mod document;
+pub mod highlight;
 pub mod layout;
 pub mod outline;
+pub mod preferences;
+pub mod search;
 pub mod theme;
 pub mod view;
