@@ -335,3 +335,28 @@ Aufnahme oder geeigneter Plattformmessung nachgewiesen werden. Compositor-
 Präsentationsdaten müssen dem App-Fenster und richtigen Monitor zugeordnet werden.
 Bis diese Nachweise und die verbleibenden Budgetüberschreitungen geklärt sind,
 bleiben beide Performance-Abnahmepunkte offen.
+
+## Phase 1 nach Entscheidung 007 (8. September 2026)
+
+Arbeitsauftrag: [007-performance-path.md](../docs/decisions/007-performance-path.md).
+Die Vorarbeiten wurden unverändert als eigener Ausgangscommit gesichert. Neue
+Builds liegen getrennt unter `benchmarks/generated/phase1-*`; SHA-256 und
+Quellmanifeste stehen in `results/phase1-*-source.json`. Die deterministischen
+Fixtures wurden nicht neu erzeugt. Jede Öffnungsreihe verwendet 30 Öffnungen je
+Größe mit `--distinct-content`; Tests und Builds laufen außerhalb der Messreihen.
+Der WebDriver läuft auf einem eigenen D-Bus mit separaten XDG-Testverzeichnissen.
+Dies sind lokale WebKitGTK-Hilfsmessungen auf der vorhandenen Entwicklungsmaschine,
+keine neue Referenzabnahme und kein Nachweis präsentierter Pixel. SPEC-Budgets
+bleiben unverändert.
+
+| Stand | klein: komplett ms | mittel: komplett ms | groß: komplett ms | groß: Einfügen ms |
+| --- | ---: | ---: | ---: | ---: |
+| [Ausgang](results/phase1-baseline-open.json) | 84,5 | 968,5 | 14.092,5 | 2.142,5 |
+| [P1.1](results/phase1-p11-open.json) | 69,5 | 783,5 | 11.587,0 | 263,0 |
+
+P1.1: Die Indexierung entfällt beim Einfügen; die erste Suche erzeugt fehlende
+Indizes weiterhin bei Bedarf. Das reduziert den vollständigen 10-MiB-Aufbau um
+17,8 %. Die Sicherheitsbereinigung ist unverändert. TypeScript-Verträge,
+Lint, Release-Build sowie native Abschnittsverträge und Desktop-Smoke bestehen.
+Rohdaten: [Ausgangsverträge](results/phase1-baseline-contracts.json),
+[P1.1-Verträge](results/phase1-p11-contracts.json).

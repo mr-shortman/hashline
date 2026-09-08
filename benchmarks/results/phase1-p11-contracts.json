@@ -1,0 +1,11 @@
+{
+  "passed": [
+    "Deferred fragment target is inserted, focused and remains visible",
+    "Inline selection survives deferred highlighting",
+    "Document-wide inline search with bounded visible highlights and last-match navigation",
+    "Select-all includes skipped sections through the last paragraph",
+    "Reload anchor and offset survive changed section boundaries",
+    "Replacement releases previous sections without late insertion"
+  ],
+  "complete": true
+}

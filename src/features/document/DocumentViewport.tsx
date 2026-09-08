@@ -253,7 +253,6 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         shells[i].append(fragment);
         shells[i].dataset.populated = 'true';
         rendered.add(i);
-        indexes.current.set(shells[i], indexText(shells[i]));
         highlightObserver.observe(shells[i]);
         insertionMs += performance.now() - sanitized;
         maxSliceMs = Math.max(maxSliceMs, performance.now() - start);
