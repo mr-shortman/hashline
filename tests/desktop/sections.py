@@ -72,6 +72,37 @@ def main():
             app.wait("document.querySelector('article').dataset.renderState === 'complete'")
             assert app.js("return document.querySelector('article').textContent.includes('THE-END')") is False
             passed.append('Replacement releases previous sections without late insertion')
+            # Since P2.4 the search reads the parser's text buffer rather than
+            # the DOM, so a complete result arrives while the build is still
+            # running. Needs a document whose build takes noticeably longer than
+            # the search: the 3000-heading file above is thirty sections and is
+            # finished before the query can be typed.
+            large = root / 'large.md'
+            large.write_text(source * 6)
+            app.open(large)
+            # One round trip: `wait` would poll past the moment this observes.
+            observed = app.js_async("""const done = arguments[arguments.length - 1];
+              window.dispatchEvent(new KeyboardEvent('keydown',{key:'f',ctrlKey:true,bubbles:true}));
+              const input = document.querySelector('.search-bar input');
+              Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Prefix needle suffix');
+              input.dispatchEvent(new Event('input',{bubbles:true}));
+              const counter = document.querySelector('.search-count');
+              const poll = () => {
+                if (/^\\d+ \\/ \\d+$/.test(counter.textContent || '')) {
+                  const article = document.querySelector('article');
+                  done({
+                    count: counter.textContent,
+                    state: article.dataset.renderState,
+                    built: article.querySelectorAll('[data-populated=true]').length,
+                    sections: article.querySelectorAll('.markdown-section').length,
+                  });
+                } else setTimeout(poll, 2);
+              };
+              poll();""")
+            assert observed['count'] == '1 / 18000', observed
+            assert observed['state'] != 'complete', observed
+            assert observed['built'] < observed['sections'], observed
+            passed.append('Full search result before the document is built')
         finally:
             app.close()
             output = Path(sys.argv[2]) if len(sys.argv) > 2 else Path('test-results/native-sections.json')

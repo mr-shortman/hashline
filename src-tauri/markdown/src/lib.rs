@@ -37,16 +37,22 @@ pub fn options() -> Options {
 /// used, so section counts and the measurement series stay comparable.
 const SECTION_BUDGET: usize = 16_384;
 
-pub const SECTION_WORDS: usize = 7;
+pub const SECTION_WORDS: usize = 9;
 pub const HEADING_WORDS: usize = 6;
 
 #[derive(Default)]
 pub struct OpDocument {
     pub ops: Vec<u32>,
     pub attrs: Vec<u32>,
+    /// Attribute values, heading ids and texts, fallback HTML.
     pub strings: String,
-    /// 7 words per section: opStart, opCount, flags, hashLow, hashHigh,
-    /// htmlOffset, htmlLen. The HTML is present only for fallback sections.
+    /// The document's text in document order, with a separator between blocks.
+    /// TEXT operations index into this, and the search runs on it directly
+    /// (docs/decisions/007, P2.4).
+    pub text: String,
+    /// 9 words per section: opStart, opCount, flags, hashLow, hashHigh,
+    /// htmlOffset, htmlLen, textStart, textLen. The HTML is present only for
+    /// fallback sections.
     pub sections: Vec<u32>,
     /// 6 words per heading: level, idOffset, idLen, sectionIndex, textOffset,
     /// textLen.
@@ -400,12 +406,17 @@ pub fn parse(source: &str) -> OpDocument {
             return;
         }
         let op_start = (builder.enc.ops.len() / 4) as u32;
+        let text_start = builder.enc.text_units();
         if *raw {
             let mut html = String::new();
             pulldown_cmark::html::push_html(&mut html, events.drain(..));
             builder.enc.hash_bytes(html.as_bytes());
             let hash = builder.enc.take_hash();
             let (offset, length) = builder.enc.reference(&html);
+            // A section the renderer sanitizes contributes no operations, so it
+            // contributes no searchable text either; the separator keeps the
+            // neighbouring sections' text from running together.
+            builder.enc.separate();
             builder.sections.extend_from_slice(&[
                 op_start,
                 0,
@@ -414,6 +425,8 @@ pub fn parse(source: &str) -> OpDocument {
                 (hash >> 32) as u32,
                 offset,
                 length,
+                text_start,
+                builder.enc.text_units() - text_start,
             ]);
         } else {
             for event in events.iter() {
@@ -429,6 +442,8 @@ pub fn parse(source: &str) -> OpDocument {
                 (hash >> 32) as u32,
                 0,
                 0,
+                text_start,
+                builder.enc.text_units() - text_start,
             ]);
         }
         *raw = false;
@@ -491,5 +506,6 @@ pub fn parse(source: &str) -> OpDocument {
     document.ops = std::mem::take(&mut builder.enc.ops);
     document.attrs = std::mem::take(&mut builder.enc.attrs);
     document.strings = std::mem::take(&mut builder.enc.strings);
+    document.text = std::mem::take(&mut builder.enc.text);
     document
 }

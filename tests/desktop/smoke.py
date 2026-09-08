@@ -36,6 +36,13 @@ class Desktop:
     def js(self, script, *args):
         return request('POST', f'/session/{self.session}/execute/sync', {'script': script, 'args': list(args)})
 
+    def js_async(self, script, *args):
+        """Runs a script that reports through the callback WebDriver appends.
+
+        Needed where a single round trip must observe a moment the polling of
+        `wait` would already have missed."""
+        return request('POST', f'/session/{self.session}/execute/async', {'script': script, 'args': list(args)})
+
     def wait(self, expression, timeout=15):
         start = time.monotonic()
         while time.monotonic() - start < timeout:

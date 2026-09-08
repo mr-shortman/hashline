@@ -15,11 +15,11 @@ import type { Heading, MarkdownSection, ParsedDocument } from './types';
  * millions.
  */
 export function readDocument(ops: OpBuffer, parseMs: number): ParsedDocument {
-  const text = decodeStrings(ops);
+  const strings = decodeStrings(ops);
   const count = sectionCount(ops);
   const bySection: Heading[][] = Array.from({ length: count }, () => []);
   const headings: Heading[] = [];
-  for (const heading of decodeHeadings(ops, text)) {
+  for (const heading of decodeHeadings(ops, strings)) {
     const entry = { id: heading.id, text: heading.text, level: heading.level };
     headings.push(entry);
     bySection[Math.min(heading.section, count - 1)]?.push(entry);
@@ -28,8 +28,8 @@ export function readDocument(ops: OpBuffer, parseMs: number): ParsedDocument {
   for (let i = 0; i < count; i++)
     sections.push({
       key: sectionKey(ops, i),
-      html: sectionHtml(ops, text, i),
+      html: sectionHtml(ops, strings, i),
       headings: bySection[i],
     });
-  return { ops, text, sections, headings, parseMs };
+  return { ops, strings, sections, headings, parseMs };
 }

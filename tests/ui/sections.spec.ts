@@ -188,3 +188,66 @@ test('rebuilds resource-bearing sections including the legacy HTML image spellin
     '0',
   );
 });
+
+test('a query entered before the document searches it in full', async ({
+  page,
+}) => {
+  // Since P2.4 the search reads the parser's text buffer, not the DOM, so it no
+  // longer waits for the build. Chrome finishes this document too quickly to
+  // observe the overlap; that part is asserted natively in
+  // tests/desktop/sections.py, where WebKit takes seconds for it.
+  // Large enough that the build cannot finish while the query is being typed:
+  // roughly six megabytes, a few thousand sections.
+  const filler = 'Ein Absatz mit ausreichend Text für echte Aufbauarbeit. '
+    .repeat(30)
+    .trim();
+  const many =
+    '# Begin\n\n' +
+    Array.from(
+      { length: 3000 },
+      (_, i) =>
+        `## Kapitel ${i}\n\nEin Absatz mit **needle** und Kontext.\n\n${filler}\n\n- ein Listenpunkt\n- noch einer\n\n`,
+    ).join('');
+  await page.goto('/');
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Öffnen', exact: true }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: 'viele.md',
+    mimeType: 'text/markdown',
+    buffer: Buffer.from(many),
+  });
+  // Everything from here runs inside the page, so no round trip can let the
+  // build finish before the query is entered. The search bar is opened before
+  // the document exists at all.
+  const observed = await page.evaluate(async () => {
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }),
+    );
+    const input =
+      document.querySelector<HTMLInputElement>('.search-bar input')!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, 'needle');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const counter = document.querySelector('.search-count')!;
+    for (let i = 0; i < 4000; i++) {
+      if (/^\d+ \/ \d+$/.test(counter.textContent || '')) break;
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    const article = document.querySelector<HTMLElement>('article')!;
+    return {
+      count: counter.textContent,
+      populated: article.querySelectorAll('[data-populated=true]').length,
+      sections: article.querySelectorAll('.markdown-section').length,
+    };
+  });
+  expect(observed.count).toBe('1 / 3000');
+  expect(observed.sections).toBe(observed.populated);
+  // Navigating to the last match works from the same query.
+  await page.keyboard.press('Shift+Enter');
+  await expect(page.locator('.search-count')).toHaveText('3000 / 3000');
+  await expect(page.locator('#doc-kapitel-2999')).toBeInViewport();
+});

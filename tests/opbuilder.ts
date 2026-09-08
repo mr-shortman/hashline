@@ -63,6 +63,7 @@ export function buildBuffer(sections: (Node[] | 'fallback')[]): OpBuffer {
     ops: new Uint32Array(ops),
     attrs: new Uint32Array(attrs),
     strings: new TextEncoder().encode(text),
+    text: new TextEncoder().encode(text),
     sections: new Uint32Array(sectionWords),
     headings: new Uint32Array(),
   };

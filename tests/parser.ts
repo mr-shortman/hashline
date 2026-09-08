@@ -39,7 +39,7 @@ export function renderClean(
     const clean = sectionEncoded(parsed.ops, i)
       ? replayFragment(
           parsed.ops,
-          parsed.text,
+          parsed.strings,
           i,
           section.headings,
           file,
@@ -57,7 +57,7 @@ export function renderStructural(source: string): HTMLDivElement {
   const root = document.createElement('div');
   for (let i = 0; i < sectionCount(parsed.ops); i++) {
     if (sectionEncoded(parsed.ops, i)) {
-      root.append(replaySection(parsed.ops, parsed.text, i, structuralSink));
+      root.append(replaySection(parsed.ops, parsed.strings, i, structuralSink));
     } else {
       const holder = document.createElement('div');
       holder.innerHTML = parsed.sections[i].html;

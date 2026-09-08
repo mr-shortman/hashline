@@ -28,9 +28,14 @@
 //               kind 1 CLOSE  a, b, c = 0
 //               kind 2 TEXT   a = strOffset  b = strLen     c = 0
 //   attrs     3 words per attribute  [nameId, strOffset, strLen]
-//   strings   UTF-8 blob
-//   sections  7 words per section    [opStart, opCount, flags,
-//                                     hashLow, hashHigh, htmlOffset, htmlLen]
+//   strings   UTF-8 blob: attribute values, heading ids and texts, and the
+//             HTML of fallback sections — never document text
+//   text      UTF-8 blob: the document's text in document order, with a
+//             separator between blocks. TEXT operations index into it, and the
+//             search runs on it directly (007, P2.4)
+//   sections  9 words per section    [opStart, opCount, flags,
+//                                     hashLow, hashHigh, htmlOffset, htmlLen,
+//                                     textStart, textLen]
 //   headings  6 words per heading    [level, idOffset, idLen, sectionIndex,
 //                                     textOffset, textLen]
 //
@@ -45,6 +50,9 @@
 //     string blob. Raw HTML has no opcode and stays on the DOMPurify path.
 //   * `headings` carries the heading text, which the outline needs and which no
 //     longer travels as JSON beside the buffer.
+//   * The text is a blob of its own. It is what the search reads, so it must be
+//     contiguous and free of attribute values; and `sections` carries each
+//     section's range in it, so a match maps back to a section in one lookup.
 //
 // Every OPEN has a matching CLOSE, void elements included. That keeps the
 // replay a single stack without a void-element table of its own.
@@ -122,7 +130,7 @@ export const OP_CLOSE = 1;
 export const OP_TEXT = 2;
 export const OP_WORDS = 4;
 export const ATTR_WORDS = 3;
-export const SECTION_WORDS = 7;
+export const SECTION_WORDS = 9;
 export const HEADING_WORDS = 6;
 /** The section could not be encoded; the renderer must sanitize its HTML. */
 export const SECTION_FALLBACK = 1;
@@ -131,16 +139,29 @@ export interface OpBuffer {
   ops: Uint32Array;
   attrs: Uint32Array;
   strings: Uint8Array;
+  text: Uint8Array;
   sections: Uint32Array;
   headings: Uint32Array;
+}
+
+/** Both blobs, decoded once per document. */
+export interface OpStrings {
+  /** Attribute values, heading ids and texts, fallback HTML. */
+  readonly strings: string;
+  /** The document's text in document order. */
+  readonly text: string;
 }
 
 // The five arrays are views on one received packet; nothing copies or
 // transfers them any more, because the parser no longer runs in a worker.
 
-/** Decodes the string blob. Call once per document, not once per section. */
-export function decodeStrings(buffer: OpBuffer): string {
-  return new TextDecoder().decode(buffer.strings);
+/** Decodes both blobs. Call once per document, not once per section. */
+export function decodeStrings(buffer: OpBuffer): OpStrings {
+  const decoder = new TextDecoder();
+  return {
+    strings: decoder.decode(buffer.strings),
+    text: decoder.decode(buffer.text),
+  };
 }
 
 export function sectionCount(buffer: OpBuffer): number {
@@ -170,14 +191,56 @@ export function sectionKey(buffer: OpBuffer, index: number): string {
 /** The HTML of a fallback section; empty for encoded sections. */
 export function sectionHtml(
   buffer: OpBuffer,
-  text: string,
+  strings: OpStrings,
   index: number,
 ): string {
   const base = index * SECTION_WORDS;
-  return text.substring(
+  return strings.strings.substring(
     buffer.sections[base + 5],
     buffer.sections[base + 5] + buffer.sections[base + 6],
   );
+}
+
+/** Where the section's text lies in the document text: [start, end). */
+export function sectionTextRange(
+  buffer: OpBuffer,
+  index: number,
+): [number, number] {
+  const base = index * SECTION_WORDS;
+  return [
+    buffer.sections[base + 7],
+    buffer.sections[base + 7] + buffer.sections[base + 8],
+  ];
+}
+
+/**
+ * Document-text offset of the section's first text run. Offsets inside a
+ * section are kept relative to it, so a section reused across reloads keeps a
+ * valid text-node map even though the document around it moved.
+ */
+export function sectionFirstText(buffer: OpBuffer, index: number): number {
+  const base = index * SECTION_WORDS;
+  const start = buffer.sections[base];
+  const end = start + buffer.sections[base + 1];
+  for (let i = start; i < end; i++)
+    if (buffer.ops[i * OP_WORDS] === OP_TEXT)
+      return buffer.ops[i * OP_WORDS + 1];
+  return 0;
+}
+
+/** The section a document-text offset falls into, or -1. */
+export function sectionAt(buffer: OpBuffer, offset: number): number {
+  let low = 0;
+  let high = sectionCount(buffer) - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const base = mid * SECTION_WORDS;
+    if (offset < buffer.sections[base + 7]) high = mid - 1;
+    else if (offset >= buffer.sections[base + 7] + buffer.sections[base + 8])
+      low = mid + 1;
+    else return mid;
+  }
+  return -1;
 }
 
 export interface DecodedHeading {
@@ -189,8 +252,9 @@ export interface DecodedHeading {
 
 export function decodeHeadings(
   buffer: OpBuffer,
-  text: string,
+  strings: OpStrings,
 ): DecodedHeading[] {
+  const text = strings.strings;
   const headings: DecodedHeading[] = [];
   for (let i = 0; i < buffer.headings.length; i += HEADING_WORDS)
     headings.push({
@@ -218,6 +282,12 @@ export interface ReplaySink {
   attribute(element: Element, name: string, value: string): void;
   /** Called once the element carries its attributes. */
   opened(element: Element): void;
+  /**
+   * Called for every text node with its offset in the document text. This is
+   * the mapping the search uses to turn a text offset back into a DOM position
+   * without ever indexing the DOM.
+   */
+  text?(node: Text, offset: number, length: number): void;
 }
 
 /** Structural replay without any value policy; for round-trip tests. */
@@ -228,7 +298,7 @@ export const structuralSink: ReplaySink = {
 
 export function replaySection(
   buffer: OpBuffer,
-  text: string,
+  strings: OpStrings,
   index: number,
   sink: ReplaySink = structuralSink,
   owner: Document = document,
@@ -251,7 +321,10 @@ export function replaySection(
           sink.attribute(
             element,
             ALLOWED_ATTR[attrs[word]],
-            text.substring(attrs[word + 1], attrs[word + 1] + attrs[word + 2]),
+            strings.strings.substring(
+              attrs[word + 1],
+              attrs[word + 1] + attrs[word + 2],
+            ),
           );
         }
         sink.opened(element);
@@ -262,12 +335,13 @@ export function replaySection(
       case OP_CLOSE:
         depth--;
         break;
-      default:
-        stack[depth].append(
-          owner.createTextNode(
-            text.substring(ops[op + 1], ops[op + 1] + ops[op + 2]),
-          ),
+      default: {
+        const node = owner.createTextNode(
+          strings.text.substring(ops[op + 1], ops[op + 1] + ops[op + 2]),
         );
+        stack[depth].append(node);
+        sink.text?.(node, ops[op + 1], ops[op + 2]);
+      }
     }
   }
   return fragment;

@@ -16,7 +16,12 @@ import {
   sanitizeFragment,
   unavailableImage,
 } from '../../core/content/policy';
-import { sectionEncoded } from '../../core/markdown/opbuffer';
+import {
+  sectionAt,
+  sectionCount,
+  sectionEncoded,
+  sectionFirstText,
+} from '../../core/markdown/opbuffer';
 import { nextTask, retireContent } from './schedule';
 import { el } from '../../ui/dom';
 
@@ -34,6 +39,34 @@ export interface ViewportOptions {
   onLink(path: string, fragment?: string): void;
   onNotice(message: string): void;
 }
+/**
+ * A search result. Hits found in the op buffer carry text offsets and are
+ * resolved to DOM positions on demand; hits from a section indexed through the
+ * DOM already carry theirs.
+ */
+interface Hit {
+  section: number;
+  start: number;
+  end: number;
+  match?: Match;
+}
+/** What the search needs from a mounted document. */
+interface SearchSurface {
+  count: number;
+  shell(section: number): HTMLElement | undefined;
+  section(shell: Element): number | undefined;
+  /** True when the buffer cannot map this section's text back to nodes. */
+  usesDom(section: number): boolean;
+  /** Builds the section if needed and indexes its DOM. */
+  domIndex(section: number): TextIndex;
+  /** Text-node map of the section, building the section if needed. */
+  nodes(
+    section: number,
+  ):
+    | { base: number; starts: number[]; lengths: number[]; nodes: Text[] }
+    | undefined;
+}
+
 export interface Viewport extends ViewportActions {
   element: HTMLElement;
   setDocument(document: RenderDocument): void;
@@ -57,11 +90,24 @@ export function createViewport(options: ViewportOptions): Viewport {
   let actions: ViewportActions | null = null;
   let position: ReadingPosition | undefined;
   let retainedSections: { key: string; shell: HTMLElement }[] = [];
+  // Search reads the document text of the op buffer directly; the DOM is only
+  // consulted for sections the buffer cannot answer for — those the parser left
+  // as raw HTML, and those whose text nodes syntax highlighting has replaced
+  // (docs/decisions/007, P2.4).
   let indexes = new WeakMap<HTMLElement, TextIndex>();
-  let ranges: Match[] = [];
+  let hits: Hit[] = [];
   const visibleSections = new Set<Element>();
-  let sectionRanges = new Map<Element, Match[]>();
+  let sectionHits = new Map<Element, Hit[]>();
   let current = 0;
+  let surface: SearchSurface | undefined;
+  // Keyed by shell so a section reused across reloads keeps its map.
+  const textMaps = new WeakMap<
+    HTMLElement,
+    { starts: number[]; lengths: number[]; nodes: Text[] }
+  >();
+  // Sections the buffer cannot map back to nodes: raw HTML, and sections whose
+  // text nodes syntax highlighting has replaced.
+  const domSections = new WeakSet<HTMLElement>();
   let forcedSection: HTMLElement | null = null;
   let navigation = 0;
   let cleanupPaint: () => void = () => {};
@@ -209,26 +255,78 @@ export function createViewport(options: ViewportOptions): Viewport {
     forcedSection = shell;
   }
 
+  /**
+   * Turns a text offset back into a DOM position: offset → text operation →
+   * the node that operation created. The section is materialized if the reader
+   * has not scrolled to it yet, which is why a match in an unbuilt section can
+   * still be counted, navigated to and painted.
+   */
+  function resolve(hit: Hit): Match | undefined {
+    if (hit.match) return hit.match;
+    const map = surface?.nodes(hit.section);
+    if (!map || !map.nodes.length) return undefined;
+    const start = hit.start - map.base;
+    const end = hit.end - map.base;
+    const before = (offset: number) => {
+      let low = 0;
+      let high = map.starts.length - 1;
+      let found = -1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (map.starts[mid] <= offset) {
+          found = mid;
+          low = mid + 1;
+        } else high = mid - 1;
+      }
+      return found;
+    };
+    const first = before(start);
+    const last = before(end - 1);
+    if (first < 0 || last < 0) return undefined;
+    // A match that reached across a block separator has no DOM counterpart.
+    if (end - map.starts[last] > map.lengths[last]) return undefined;
+    return {
+      startNode: map.nodes[first],
+      startOffset: start - map.starts[first],
+      endNode: map.nodes[last],
+      endOffset: end - map.starts[last],
+    };
+  }
+
   function paintVisible() {
     cleanupPaint();
     if (!hasHighlights()) return;
-    const visible: Match[] = [];
+    const visible: Range[] = [];
+    const active = hits[current];
+    let activeIndex = 0;
+    let paintedActive = false;
     for (const shell of visibleSections) {
-      for (const range of sectionRanges.get(shell) || []) visible.push(range);
+      for (const hit of sectionHits.get(shell) || []) {
+        const match = resolve(hit);
+        if (!match) continue;
+        if (hit === active) {
+          activeIndex = visible.length;
+          paintedActive = true;
+        }
+        visible.push(toRange(match));
+      }
     }
-    const active = ranges[current];
-    if (active && !visible.includes(active)) visible.push(active);
-    cleanupPaint = paintRanges(
-      visible.map(toRange),
-      active ? visible.indexOf(active) : 0,
-    );
+    if (active && !paintedActive) {
+      const match = resolve(active);
+      if (match) {
+        activeIndex = visible.length;
+        visible.push(toRange(match));
+      }
+    }
+    cleanupPaint = paintRanges(visible, activeIndex);
   }
 
   function drawFallback() {
     if (hasHighlights()) return;
-    if (!overlay.hasChildNodes() && !ranges.length) return;
+    if (!overlay.hasChildNodes() && !hits.length) return;
     overlay.replaceChildren();
-    const match = ranges[current];
+    const hit = hits[current];
+    const match = hit && resolve(hit);
     if (!match) return;
     const range = toRange(match);
     const base = scroll.getBoundingClientRect();
@@ -317,8 +415,11 @@ export function createViewport(options: ViewportOptions): Viewport {
       article.dataset.renderState = 'rendering';
       article.setAttribute('aria-busy', 'true');
       visibleSections.clear();
-      sectionRanges.clear();
+      sectionHits.clear();
       const shells = planned.map(({ shell }) => shell);
+      const shellIndex = new Map<Element, number>(
+        shells.map((shell, i) => [shell, i]),
+      );
       // Keep already ordered nodes connected: moving them through a fragment
       // would synchronously destroy the render trees we are trying to retain.
       let cursor: ChildNode | null = article.firstChild;
@@ -360,27 +461,42 @@ export function createViewport(options: ViewportOptions): Viewport {
         // Replay creates the nodes directly in this document: no HTML parse,
         // no foreign document, no adoption, no sanitizing walk. Sections the
         // encoder refused keep the DOMPurify path (docs/decisions/007, P2.2).
+        const replayed = sectionEncoded(active.ops, i)
+          ? replayFragment(
+              active.ops,
+              active.strings,
+              i,
+              section.headings,
+              active.file,
+              gateway,
+            )
+          : undefined;
+        const clean =
+          replayed ??
+          sanitizeFragment(
+            section.html,
+            section.headings,
+            active.file,
+            gateway,
+          );
         const {
           fragment,
           remoteImages: count,
           hasImages,
           tables,
           pres,
-        } = sectionEncoded(active.ops, i)
-          ? replayFragment(
-              active.ops,
-              active.text,
-              i,
-              section.headings,
-              active.file,
-              gateway,
-            )
-          : sanitizeFragment(
-              section.html,
-              section.headings,
-              active.file,
-              gateway,
-            );
+        } = clean;
+        if (replayed?.textOffsets.length) {
+          // Offsets are stored relative to the section's first text run so a
+          // section reused across reloads keeps a valid map: its content is
+          // identical, its absolute position in the document text need not be.
+          const base = replayed.textOffsets[0];
+          textMaps.set(shells[i], {
+            starts: replayed.textOffsets.map((offset) => offset - base),
+            lengths: replayed.textNodes.map((node) => node.data.length),
+            nodes: replayed.textNodes,
+          });
+        }
         if (count) {
           // Coalesced like React batched the former state updates: the banner
           // must never lay out once per filled section.
@@ -613,8 +729,14 @@ export function createViewport(options: ViewportOptions): Viewport {
           void highlightCode(code, () => !cancelled && !query)
             .then((changed) => {
               if (changed && !cancelled) {
+                // Highlighting replaced this section's text nodes, so the
+                // buffer can no longer map its offsets; it falls back to a DOM
+                // index for search from here on.
                 const shell = code.closest<HTMLElement>('.markdown-section');
-                if (shell) indexes.delete(shell);
+                if (shell) {
+                  domSections.add(shell);
+                  indexes.delete(shell);
+                }
                 if (query) startSearch();
               }
               scheduleHighlight();
@@ -633,7 +755,28 @@ export function createViewport(options: ViewportOptions): Viewport {
         }
       }
       article.dataset.reusedSections = String(rendered.size);
-      ranges = [];
+      surface = {
+        count: sectionCount(active.ops),
+        shell: (index) => shells[index],
+        section: (shell) => shellIndex.get(shell),
+        usesDom: (index) =>
+          !sectionEncoded(active.ops, index) || domSections.has(shells[index]),
+        domIndex(index) {
+          insert(index);
+          let index_ = indexes.get(shells[index]);
+          if (!index_) {
+            index_ = indexText(shells[index]);
+            indexes.set(shells[index], index_);
+          }
+          return index_;
+        },
+        nodes(index) {
+          insert(index);
+          const map = textMaps.get(shells[index]);
+          return map && { base: sectionFirstText(active.ops, index), ...map };
+        },
+      };
+      hits = [];
       cleanupPaint();
       // Paint the reading anchor (or first section) before filling the document.
       if (shells.length) insert(0);
@@ -722,7 +865,6 @@ export function createViewport(options: ViewportOptions): Viewport {
             start: active.openedAt,
             end: performance.now(),
           });
-          startSearch();
         } catch (error) {
           if (!cancelled) {
             article.dataset.renderState = 'error';
@@ -733,6 +875,7 @@ export function createViewport(options: ViewportOptions): Viewport {
           }
         }
       }
+      const mounted = surface;
       const api: ViewportActions = {
         jump(id) {
           navigation++;
@@ -779,6 +922,7 @@ export function createViewport(options: ViewportOptions): Viewport {
         highlightObserver.disconnect();
         document.removeEventListener('selectionchange', scheduleHighlight);
         if (resumeHighlight === scheduleHighlight) resumeHighlight = () => {};
+        if (surface === mounted) surface = undefined;
         cleanupPaint();
         viewport.removeEventListener('scroll', onScroll);
         window.removeEventListener('pagehide', persist);
@@ -796,8 +940,8 @@ export function createViewport(options: ViewportOptions): Viewport {
     searchCleanup?.();
     // Drop node offsets before highlighting can replace their text nodes.
     cleanupPaint();
-    ranges = [];
-    sectionRanges.clear();
+    hits = [];
+    sectionHits.clear();
     drawFallback();
     if (!query) resumeHighlight();
     const abort = new AbortController();
@@ -812,22 +956,43 @@ export function createViewport(options: ViewportOptions): Viewport {
       searchCleanup = undefined;
     };
     async function search() {
-      if (query && root.dataset.renderState !== 'complete') return;
-      const found: Match[] = [];
-      const bySection = new Map<Element, Match[]>();
+      const document_ = doc;
+      if (!document_ || !surface) return;
+      const found: Hit[][] = Array.from({ length: surface.count }, () => []);
       let slice = performance.now();
       if (query) {
-        for (const shell of root.querySelectorAll<HTMLElement>(
-          '.markdown-section',
-        )) {
-          let index = indexes.get(shell);
-          if (!index) {
-            index = indexText(shell);
-            indexes.set(shell, index);
+        // One pass over the document text of the whole buffer. No DOM is
+        // touched here, so the full result is available from the first frame
+        // rather than after the last section has been inserted.
+        const pattern = new RegExp(
+          query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+          'giu',
+        );
+        for (const match of document_.strings.text.matchAll(pattern)) {
+          const section = sectionAt(document_.ops, match.index);
+          if (section >= 0)
+            found[section].push({
+              section,
+              start: match.index,
+              end: match.index + match[0].length,
+            });
+          if (performance.now() - slice >= 6) {
+            await nextTask(abort.signal);
+            slice = performance.now();
           }
-          const matches = findMatches(index, query);
-          bySection.set(shell, matches);
-          for (const range of matches) found.push(range);
+        }
+        // The exceptions: raw HTML the parser could not encode, and sections
+        // whose nodes highlighting replaced. Those are indexed from their DOM,
+        // which means building them — for raw HTML that is unavoidable, and it
+        // is the only case that still waits for insertion.
+        for (let i = 0; i < surface.count; i++) {
+          if (!surface.usesDom(i)) continue;
+          found[i] = findMatches(surface.domIndex(i), query).map((match) => ({
+            section: i,
+            start: 0,
+            end: 0,
+            match,
+          }));
           if (performance.now() - slice >= 6) {
             await nextTask(abort.signal);
             slice = performance.now();
@@ -836,12 +1001,17 @@ export function createViewport(options: ViewportOptions): Viewport {
       }
       if (abort.signal.aborted) return;
       cleanupPaint();
-      ranges = found;
-      sectionRanges = bySection;
+      hits = found.flat();
+      sectionHits = new Map(
+        found.flatMap((sectionMatches, i) => {
+          const shell = surface?.shell(i);
+          return shell ? [[shell, sectionMatches] as [Element, Hit[]]] : [];
+        }),
+      );
       current = 0;
       paintVisible();
-      options.onMatches(found.length, 0);
-      const match = found[0];
+      options.onMatches(hits.length, 0);
+      const match = hits[0] && resolve(hits[0]);
       if (match) {
         reveal(match.startNode.parentElement);
         const range = toRange(match);
@@ -886,20 +1056,21 @@ export function createViewport(options: ViewportOptions): Viewport {
       root.style.fontSize = `${(17 * zoom) / 100}px`;
     },
     step(delta) {
-      if (!delta || !ranges.length) return;
-      current =
-        (current + (delta % ranges.length) + ranges.length) % ranges.length;
+      if (!delta || !hits.length) return;
+      current = (current + (delta % hits.length) + hits.length) % hits.length;
       cleanupPaint();
+      const match = resolve(hits[current]);
       paintVisible();
-      const match = ranges[current];
-      reveal(match.startNode.parentElement);
-      const range = toRange(match);
-      navigation++;
-      scroll.scrollTop +=
-        range.getBoundingClientRect().top -
-        scroll.getBoundingClientRect().top -
-        scroll.clientHeight / 3;
-      options.onMatches(ranges.length, current);
+      options.onMatches(hits.length, current);
+      if (match) {
+        reveal(match.startNode.parentElement);
+        const range = toRange(match);
+        navigation++;
+        scroll.scrollTop +=
+          range.getBoundingClientRect().top -
+          scroll.getBoundingClientRect().top -
+          scroll.clientHeight / 3;
+      }
       drawFallback();
     },
     jump(id) {

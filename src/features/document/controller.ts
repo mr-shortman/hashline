@@ -1,5 +1,5 @@
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
-import type { OpBuffer } from '../../core/markdown/opbuffer';
+import type { OpBuffer, OpStrings } from '../../core/markdown/opbuffer';
 import type { Heading, MarkdownSection } from '../../core/markdown/types';
 
 export interface RenderDocument {
@@ -7,8 +7,8 @@ export interface RenderDocument {
   readonly sections: readonly MarkdownSection[];
   /** Replay operations for the same sections. */
   readonly ops: OpBuffer;
-  /** The buffer's string blob, decoded once per document. */
-  readonly text: string;
+  /** The buffer's two string blobs, decoded once per document. */
+  readonly strings: OpStrings;
   readonly openedAt: number;
   readonly headings: readonly Heading[];
   readonly revision: number;
@@ -108,7 +108,7 @@ export class DocumentController {
         file,
         sections: read.parsed.sections,
         ops: read.parsed.ops,
-        text: read.parsed.text,
+        strings: read.parsed.strings,
         openedAt: start,
         headings: read.parsed.headings,
         revision: request,

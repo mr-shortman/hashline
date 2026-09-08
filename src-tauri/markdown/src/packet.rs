@@ -8,6 +8,7 @@
 //! …    sections  u32
 //! …    headings  u32
 //! …    strings   UTF-8
+//! …    text      UTF-8
 //! ```
 //!
 //! The padding is what lets the frontend build `Uint32Array` views straight on
@@ -23,6 +24,7 @@ pub struct Layout {
     pub sections: usize,
     pub headings: usize,
     pub strings: usize,
+    pub text: usize,
 }
 
 impl Layout {
@@ -33,12 +35,13 @@ impl Layout {
             sections: document.sections.len(),
             headings: document.headings.len(),
             strings: document.strings.len(),
+            text: document.text.len(),
         }
     }
     pub fn json(&self) -> String {
         format!(
-            "\"layout\":{{\"ops\":{},\"attrs\":{},\"sections\":{},\"headings\":{},\"strings\":{}}}",
-            self.ops, self.attrs, self.sections, self.headings, self.strings
+            "\"layout\":{{\"ops\":{},\"attrs\":{},\"sections\":{},\"headings\":{},\"strings\":{},\"text\":{}}}",
+            self.ops, self.attrs, self.sections, self.headings, self.strings, self.text
         )
     }
 }
@@ -62,7 +65,8 @@ pub fn to_packet(document: &OpDocument, fields: &str) -> Vec<u8> {
                 + document.attrs.len()
                 + document.sections.len()
                 + document.headings.len())
-            + document.strings.len(),
+            + document.strings.len()
+            + document.text.len(),
     );
     packet.extend_from_slice(&((header.len() + padding) as u32).to_le_bytes());
     packet.extend_from_slice(header.as_bytes());
@@ -72,5 +76,6 @@ pub fn to_packet(document: &OpDocument, fields: &str) -> Vec<u8> {
     extend_words(&mut packet, &document.sections);
     extend_words(&mut packet, &document.headings);
     packet.extend_from_slice(document.strings.as_bytes());
+    packet.extend_from_slice(document.text.as_bytes());
     packet
 }

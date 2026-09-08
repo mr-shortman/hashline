@@ -6,6 +6,7 @@ export interface PacketLayout {
   sections: number;
   headings: number;
   strings: number;
+  text: number;
 }
 export interface PacketHeader {
   layout: PacketLayout;
@@ -23,8 +24,9 @@ const fail = (message: string): never => {
 /**
  * u32 little-endian header byte length, UTF-8 JSON header padded to a multiple
  * of four, then the op buffer: ops, attrs, sections and headings as u32 arrays
- * followed by the UTF-8 string blob. The padding is what makes the typed-array
- * views possible without copying — see `src-tauri/markdown/src/packet.rs`.
+ * followed by the two UTF-8 blobs, strings and text. The padding is what makes
+ * the typed-array views possible without copying — see
+ * `src-tauri/markdown/src/packet.rs`.
  */
 export function decodePacket(buffer: ArrayBuffer): DocumentPacket {
   if (buffer.byteLength < 4) fail('Unvollständige Dokumentübertragung.');
@@ -40,7 +42,7 @@ export function decodePacket(buffer: ArrayBuffer): DocumentPacket {
   const layout = header.layout;
   if (
     !layout ||
-    ['ops', 'attrs', 'sections', 'headings', 'strings'].some(
+    ['ops', 'attrs', 'sections', 'headings', 'strings', 'text'].some(
       (field) => !Number.isInteger(layout[field as keyof PacketLayout]),
     )
   )
@@ -57,8 +59,14 @@ export function decodePacket(buffer: ArrayBuffer): DocumentPacket {
   const attrs = words(layout.attrs);
   const sections = words(layout.sections);
   const headings = words(layout.headings);
-  if (offset + layout.strings > buffer.byteLength)
-    fail('Unvollständige Dokumentübertragung.');
-  const strings = new Uint8Array(buffer, offset, layout.strings);
-  return { header, ops: { ops, attrs, strings, sections, headings } };
+  const bytes = (count: number): Uint8Array => {
+    if (offset + count > buffer.byteLength)
+      fail('Unvollständige Dokumentübertragung.');
+    const view = new Uint8Array(buffer, offset, count);
+    offset += count;
+    return view;
+  };
+  const strings = bytes(layout.strings);
+  const text = bytes(layout.text);
+  return { header, ops: { ops, attrs, strings, text, sections, headings } };
 }

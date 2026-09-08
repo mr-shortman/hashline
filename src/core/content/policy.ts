@@ -4,6 +4,7 @@ import {
   ALLOWED_TAGS,
   replaySection,
   type OpBuffer,
+  type OpStrings,
 } from '../markdown/opbuffer';
 import type { Heading } from '../markdown/types';
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
@@ -234,14 +235,20 @@ export function allowedAttributeValue(name: string, value: string): boolean {
  * `sanitizeFragment` is repeated here on the small known set of encoded
  * attributes rather than on a DOM walk (docs/decisions/007, P2.2).
  */
+export interface ReplayedFragment extends SanitizedFragment {
+  /** Document-text offset of every text node, in document order. */
+  textOffsets: number[];
+  textNodes: Text[];
+}
+
 export function replayFragment(
   buffer: OpBuffer,
-  text: string,
+  strings: OpStrings,
   index: number,
   headings: readonly Heading[],
   file: FileDocument,
   gateway: DocumentGateway,
-): SanitizedFragment {
+): ReplayedFragment {
   // Only parser-generated heading IDs survive; even passive HTML cannot claim app IDs.
   const remaining = new Map(headings.map((h) => [h.id, h.level]));
   let blockedImages = 0;
@@ -251,7 +258,13 @@ export function replayFragment(
   const pres: HTMLPreElement[] = [];
   const rejectedInputs: Element[] = [];
   const unavailableImages: HTMLImageElement[] = [];
-  const fragment = replaySection(buffer, text, index, {
+  const textOffsets: number[] = [];
+  const textNodes: Text[] = [];
+  const fragment = replaySection(buffer, strings, index, {
+    text(node, offset) {
+      textOffsets.push(offset);
+      textNodes.push(node);
+    },
     attribute(element, name, raw) {
       // DOMPurify trims every attribute value it keeps; the checks below and
       // `classifyUrl` therefore have to see the trimmed value, not the source.
@@ -346,7 +359,16 @@ export function replayFragment(
   for (const input of rejectedInputs) input.remove();
   for (const img of unavailableImages)
     unavailableImage(img, 'Bildzugriff nicht freigegeben');
-  return { fragment, blockedImages, remoteImages, hasImages, tables, pres };
+  return {
+    fragment,
+    blockedImages,
+    remoteImages,
+    hasImages,
+    tables,
+    pres,
+    textOffsets,
+    textNodes,
+  };
 }
 
 // String adapter for contract comparisons; the renderer inserts the fragment

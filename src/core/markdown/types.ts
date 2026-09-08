@@ -1,4 +1,4 @@
-import type { OpBuffer } from './opbuffer';
+import type { OpBuffer, OpStrings } from './opbuffer';
 
 export interface Heading {
   readonly id: string;
@@ -14,8 +14,8 @@ export interface MarkdownSection {
 }
 export interface ParsedDocument {
   readonly ops: OpBuffer;
-  /** The string blob, decoded once per document. */
-  readonly text: string;
+  /** Both string blobs, decoded once per document. */
+  readonly strings: OpStrings;
   readonly sections: readonly MarkdownSection[];
   readonly headings: readonly Heading[];
   readonly parseMs: number;

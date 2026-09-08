@@ -4,10 +4,13 @@ import {
   decodeHeadings,
   decodeStrings,
   replaySection,
+  sectionAt,
   sectionCount,
   sectionEncoded,
+  sectionFirstText,
   sectionHtml,
   sectionKey,
+  sectionTextRange,
 } from '../src/core/markdown/opbuffer';
 
 function replay(source: string): HTMLDivElement {
@@ -15,7 +18,7 @@ function replay(source: string): HTMLDivElement {
   const root = document.createElement('div');
   for (let i = 0; i < sectionCount(parsed.ops); i++)
     if (sectionEncoded(parsed.ops, i))
-      root.append(replaySection(parsed.ops, parsed.text, i));
+      root.append(replaySection(parsed.ops, parsed.strings, i));
   return root;
 }
 
@@ -68,10 +71,12 @@ it('gives identical content the same section key and different content another',
 it('keeps the HTML of fallback sections and nothing else', () => {
   const parsed = parseMarkdown('<div>roh</div>\n');
   expect(sectionEncoded(parsed.ops, 0)).toBe(false);
-  expect(sectionHtml(parsed.ops, parsed.text, 0)).toContain('<div>roh</div>');
+  expect(sectionHtml(parsed.ops, parsed.strings, 0)).toContain(
+    '<div>roh</div>',
+  );
   const encoded = parseMarkdown('Nur **Text**.\n');
   expect(sectionEncoded(encoded.ops, 0)).toBe(true);
-  expect(sectionHtml(encoded.ops, encoded.text, 0)).toBe('');
+  expect(sectionHtml(encoded.ops, encoded.strings, 0)).toBe('');
 });
 
 it('replays tables, task lists, code languages and links', () => {
@@ -88,4 +93,67 @@ it('replays tables, task lists, code languages and links', () => {
   expect(root.querySelector('input')?.hasAttribute('checked')).toBe(true);
   expect(root.querySelector('pre code')?.className).toBe('language-js');
   expect(root.querySelector('a')?.getAttribute('title')).toBe('Titel');
+});
+
+it('keeps the document text contiguous, in order and separated by block', () => {
+  const parsed = parseMarkdown(
+    '# Titel\n\nfoo\n\nbar\n\n- eins\n- zwei\n\n| a | b |\n| - | - |\n| c | d |\n',
+  );
+  // A separator between blocks is what keeps a match from running from the end
+  // of one block into the start of the next.
+  expect(parsed.strings.text).toBe('Titel\nfoo\nbar\neins\nzwei\na\nb\nc\nd');
+  expect(parsed.strings.text).not.toContain('foobar');
+});
+
+it('maps every text offset to the node the replay creates', () => {
+  const parsed = parseMarkdown(
+    '## Kapitel\n\nEin *kursiver* Absatz mit `code` und 😀.\n\n> Zitat\n',
+  );
+  const seen: { node: Text; offset: number; length: number }[] = [];
+  const root = document.createElement('div');
+  root.append(
+    replaySection(parsed.ops, parsed.strings, 0, {
+      attribute: (element, name, value) => element.setAttribute(name, value),
+      opened: () => {},
+      text: (node, offset, length) => seen.push({ node, offset, length }),
+    }),
+  );
+  expect(seen.length).toBeGreaterThan(3);
+  for (const { node, offset, length } of seen) {
+    expect(parsed.strings.text.substring(offset, offset + length)).toBe(
+      node.data,
+    );
+    expect(length).toBe(node.data.length);
+  }
+  // Ascending, so a binary search over the offsets is valid.
+  expect(seen.map((entry) => entry.offset)).toEqual(
+    [...seen.map((entry) => entry.offset)].sort((a, b) => a - b),
+  );
+});
+
+it('assigns every text offset to its section', () => {
+  const parsed = parseMarkdown(
+    ('## Abschnitt\n\nEin Absatz mit Text.\n\n'.repeat(60) + '\n').repeat(6),
+  );
+  expect(sectionCount(parsed.ops)).toBeGreaterThan(1);
+  for (let i = 0; i < sectionCount(parsed.ops); i++) {
+    const [start, end] = sectionTextRange(parsed.ops, i);
+    expect(sectionAt(parsed.ops, start)).toBe(i);
+    expect(sectionAt(parsed.ops, end - 1)).toBe(i);
+    expect(sectionFirstText(parsed.ops, i)).toBeGreaterThanOrEqual(start);
+    expect(sectionFirstText(parsed.ops, i)).toBeLessThan(end);
+  }
+  const [, last] = sectionTextRange(parsed.ops, sectionCount(parsed.ops) - 1);
+  expect(last).toBe(parsed.strings.text.length);
+});
+
+it('gives a raw section a separator of its own so neighbours cannot join', () => {
+  const parsed = parseMarkdown('Ende\n\n<div>roh</div>\n\nAnfang\n');
+  const raw = parsed.sections.findIndex(
+    (_, i) => !sectionEncoded(parsed.ops, i),
+  );
+  expect(raw).toBeGreaterThanOrEqual(0);
+  const [start, end] = sectionTextRange(parsed.ops, raw);
+  expect(parsed.strings.text.substring(start, end)).toBe('\n');
+  expect(parsed.strings.text).not.toContain('EndeAnfang');
 });

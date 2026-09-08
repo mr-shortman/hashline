@@ -43,6 +43,9 @@ pub const TAG_TABLE: u32 = 21;
 pub const TAG_THEAD: u32 = 22;
 pub const TAG_TBODY: u32 = 23;
 pub const TAG_TR: u32 = 25;
+pub const TAG_SUMMARY: u32 = 33;
+pub const TAG_DT: u32 = 37;
+pub const TAG_DD: u32 = 38;
 pub const TAG_TH: u32 = 26;
 pub const TAG_TD: u32 = 27;
 pub const TAG_INPUT: u32 = 28;
@@ -93,15 +96,31 @@ impl Fnv {
     }
 }
 
+// The blocks `indexText` treated as separate for search, unchanged: a match
+// must not run from the end of one block into the start of the next.
+const BLOCK_TAGS: [u32; 14] = [
+    TAG_P, TAG_LI, TAG_PRE, TAG_TD, TAG_TH, 1, 2, 3, 4, 5, 6, TAG_SUMMARY, TAG_DT, TAG_DD,
+];
+
 #[derive(Default)]
 pub struct Encoder {
     pub ops: Vec<u32>,
     pub attrs: Vec<u32>,
+    /// Attribute values, heading ids and texts, and the HTML of fallback
+    /// sections. Never document text.
     pub strings: String,
     units: u32,
+    /// The document's text in document order — what the search runs on.
+    pub text: String,
+    text_units: u32,
     pub attr_count: u32,
     hash: Fnv,
     pending: String,
+    /// Serial of the block element enclosing the current position, and of the
+    /// one that produced the previous text run.
+    blocks: Vec<u32>,
+    block_serial: u32,
+    last_block: Option<u32>,
 }
 
 impl Encoder {
@@ -110,6 +129,20 @@ impl Encoder {
         self.strings.push_str(value);
         self.units += utf16_len(value);
         offset
+    }
+    fn current_block(&self) -> Option<u32> {
+        self.blocks.last().copied()
+    }
+    /// Length of the document text so far, in UTF-16 code units.
+    pub fn text_units(&self) -> u32 {
+        self.text_units
+    }
+    /// Separates two sections whose text must not run together, for sections
+    /// that contribute no operations at all.
+    pub fn separate(&mut self) {
+        self.text.push('\n');
+        self.text_units += 1;
+        self.last_block = None;
     }
     /// Text runs are merged the way an HTML parser merges them, so that
     /// `isEqualNode` stays usable as a contract and fewer nodes are created.
@@ -123,8 +156,18 @@ impl Encoder {
         let pending = std::mem::take(&mut self.pending);
         self.hash.write(b"\x02");
         self.hash.write(pending.as_bytes());
-        let offset = self.intern(&pending);
+        let block = self.current_block();
+        if self.last_block.is_some() && block != self.last_block {
+            // The separator belongs to no operation; it only keeps a match from
+            // spanning a block boundary, exactly as `indexText` did.
+            self.text.push('\n');
+            self.text_units += 1;
+        }
+        self.last_block = block;
+        let offset = self.text_units;
+        self.text.push_str(&pending);
         let length = utf16_len(&pending);
+        self.text_units += length;
         self.ops.extend_from_slice(&[OP_TEXT, offset, length, 0]);
         self.pending = pending;
         self.pending.clear();
@@ -133,6 +176,15 @@ impl Encoder {
         self.flush_text();
         self.hash.write(b"\x00");
         self.hash.write_u32(tag);
+        // Every open pushes the block in force inside it, so the enclosing
+        // block is one lookup rather than a walk up the stack.
+        let block = if BLOCK_TAGS.contains(&tag) {
+            self.block_serial += 1;
+            Some(self.block_serial)
+        } else {
+            self.current_block()
+        };
+        self.blocks.push(block.unwrap_or(0));
         Open {
             tag,
             attr_start: self.attr_count,
@@ -157,6 +209,7 @@ impl Encoder {
     pub fn close(&mut self) {
         self.flush_text();
         self.hash.write(b"\x01");
+        self.blocks.pop();
         self.ops.extend_from_slice(&[OP_CLOSE, 0, 0, 0]);
     }
     pub fn end_section(&mut self) -> (usize, u64) {

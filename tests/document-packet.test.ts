@@ -33,7 +33,14 @@ it('decodes the header and views every buffer without copying', () => {
     digest: 'abc',
     readMs: 1,
     parseMs: 2,
-    layout: { ops: 4, attrs: 3, sections: 7, headings: 6, strings: 5 },
+    layout: {
+      ops: 4,
+      attrs: 3,
+      sections: 9,
+      headings: 6,
+      strings: 3,
+      text: 5,
+    },
   };
   const decoded = decodePacket(
     packet(
@@ -41,18 +48,19 @@ it('decodes the header and views every buffer without copying', () => {
       [
         [2, 0, 5, 0],
         [1, 0, 5],
-        [0, 1, 0, 0, 0, 0, 0],
-        [1, 0, 5, 0, 0, 5],
+        [0, 1, 0, 0, 0, 0, 0, 0, 5],
+        [1, 0, 3, 0, 0, 3],
       ],
-      'Hallo',
+      'ID.Hallo',
     ),
   );
   expect(decoded.header.path).toBe('/Grüße 日本語.md');
   expect(Array.from(decoded.ops.ops)).toEqual([2, 0, 5, 0]);
   expect(Array.from(decoded.ops.attrs)).toEqual([1, 0, 5]);
-  expect(Array.from(decoded.ops.sections)).toEqual([0, 1, 0, 0, 0, 0, 0]);
-  expect(Array.from(decoded.ops.headings)).toEqual([1, 0, 5, 0, 0, 5]);
-  expect(new TextDecoder().decode(decoded.ops.strings)).toBe('Hallo');
+  expect(Array.from(decoded.ops.sections)).toEqual([0, 1, 0, 0, 0, 0, 0, 0, 5]);
+  expect(Array.from(decoded.ops.headings)).toEqual([1, 0, 3, 0, 0, 3]);
+  expect(new TextDecoder().decode(decoded.ops.strings)).toBe('ID.');
+  expect(new TextDecoder().decode(decoded.ops.text)).toBe('Hallo');
 });
 
 it('pads the header so the word arrays stay four-byte aligned', () => {
@@ -61,7 +69,14 @@ it('pads the header so the word arrays stay four-byte aligned', () => {
     packet(
       {
         pad: 'x',
-        layout: { ops: 4, attrs: 0, sections: 0, headings: 0, strings: 0 },
+        layout: {
+          ops: 4,
+          attrs: 0,
+          sections: 0,
+          headings: 0,
+          strings: 0,
+          text: 0,
+        },
       },
       [[2, 0, 0, 0]],
       '',
