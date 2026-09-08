@@ -1,0 +1,14 @@
+{
+  "engine": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15",
+  "cssHighlights": true,
+  "passed": [
+    "CLI opening and controlled local image URL",
+    "WebKit text search in tables and code",
+    "Selection across paragraphs, lists, tables and code",
+    "Relative caller cwd, Unicode/spaces, relative Markdown link and fragment",
+    "Atomic rename reload preserves reading position",
+    "Delete/recreate keeps content on error and recovers",
+    "Native command rejects unapproved paths"
+  ],
+  "driverBackend": "wayland"
+}

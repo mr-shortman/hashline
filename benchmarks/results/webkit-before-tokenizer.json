@@ -1,0 +1,334 @@
+{
+  "method": "Release app through WebKitGTK WebDriver. CLI-to-observed-frame includes subprocess and driver overhead; double requestAnimationFrame is only a helper. Not a compositor or installed-package measurement.",
+  "repetitions": 30,
+  "raw": [
+    {
+      "fixture": "small",
+      "iteration": 0,
+      "cliToObservedFrameMs": 1254.9441299997852,
+      "hashline.content-to-frame": 257,
+      "hashline.read": 0.053229,
+      "hashline.parse": 888,
+      "hashline.open-to-content": 935,
+      "hashline.sanitize": 39
+    },
+    {
+      "fixture": "small",
+      "iteration": 1,
+      "cliToObservedFrameMs": 1027.7636180035188,
+      "hashline.content-to-frame": 56,
+      "hashline.read": 0.036899,
+      "hashline.parse": 875,
+      "hashline.open-to-content": 902.9999999999998,
+      "hashline.sanitize": 26
+    },
+    {
+      "fixture": "small",
+      "iteration": 2,
+      "cliToObservedFrameMs": 1018.9728600016679,
+      "hashline.content-to-frame": 61,
+      "hashline.read": 0.04128,
+      "hashline.parse": 868,
+      "hashline.open-to-content": 896.0000000000005,
+      "hashline.sanitize": 26.000000000000455
+    },
+    {
+      "fixture": "small",
+      "iteration": 3,
+      "cliToObservedFrameMs": 1029.06758399331,
+      "hashline.content-to-frame": 61,
+      "hashline.read": 0.03349,
+      "hashline.parse": 873,
+      "hashline.open-to-content": 901,
+      "hashline.sanitize": 26
+    },
+    {
+      "fixture": "small",
+      "iteration": 4,
+      "cliToObservedFrameMs": 1021.2934259980102,
+      "hashline.content-to-frame": 59,
+      "hashline.read": 0.04131,
+      "hashline.parse": 867,
+      "hashline.open-to-content": 896,
+      "hashline.sanitize": 27
+    },
+    {
+      "fixture": "small",
+      "iteration": 5,
+      "cliToObservedFrameMs": 1018.101250003383,
+      "hashline.content-to-frame": 61,
+      "hashline.read": 0.035840000000000004,
+      "hashline.parse": 867,
+      "hashline.open-to-content": 894,
+      "hashline.sanitize": 25
+    },
+    {
+      "fixture": "small",
+      "iteration": 6,
+      "cliToObservedFrameMs": 1024.481932996423,
+      "hashline.content-to-frame": 62.99999999999909,
+      "hashline.read": 0.033599000000000004,
+      "hashline.parse": 868,
+      "hashline.open-to-content": 897,
+      "hashline.sanitize": 26
+    },
+    {
+      "fixture": "small",
+      "iteration": 7,
+      "cliToObservedFrameMs": 1018.6545430042315,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.03499,
+      "hashline.parse": 867.9999999999991,
+      "hashline.open-to-content": 895,
+      "hashline.sanitize": 25
+    },
+    {
+      "fixture": "small",
+      "iteration": 8,
+      "cliToObservedFrameMs": 1023.6624509998364,
+      "hashline.content-to-frame": 66,
+      "hashline.read": 0.04902,
+      "hashline.parse": 868,
+      "hashline.open-to-content": 896,
+      "hashline.sanitize": 26
+    },
+    {
+      "fixture": "small",
+      "iteration": 9,
+      "cliToObservedFrameMs": 1027.3106820022804,
+      "hashline.content-to-frame": 64.00000000000182,
+      "hashline.read": 0.047299,
+      "hashline.parse": 873,
+      "hashline.open-to-content": 902,
+      "hashline.sanitize": 27
+    },
+    {
+      "fixture": "small",
+      "iteration": 10,
+      "cliToObservedFrameMs": 1022.586452003452,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.034279000000000004,
+      "hashline.parse": 871,
+      "hashline.open-to-content": 899,
+      "hashline.sanitize": 25.99999999999818
+    },
+    {
+      "fixture": "small",
+      "iteration": 11,
+      "cliToObservedFrameMs": 1027.9478359952918,
+      "hashline.content-to-frame": 62.99999999999818,
+      "hashline.read": 0.054258999999999995,
+      "hashline.parse": 870,
+      "hashline.open-to-content": 903,
+      "hashline.sanitize": 31
+    },
+    {
+      "fixture": "small",
+      "iteration": 12,
+      "cliToObservedFrameMs": 1022.7208699943731,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.05433,
+      "hashline.parse": 868,
+      "hashline.open-to-content": 901,
+      "hashline.sanitize": 31
+    },
+    {
+      "fixture": "small",
+      "iteration": 13,
+      "cliToObservedFrameMs": 1023.3260140012135,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.034579000000000006,
+      "hashline.parse": 864,
+      "hashline.open-to-content": 900.9999999999982,
+      "hashline.sanitize": 34.99999999999818
+    },
+    {
+      "fixture": "small",
+      "iteration": 14,
+      "cliToObservedFrameMs": 1023.118926997995,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.036109,
+      "hashline.parse": 865,
+      "hashline.open-to-content": 899.0000000000018,
+      "hashline.sanitize": 32
+    },
+    {
+      "fixture": "small",
+      "iteration": 15,
+      "cliToObservedFrameMs": 1017.5812149973353,
+      "hashline.content-to-frame": 62.99999999999636,
+      "hashline.read": 0.03281,
+      "hashline.parse": 866,
+      "hashline.open-to-content": 894,
+      "hashline.sanitize": 26
+    },
+    {
+      "fixture": "small",
+      "iteration": 16,
+      "cliToObservedFrameMs": 1025.7516679994296,
+      "hashline.content-to-frame": 63.99999999999636,
+      "hashline.read": 0.035769999999999996,
+      "hashline.parse": 870,
+      "hashline.open-to-content": 904,
+      "hashline.sanitize": 32
+    },
+    {
+      "fixture": "small",
+      "iteration": 17,
+      "cliToObservedFrameMs": 1029.0401439997368,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.03412,
+      "hashline.parse": 868.0000000000036,
+      "hashline.open-to-content": 901,
+      "hashline.sanitize": 31
+    },
+    {
+      "fixture": "small",
+      "iteration": 18,
+      "cliToObservedFrameMs": 1032.0069230001536,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.03455,
+      "hashline.parse": 870,
+      "hashline.open-to-content": 907,
+      "hashline.sanitize": 30.999999999996362
+    },
+    {
+      "fixture": "small",
+      "iteration": 19,
+      "cliToObservedFrameMs": 1026.5977689996362,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.035089999999999996,
+      "hashline.parse": 870,
+      "hashline.open-to-content": 902,
+      "hashline.sanitize": 30
+    },
+    {
+      "fixture": "small",
+      "iteration": 20,
+      "cliToObservedFrameMs": 1025.3751220006961,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.03601,
+      "hashline.parse": 871,
+      "hashline.open-to-content": 903,
+      "hashline.sanitize": 30
+    },
+    {
+      "fixture": "small",
+      "iteration": 21,
+      "cliToObservedFrameMs": 1023.6573099973612,
+      "hashline.content-to-frame": 63.99999999999636,
+      "hashline.read": 0.04805,
+      "hashline.parse": 865,
+      "hashline.open-to-content": 899,
+      "hashline.sanitize": 32
+    },
+    {
+      "fixture": "small",
+      "iteration": 22,
+      "cliToObservedFrameMs": 1022.8206089959713,
+      "hashline.content-to-frame": 63.99999999999636,
+      "hashline.read": 0.034048999999999996,
+      "hashline.parse": 866,
+      "hashline.open-to-content": 900.0000000000036,
+      "hashline.sanitize": 30.999999999996362
+    },
+    {
+      "fixture": "small",
+      "iteration": 23,
+      "cliToObservedFrameMs": 1024.0129070007242,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.03452,
+      "hashline.parse": 867.0000000000036,
+      "hashline.open-to-content": 900,
+      "hashline.sanitize": 29.999999999996362
+    },
+    {
+      "fixture": "small",
+      "iteration": 24,
+      "cliToObservedFrameMs": 1024.9568369981716,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.033899,
+      "hashline.parse": 868,
+      "hashline.open-to-content": 902.0000000000036,
+      "hashline.sanitize": 32
+    },
+    {
+      "fixture": "small",
+      "iteration": 25,
+      "cliToObservedFrameMs": 1025.1114960046834,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.049499999999999995,
+      "hashline.parse": 866,
+      "hashline.open-to-content": 899,
+      "hashline.sanitize": 30.999999999996362
+    },
+    {
+      "fixture": "small",
+      "iteration": 26,
+      "cliToObservedFrameMs": 1022.4248529993929,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.036149999999999995,
+      "hashline.parse": 865.0000000000036,
+      "hashline.open-to-content": 897.0000000000036,
+      "hashline.sanitize": 30.000000000003638
+    },
+    {
+      "fixture": "small",
+      "iteration": 27,
+      "cliToObservedFrameMs": 1023.3119839977007,
+      "hashline.content-to-frame": 64,
+      "hashline.read": 0.036719,
+      "hashline.parse": 867.0000000000036,
+      "hashline.open-to-content": 900,
+      "hashline.sanitize": 31
+    },
+    {
+      "fixture": "small",
+      "iteration": 28,
+      "cliToObservedFrameMs": 1030.4183090047445,
+      "hashline.content-to-frame": 58,
+      "hashline.read": 0.05045,
+      "hashline.parse": 872.0000000000036,
+      "hashline.open-to-content": 905,
+      "hashline.sanitize": 31
+    },
+    {
+      "fixture": "small",
+      "iteration": 29,
+      "cliToObservedFrameMs": 1022.3249249975197,
+      "hashline.content-to-frame": 70,
+      "hashline.read": 0.047349999999999996,
+      "hashline.parse": 867,
+      "hashline.open-to-content": 899,
+      "hashline.sanitize": 30
+    }
+  ],
+  "summary": {
+    "small": {
+      "cliToObservedFrameMs": {
+        "median": 1023.8376790002803,
+        "p95": 1032.0069230001536
+      },
+      "hashline.content-to-frame": {
+        "median": 64.0,
+        "p95": 70
+      },
+      "hashline.read": {
+        "median": 0.0360595,
+        "p95": 0.054258999999999995
+      },
+      "hashline.parse": {
+        "median": 868.0,
+        "p95": 875
+      },
+      "hashline.open-to-content": {
+        "median": 900.0000000000018,
+        "p95": 907
+      },
+      "hashline.sanitize": {
+        "median": 30.00000000000182,
+        "p95": 34.99999999999818
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Only the local reader window may call validated document adapters.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-set-title",
+    "allow-choose-file",
+    "allow-read-document",
+    "allow-release-document",
+    "allow-watch-document",
+    "allow-unwatch-document",
+    "allow-follow-link",
+    "allow-copy-text",
+    "allow-take-open-requests"
+  ]
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "small",
+    "bytes": 102465,
+    "blocks": 2891,
+    "parserDomNodes": 16187,
+    "sha256": "fbe5ae66a2ebfa2050774a485013b139601e78b82e7e12bc0b1f3e81f3b3dbb5"
+  },
+  {
+    "name": "medium",
+    "bytes": 1048581,
+    "blocks": 29251,
+    "parserDomNodes": 163803,
+    "sha256": "638011c98a6b1fdc8879123ff1eeffafaa173f1fb014a4c3d53c4dec708e59fa"
+  },
+  {
+    "name": "large",
+    "bytes": 10486101,
+    "blocks": 289301,
+    "parserDomNodes": 1620083,
+    "sha256": "330d8fb7e3ba07225fff00815257c8f2dab07eb075ce3735d6e4e89efa69ce57"
+  },
+  {
+    "name": "long-line",
+    "bytes": 1000015,
+    "blocks": 3,
+    "parserDomNodes": 6,
+    "sha256": "d45438a9e82637397f2b0a6ed2d6f2e761abd9fa4c4a682135a1a70b3735c83f"
+  },
+  {
+    "name": "deep-list",
+    "bytes": 11004,
+    "blocks": 3,
+    "parserDomNodes": 603,
+    "sha256": "9f61e9214d7226a1c137bd8736477c1c62ecee7c2f4a3d5095d6c96895cb51e1"
+  },
+  {
+    "name": "wide-table",
+    "bytes": 91722,
+    "blocks": 3,
+    "parserDomNodes": 30613,
+    "sha256": "b78970def3d29b072c8acce2343fee343f4c3cc679b09ff5b4f4e2b4d34086f2"
+  },
+  {
+    "name": "many-blocks",
+    "bytes": 180018,
+    "blocks": 40002,
+    "parserDomNodes": 60003,
+    "sha256": "3a0beb9cf44046763bf737e4d36e7489eaa420ca686d614ba72492e534d49026"
+  }
+]
