@@ -5,7 +5,7 @@ import {
   replaySection,
   type OpBuffer,
 } from '../markdown/opbuffer';
-import type { Heading, ParsedMarkdown } from '../markdown/types';
+import type { Heading } from '../markdown/types';
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
 
 declare const clean: unique symbol;
@@ -72,11 +72,12 @@ export interface SanitizedFragment {
 }
 
 export function sanitizeFragment(
-  parsed: ParsedMarkdown,
+  html: string,
+  headings: readonly Heading[],
   file: FileDocument,
   gateway: DocumentGateway,
 ): SanitizedFragment {
-  const fragment = DOMPurify.sanitize(parsed.html, {
+  const fragment = DOMPurify.sanitize(html, {
     RETURN_DOM_FRAGMENT: true,
     // The op buffer encodes exactly these tables; a tag or attribute name
     // outside them is not expressible there at all (docs/decisions/007).
@@ -100,7 +101,7 @@ export function sanitizeFragment(
     ],
   });
   // Only parser-generated heading IDs survive; even passive HTML cannot claim app IDs.
-  const remaining = new Map(parsed.headings.map((h) => [h.id, h.level]));
+  const remaining = new Map(headings.map((h) => [h.id, h.level]));
   let blockedImages = 0;
   let remoteImages = 0;
   let hasImages = false;
@@ -351,11 +352,17 @@ export function replayFragment(
 // String adapter for contract comparisons; the renderer inserts the fragment
 // directly, avoiding serialization and a second HTML parse.
 export function sanitizeContent(
-  parsed: ParsedMarkdown,
+  html: string,
+  headings: readonly Heading[],
   file: FileDocument,
   gateway: DocumentGateway,
 ): CleanContent {
-  const { fragment, blockedImages } = sanitizeFragment(parsed, file, gateway);
+  const { fragment, blockedImages } = sanitizeFragment(
+    html,
+    headings,
+    file,
+    gateway,
+  );
   const container = document.createElement('div');
   container.append(fragment);
   return { html: container.innerHTML as SanitizedHtml, blockedImages };

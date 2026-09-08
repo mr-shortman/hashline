@@ -1,14 +1,32 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { decodeDocument } from './document-packet';
+import { decodePacket } from './document-packet';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { DocumentGateway, FileDocument, OpenRequest } from './gateway';
+import { readDocument } from '../core/markdown/parser';
+import { loadParser } from '../core/markdown/wasm';
+import type {
+  DocumentGateway,
+  FileDocument,
+  OpenRequest,
+  ReadDocument,
+} from './gateway';
 
 class TauriGateway implements DocumentGateway {
   private restoredDevFile = false;
   choose = (): Promise<string[]> => invoke('choose_file');
-  read = async (path: string): Promise<FileDocument> =>
-    decodeDocument(await invoke<ArrayBuffer>('read_document', { path }));
+  read = async (path: string): Promise<ReadDocument> => {
+    const packet = decodePacket(
+      await invoke<ArrayBuffer>('read_document', { path }),
+    );
+    // The header carries the file metadata beside the buffer layout and the
+    // native parse time; neither belongs on the FileDocument.
+    const { layout, parseMs, ...file } = packet.header;
+    void layout;
+    return {
+      file: file as unknown as FileDocument,
+      parsed: readDocument(packet.ops, Number(parseMs) || 0),
+    };
+  };
   release = (id: string): Promise<void> => invoke('release_document', { id });
   allowRemoteImages = (file: FileDocument): Promise<void> =>
     invoke('allow_remote_images', { id: file.id });
@@ -103,7 +121,7 @@ class BrowserGateway implements DocumentGateway {
       input.click();
     });
   }
-  async read(path: string): Promise<FileDocument> {
+  async read(path: string): Promise<ReadDocument> {
     const start = performance.now();
     const file = this.files.get(path);
     if (!file)
@@ -120,12 +138,19 @@ class BrowserGateway implements DocumentGateway {
     } catch {
       throw new Error('Die Datei ist nicht gültig UTF-8-kodiert.');
     }
+    // The same parser the desktop runs natively, as WebAssembly. Loading it
+    // here keeps it out of the desktop bundle's startup path entirely.
+    const parser = await loadParser();
+    const readMs = performance.now() - start;
     return {
-      id: String(++this.sequence),
-      path,
-      name: file.name,
-      source,
-      readMs: performance.now() - start,
+      file: {
+        id: String(++this.sequence),
+        path,
+        name: file.name,
+        digest: `${file.size}:${file.lastModified}:${source.length}`,
+        readMs,
+      },
+      parsed: parser.parse(source),
     };
   }
   async watch(): Promise<() => void> {

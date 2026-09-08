@@ -6,22 +6,17 @@ export interface Heading {
   readonly level: number;
 }
 export interface MarkdownSection {
+  /** Content identity, for recognizing unchanged sections across reloads. */
+  readonly key: string;
+  /** Only fallback sections carry HTML; encoded sections replay operations. */
   readonly html: string;
   readonly headings: readonly Heading[];
 }
-export interface ParsedMarkdown {
-  readonly sections?: readonly MarkdownSection[];
-  // The same sections as replayable operations; absent outside sectioned
-  // parses. Sections the encoder could not reproduce are marked inside the
-  // buffer and keep the HTML path (docs/decisions/007, P2.1).
-  readonly ops?: OpBuffer;
-  readonly html: string;
+export interface ParsedDocument {
+  readonly ops: OpBuffer;
+  /** The string blob, decoded once per document. */
+  readonly text: string;
+  readonly sections: readonly MarkdownSection[];
   readonly headings: readonly Heading[];
   readonly parseMs: number;
 }
-export interface ParseRequest {
-  id: number;
-  source: string;
-}
-export type ParseResponse =
-  { id: number; result: ParsedMarkdown } | { id: number; error: string };

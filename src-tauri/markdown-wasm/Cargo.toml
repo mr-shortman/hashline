@@ -1,0 +1,21 @@
+# WebAssembly wrapper around the parser, for the browser preview and the test
+# suite (docs/decisions/008-parser-reference.md). Nothing but a byte interface:
+# no wasm-bindgen, no JavaScript glue generation.
+[package]
+name = "hashline-markdown-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hashline-markdown = { path = "../markdown" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

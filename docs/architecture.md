@@ -5,28 +5,34 @@ Dateien, Revisionen und Watcher. `DocumentGateway` begrenzt den Plattformzugriff
 nur `src/platform/tauri.ts` importiert Tauri-Frontend-APIs. Der Browseradapter ist
 eine Entwicklungshilfe und besitzt keine nativen Rechte.
 
-Native Dokumente werden als Binärantwort übertragen: vier Bytes Metadatenlänge
-(u32 little-endian), UTF-8-JSON-Metadaten und anschließend der unveränderte
-UTF-8-Markdowntext. Damit entfällt das JSON-Escaping des gesamten Dokuments.
-Der Adapter prüft die Paketgrenzen und dekodiert UTF-8 strikt.
+Der Parser läuft in Rust (`src-tauri/markdown`, `pulldown-cmark`). Er liest das
+Dokument einmal und erzeugt den Op-Buffer, den der Renderer abspielt; ein
+HTML-String entsteht nur noch für Abschnitte mit rohem HTML. Dieselbe Bibliothek
+wird nach WebAssembly übersetzt und bedient Browser-Vorschau und Testlauf, damit
+es genau eine Parserimplementierung gibt
+([008](decisions/008-parser-reference.md)).
 
-`WorkerMarkdownService` verwendet einen wiederverwendbaren Worker. Ein neuer
-Auftrag beendet einen noch beschäftigten Worker; es gibt keine unbeschränkte
-Auftragswarteschlange. Nach 30 Sekunden ohne neue Parserarbeit wird der Worker
-beendet, um seinen Lexer-Heap freizugeben. Der Controller prüft steigende Anfrage-IDs nach Lesen und
-Parsing. Veraltete native Dokumenthandles werden freigegeben. Ein fehlgeschlagener
-Dateiwechsel erhält Inhalt und Namen der erfolgreich geöffneten Datei.
-Kontextunabhängige wiederkehrende Listen können ihren Tokenbaum innerhalb
-derselben Lexerinstanz weiterverwenden. Dieser Cache umfasst höchstens 64
-Einträge mit je höchstens 8 KiB Quelltext. Mögliches HTML im Dokument sowie
-Referenz-/Tasksyntax in der Liste schließen diesen Pfad aus. Die globale
-Inline-Auflösung bleibt in Marked; veränderliche äußere Token werden kopiert.
+Native Dokumente werden als Binärantwort übertragen: vier Bytes Kopflänge
+(u32 little-endian), UTF-8-JSON-Kopf auf ein Vielfaches von vier aufgefüllt und
+anschließend die Puffer `ops`, `attrs`, `sections`, `headings` als u32-Arrays
+sowie der UTF-8-Zeichenblob. Die Auffüllung ist es, die die typisierten Sichten
+ohne Kopie erlaubt. Der Markdowntext selbst überquert die Grenze nicht mehr; für
+Änderungserkennung trägt der Kopf einen Inhaltsfingerabdruck. Der Adapter prüft
+die Paketgrenzen und dekodiert UTF-8 strikt.
 
-DOMPurify läuft auf dem Hauptthread mit einer expliziten Element-/Attributliste.
-Anschließend werden IDs, Links, Aufgabenlisten und Ressourcen geprüft und
-umgeschrieben. Der Worker gruppiert vollständige semantische Blöcke zu
-HTML-Abschnitten; globale Referenzen und Überschriften-IDs werden zuvor für das
-gesamte Dokument aufgelöst. Nur `DocumentViewport` fügt unmittelbar bereinigte
+Der Controller prüft steigende Anfrage-IDs nach dem Lesen. Veraltete native
+Dokumenthandles werden freigegeben. Ein fehlgeschlagener Dateiwechsel erhält
+Inhalt und Namen der erfolgreich geöffneten Datei.
+
+Der Renderer erzeugt die Knoten unmittelbar aus den Operationen: kein
+HTML-Parse, kein Fremddokument, keine Adoption. Tag- und Attributnamen sind
+durch das Format auf die Sanitizerlisten begrenzt und damit gar nicht erst
+ausdrückbar, wenn sie nicht erlaubt sind; Attribut*werte* prüft `replayFragment`
+mit derselben Politik wie der HTML-Pfad. DOMPurify bleibt für Abschnitte mit
+rohem HTML zuständig und läuft dort auf dem Hauptthread mit einer expliziten
+Element-/Attributliste. Der Parser gruppiert vollständige semantische Blöcke zu
+Abschnitten von rund 16 KiB; globale Referenzen und Überschriften-IDs werden
+zuvor für das gesamte Dokument aufgelöst. Nur `DocumentViewport` fügt bereinigte
 `DocumentFragment`s in sein DOM ein. Die Bereinigung und Einfügung laufen in
 abbrechbaren Aufgaben mit echten Event-Loop-Grenzen. Unsicheres rohes HTML behält
 ein gemeinsames Fragment. Das Gruppierungsziel ist keine Größenobergrenze für
@@ -72,9 +78,10 @@ nicht schreibbare Einstellungen blockieren den Reader nicht.
 
 ## Markdown-Regeln
 
-Marked läuft mit `gfm: true`, `breaks: false`, `async: false` im Worker. Softbreaks
-bleiben Zeilenumbrüche im Absatz; zwei abschließende Leerzeichen erzeugen `<br>`.
-Der Adapter erhält GFM-Tabellen, Autolinks, Durchstreichung und deaktivierte Tasks.
+`pulldown-cmark` läuft mit Tabellen, Durchstreichung, Aufgabenlisten und
+Fußnoten. Softbreaks bleiben Zeilenumbrüche im Absatz; zwei abschließende
+Leerzeichen erzeugen `<br>`. Tabellenausrichtung wird als `align` emittiert, weil
+`style` nicht auf der Attributliste steht.
 
 Überschriften-IDs: Inline-Text → NFKC → Kleinschreibung → nur Unicode-Buchstaben,
 Ziffern, Leerraum, Bindestrich und Unterstrich behalten → Leerraum/Unterstriche zu
@@ -84,7 +91,8 @@ Suffix-Namen werden ebenfalls berücksichtigt. TOC und Dokument teilen dieselben
 Metadaten. Es wird keine vollständige GitHub-Kompatibilität behauptet. Häufige
 HTML-Entities werden für Titel dekodiert; eigene HTML-IDs werden verworfen.
 
-Der optimierte Tokenizer verwendet weiterhin die Marked-Grammatik. Die Absicherung
-vergleicht alle 652 offiziellen CommonMark-0.31.2-Beispiele und die GFM-Fixture mit
-der ungeänderten, festgeschriebenen Marked-Version. Das ist ein Gleichheitstest des
-Adapters, keine Behauptung vollständiger CommonMark-Konformität des GFM-Modus.
+Die Absicherung vergleicht alle 652 offiziellen CommonMark-0.31.2-Beispiele
+gegen die **Spezifikation** — das `html`-Feld der Beispieldatei — mit
+`isEqualNode` statt Stringvergleich. Ausgenommen sind die erzeugten
+Überschriften-IDs und Whitespace an Blockgrenzen; beide Ausnahmen und ihre
+Begründung stehen in [008](decisions/008-parser-reference.md).

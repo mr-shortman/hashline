@@ -1,16 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdown } from '../src/core/markdown/parser';
-import { classifyUrl, sanitizeContent } from '../src/core/content/policy';
+import { parseMarkdown, renderClean, testFile } from './parser';
+import { classifyUrl } from '../src/core/content/policy';
 import type { DocumentGateway, FileDocument } from '../src/platform/gateway';
 
-const file: FileDocument = {
-  id: '1',
-  path: '/docs/a.md',
-  name: 'a.md',
-  source: '',
-  readMs: 0,
-};
 const gateway = {
   imageUrl: (_file: FileDocument, source: string) =>
     `hashline-image://localhost/1/${encodeURIComponent(source)}`,
@@ -32,22 +25,31 @@ describe('Markdown contract', () => {
     ]);
     expect(parseMarkdown(source).headings).toEqual(parsed.headings);
   });
+  it('keeps heading text for the outline, without markup', () => {
+    const parsed = parseMarkdown('## Ein **fetter** `Titel` mit [Link](a.md)');
+    expect(parsed.headings).toEqual([
+      {
+        id: 'doc-ein-fetter-titel-mit-link',
+        text: 'Ein fetter Titel mit Link',
+        level: 2,
+      },
+    ]);
+  });
   it('preserves CommonMark breaks and renders GFM as passive semantic HTML', () => {
-    const parsed = parseMarkdown(
+    const root = renderClean(
       'soft\nbreak\n\nhard  \nbreak\n\n- [x] done\n\n| a | b |\n| - | - |\n| c | d |',
+      gateway,
     );
-    expect(parsed.html).toContain('soft\nbreak');
-    expect(parsed.html).toContain('hard<br>');
-    expect(parsed.html).toContain('<table>');
-    expect(parsed.html).toContain('disabled');
+    expect(root.querySelector('p')?.textContent).toBe('soft\nbreak');
+    expect(root.querySelectorAll('br')).toHaveLength(1);
+    expect(root.querySelector('table')).not.toBeNull();
+    expect(root.querySelector('input')?.hasAttribute('disabled')).toBe(true);
   });
   it('removes active content, app impersonation and remote resource requests', () => {
-    const parsed = parseMarkdown(
+    const root = renderClean(
       readFileSync('tests/fixtures/hostile.md', 'utf8'),
+      gateway,
     );
-    const { html } = sanitizeContent(parsed, file, gateway);
-    const root = document.createElement('div');
-    root.innerHTML = html;
     expect(
       root.querySelector('script,style,iframe,svg,form,input[type=text]'),
     ).toBeNull();
@@ -59,16 +61,19 @@ describe('Markdown contract', () => {
     expect(root.querySelectorAll('a[data-link]')).toHaveLength(1);
   });
   it('blocks remote and embedded images before any request and preserves original link targets', () => {
-    const { html, blockedImages } = sanitizeContent(
-      parseMarkdown(
-        '![x](https://example.com/a.png)\n![y](data:image/png;base64,aaa)\n[go](file.md#hi)',
-      ),
-      file,
+    const root = renderClean(
+      '![x](https://example.com/a.png)\n\n![y](data:image/png;base64,aaa)\n\n[go](file.md#hi)',
       gateway,
     );
-    expect(blockedImages).toBe(2);
-    expect(html).not.toContain('src=');
-    expect(html).toContain('data-link="file.md#hi"');
+    expect(root.querySelectorAll('img[data-unavailable]')).toHaveLength(2);
+    expect(root.querySelector('img[src]')).toBeNull();
+    expect(root.querySelector('a')?.dataset.link).toBe('file.md#hi');
+  });
+  it('resolves local images through the gateway', () => {
+    const root = renderClean('![x](bild.png)', gateway, testFile);
+    expect(root.querySelector('img')?.getAttribute('src')).toBe(
+      'hashline-image://localhost/1/bild.png',
+    );
   });
   it.each([
     'javascript:alert(1)',
@@ -90,6 +95,8 @@ describe('Markdown contract', () => {
 });
 
 it('keeps locale-independent Unicode heading case mapping', () => {
+  // The rule itself, applied in JavaScript, is the reference for the Rust port
+  // (docs/decisions/008-parser-reference.md, section 4).
   const headings = ['I İ ı i', 'Σ ΟΣ', 'ẞ Straße', 'ＡＢＣ ﬁ', 'GRÜẞE 日本語'];
   for (const heading of headings) {
     const expected =

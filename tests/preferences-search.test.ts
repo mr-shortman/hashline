@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { parseMarkdown } from '../src/core/markdown/parser';
+import { renderStructural } from './parser';
 import { describe, expect, it, vi } from 'vitest';
 import { validatePreferences } from '../src/features/preferences/preferences';
 import {
@@ -63,10 +63,9 @@ describe('search traversal contract', () => {
   it.each(['hostile.md', 'reader.md', 'search-context.html'])(
     'preserves text, document order and UTF-16 part boundaries: %s',
     (fixture) => {
-      const root = document.createElement('section');
-      root.innerHTML = parseMarkdown(
+      const root = renderStructural(
         readFileSync(`tests/fixtures/${fixture}`, 'utf8'),
-      ).html;
+      );
       const index = indexText(root);
       expect({
         text: index.text,
@@ -79,10 +78,9 @@ describe('search traversal contract', () => {
     },
   );
   it('indexes the deep-list stress fixture without call-stack recursion', () => {
-    const root = document.createElement('section');
-    root.innerHTML = parseMarkdown(
+    const root = renderStructural(
       readFileSync('tests/fixtures/deep-list.md', 'utf8'),
-    ).html;
+    );
     const index = indexText(root);
     expect(index.parts.length).toBeGreaterThan(100);
     expect(index.parts.map((part) => part.node.data).join('')).toBe(

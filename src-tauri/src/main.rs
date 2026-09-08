@@ -42,8 +42,11 @@ struct FileDocument {
     id: String,
     path: String,
     name: String,
-    source: String,
+    /// Content fingerprint. The source itself no longer crosses the IPC
+    /// boundary: the frontend receives the parsed op buffer instead.
+    digest: String,
     read_ms: f64,
+    parse_ms: f64,
     process_started_at_ms: f64,
 }
 #[derive(Clone, Serialize)]
@@ -55,6 +58,17 @@ struct Change {
 struct LinkResult {
     path: Option<String>,
     fragment: Option<String>,
+}
+
+/// FNV-1a over the file contents; used only to notice that a reload brought
+/// the same bytes back, never for integrity.
+fn digest(source: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for &byte in source.as_bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x1000_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 fn authorize(state: &Documents, path: PathBuf) -> String {
@@ -157,12 +171,18 @@ async fn read_document(
             source
         };
         let id = state.sequence.fetch_add(1, Ordering::Relaxed).to_string();
-        let mut result = FileDocument {
+        let read_ms = start.elapsed().as_secs_f64() * 1000.0;
+        // Parsing happens here, off the WebView's thread, and only the op
+        // buffer crosses the boundary (docs/decisions/007, P2.3).
+        let parse_start = Instant::now();
+        let document = hashline_markdown::parse(&source);
+        let result = FileDocument {
             id: id.clone(),
             path: path.to_string_lossy().into_owned(),
             name: name.to_string_lossy().into_owned(),
-            source,
-            read_ms: start.elapsed().as_secs_f64() * 1000.0,
+            digest: digest(&source),
+            read_ms,
+            parse_ms: parse_start.elapsed().as_secs_f64() * 1000.0,
             process_started_at_ms: PROCESS_START
                 .get()
                 .unwrap()
@@ -171,14 +191,17 @@ async fn read_document(
                 .as_secs_f64()
                 * 1000.0,
         };
-        // Binary IPC avoids escaping/reparsing the entire Markdown as JSON.
-        // Only the small metadata header is JSON; the source remains UTF-8.
-        let source = std::mem::take(&mut result.source);
-        let header = serde_json::to_vec(&result).map_err(|_| "Dokumentmetadaten sind ungültig.")?;
-        let mut packet = Vec::with_capacity(4 + header.len() + source.len());
-        packet.extend_from_slice(&(header.len() as u32).to_le_bytes());
-        packet.extend_from_slice(&header);
-        packet.extend_from_slice(source.as_bytes());
+        // Binary IPC avoids escaping and reparsing the document as JSON. Only
+        // the small metadata header is JSON; the buffers follow it raw.
+        let header = serde_json::to_string(&result)
+            .map_err(|_| "Dokumentmetadaten sind ungültig.".to_string())?;
+        let packet = hashline_markdown::to_packet(
+            &document,
+            header
+                .strip_prefix('{')
+                .and_then(|fields| fields.strip_suffix('}'))
+                .unwrap_or_default(),
+        );
         let mut sessions = state.sessions.lock().unwrap();
         if sessions.len() >= 8 {
             return Err("Zu viele gleichzeitige Dateiöffnungen. Bitte erneut versuchen.".into());

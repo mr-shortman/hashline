@@ -16,7 +16,7 @@ import {
   sanitizeFragment,
   unavailableImage,
 } from '../../core/content/policy';
-import { decodeStrings, sectionEncoded } from '../../core/markdown/opbuffer';
+import { sectionEncoded } from '../../core/markdown/opbuffer';
 import { nextTask, retireContent } from './schedule';
 import { el } from '../../ui/dom';
 
@@ -56,7 +56,7 @@ export function createViewport(options: ViewportOptions): Viewport {
   let searchCleanup: (() => void) | undefined;
   let actions: ViewportActions | null = null;
   let position: ReadingPosition | undefined;
-  let retainedSections: { html: string; shell: HTMLElement }[] = [];
+  let retainedSections: { key: string; shell: HTMLElement }[] = [];
   let indexes = new WeakMap<HTMLElement, TextIndex>();
   let ranges: Match[] = [];
   const visibleSections = new Set<Element>();
@@ -248,21 +248,21 @@ export function createViewport(options: ViewportOptions): Viewport {
     const active = doc!;
     const preparation = new AbortController();
     const reusable = new Map<string, HTMLElement[]>();
-    for (const { html, shell } of retainedSections.slice().reverse()) {
+    for (const { key, shell } of retainedSections.slice().reverse()) {
       if (
         shell.parentNode !== root ||
         shell.dataset.populated !== 'true' ||
         shell.dataset.hasImages === 'true'
       )
         continue;
-      const candidates = reusable.get(html) || [];
+      const candidates = reusable.get(key) || [];
       candidates.push(shell);
-      reusable.set(html, candidates);
+      reusable.set(key, candidates);
     }
-    const planned = active.sections.map(({ html }) => {
-      const shell = reusable.get(html)?.pop() || document.createElement('div');
+    const planned = active.sections.map(({ key }) => {
+      const shell = reusable.get(key)?.pop() || document.createElement('div');
       shell.className = 'markdown-section';
-      return { html, shell };
+      return { key, shell };
     });
     const keep = new Set(planned.map(({ shell }) => shell));
     root.dataset.renderState = 'retiring';
@@ -351,9 +351,6 @@ export function createViewport(options: ViewportOptions): Viewport {
         selection?.removeAllRanges();
         selection?.addRange(range);
       };
-      // The string blob is decoded once per document, on first use, so its cost
-      // lands in the same window the HTML parse it replaces used to occupy.
-      let opsText: string | undefined;
       let remotePending = 0;
       let remoteFrame = 0;
       const insert = (i: number) => {
@@ -369,16 +366,21 @@ export function createViewport(options: ViewportOptions): Viewport {
           hasImages,
           tables,
           pres,
-        } = active.ops && sectionEncoded(active.ops, i)
+        } = sectionEncoded(active.ops, i)
           ? replayFragment(
               active.ops,
-              (opsText ??= decodeStrings(active.ops)),
+              active.text,
               i,
               section.headings,
               active.file,
               gateway,
             )
-          : sanitizeFragment({ ...section, parseMs: 0 }, active.file, gateway);
+          : sanitizeFragment(
+              section.html,
+              section.headings,
+              active.file,
+              gateway,
+            );
         if (count) {
           // Coalesced like React batched the former state updates: the banner
           // must never lay out once per filled section.

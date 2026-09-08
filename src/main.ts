@@ -1,12 +1,11 @@
 import { createApp } from './app/app';
 import { DocumentController } from './features/document/controller';
-import { WorkerMarkdownService } from './core/markdown/service';
 import { createGateway, desktop } from './platform/tauri';
 import './app/styles.css';
 
 performance.mark('hashline.frontend-ready');
 const gateway = createGateway();
-const controller = new DocumentController(gateway, new WorkerMarkdownService());
+const controller = new DocumentController(gateway);
 if (import.meta.env.DEV && desktop) {
   let lastPath: string | undefined;
   controller.subscribe(() => {

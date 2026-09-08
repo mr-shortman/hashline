@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DocumentController } from '../src/features/document/controller';
-import { parseMarkdown } from '../src/core/markdown/parser';
-import type { DocumentGateway, FileDocument } from '../src/platform/gateway';
-import type { MarkdownService } from '../src/core/markdown/service';
+import { parseMarkdown } from './parser';
+import type { DocumentGateway, ReadDocument } from '../src/platform/gateway';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -11,55 +10,56 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-function file(path: string, source = '# ' + path): FileDocument {
-  return { id: path + source, path, name: path, source, readMs: 1 };
+function read(path: string, source = '# ' + path): ReadDocument {
+  return {
+    file: {
+      id: path + source,
+      path,
+      name: path,
+      digest: source,
+      readMs: 1,
+    },
+    parsed: parseMarkdown(source),
+  };
 }
-function setup(read: DocumentGateway['read']) {
+function setup(open: DocumentGateway['read']) {
   const stop = vi.fn();
   const gateway = {
-    read,
+    read: vi.fn(open),
     release: vi.fn(async () => {}),
     watch: vi.fn(async () => stop),
     setTitle: vi.fn(async () => {}),
     imageUrl: () => null,
   } as unknown as DocumentGateway;
-  const service: MarkdownService = {
-    parse: async (source) => parseMarkdown(source),
-    cancel: vi.fn(),
-    dispose: vi.fn(),
-  };
-  const controller = new DocumentController(gateway, service);
-  return { controller, gateway, stop, service };
+  const controller = new DocumentController(gateway);
+  return { controller, gateway, stop };
 }
 afterEach(() => vi.useRealTimers());
 describe('document lifecycle', () => {
   it('keeps B when the earlier read of A arrives late and releases A', async () => {
-    const a = deferred<FileDocument>();
+    const a = deferred<ReadDocument>();
     const { controller, gateway } = setup((path) =>
-      path === 'A.md' ? a.promise : Promise.resolve(file(path)),
+      path === 'A.md' ? a.promise : Promise.resolve(read(path)),
     );
     const openingA = controller.open('A.md');
     await controller.open('B.md');
-    a.resolve(file('A.md'));
+    a.resolve(read('A.md'));
     await openingA;
     expect(controller.getSnapshot().document?.file.path).toBe('B.md');
-    expect(gateway.release).toHaveBeenCalledWith(file('A.md').id);
+    expect(gateway.release).toHaveBeenCalledWith(read('A.md').file.id);
     controller.dispose();
   });
-  it('discards a late parser result and keeps the previous document on read errors', async () => {
-    const { controller, service, stop } = setup(async (path) => {
+  it('discards a late read and keeps the previous document on read errors', async () => {
+    const late = deferred<ReadDocument>();
+    const { controller, stop } = setup(async (path) => {
       if (path === 'missing.md') throw new Error('nicht gefunden');
-      return file(path);
+      if (path === 'A.md') return late.promise;
+      return read(path);
     });
-    const parsed = deferred<ReturnType<typeof parseMarkdown>>();
-    service.parse = vi
-      .fn()
-      .mockImplementationOnce(() => parsed.promise)
-      .mockImplementation(async (source: string) => parseMarkdown(source));
     const a = controller.open('A.md');
     await Promise.resolve();
     await controller.open('B.md');
-    parsed.resolve(parseMarkdown('# A'));
+    late.resolve(read('A.md'));
     await a;
     await controller.open('missing.md');
     expect(controller.getSnapshot().document?.file.path).toBe('B.md');
@@ -70,19 +70,30 @@ describe('document lifecycle', () => {
   });
   it('does not replace an unchanged revision and batches watcher events', async () => {
     vi.useFakeTimers();
-    const { controller, gateway, service } = setup(async (path) => file(path));
-    const parse = vi.spyOn(service, 'parse');
+    const { controller, gateway } = setup(async (path) => read(path));
     await controller.open('A.md');
     const original = controller.getSnapshot().document;
     await controller.reload();
+    // Same digest, same document object: the viewport must not rebuild.
     expect(controller.getSnapshot().document).toBe(original);
-    expect(parse).toHaveBeenCalledOnce();
+    expect(gateway.read).toHaveBeenCalledTimes(2);
     const changed = vi.mocked(gateway.watch).mock.calls[0][1];
     changed();
     changed();
     changed();
     await vi.advanceTimersByTimeAsync(150);
-    expect(parse).toHaveBeenCalledOnce();
+    expect(gateway.read).toHaveBeenCalledTimes(3);
+    controller.dispose();
+  });
+  it('rebuilds when the content behind the same path changes', async () => {
+    let body = '# eins';
+    const { controller } = setup(async (path) => read(path, body));
+    await controller.open('A.md');
+    const original = controller.getSnapshot().document;
+    body = '# zwei';
+    await controller.reload();
+    expect(controller.getSnapshot().document).not.toBe(original);
+    expect(controller.getSnapshot().document?.headings[0].text).toBe('zwei');
     controller.dispose();
   });
 });

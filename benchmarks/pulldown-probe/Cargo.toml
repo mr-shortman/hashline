@@ -1,0 +1,17 @@
+# Gate for P2.3 (docs/decisions/007-performance-path.md): measure pulldown-cmark
+# on the frozen fixtures before any parser work starts. Kept out of the
+# src-tauri workspace so the probe never pulls the Tauri dependency graph.
+[package]
+name = "pulldown-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+pulldown-cmark = { version = "0.13.4", default-features = false, features = [
+  "html",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"

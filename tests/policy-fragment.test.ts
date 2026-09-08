@@ -1,10 +1,7 @@
 import { expect, it } from 'vitest';
 import { replayFragment, sanitizeFragment } from '../src/core/content/policy';
-import {
-  decodeStrings,
-  encodeDocument,
-  sectionEncoded,
-} from '../src/core/markdown/opbuffer';
+import { decodeStrings, sectionEncoded } from '../src/core/markdown/opbuffer';
+import { buildBuffer } from './opbuilder';
 import type { DocumentGateway, FileDocument } from '../src/platform/gateway';
 
 it('collects sanitized resources without skipping siblings or sanitizing generated placeholders', () => {
@@ -12,16 +9,13 @@ it('collects sanitized resources without skipping siblings or sanitizing generat
     id: '1',
     name: 'a.md',
     path: '/a.md',
-    source: '',
+    digest: '0',
     readMs: 0,
   };
   const gateway = { imageUrl: () => null } as unknown as DocumentGateway;
   const clean = sanitizeFragment(
-    {
-      html: '<input type="text"><h2 id="doc-allowed">Allowed</h2><h2 id="doc-allowed">Duplicate</h2><a href="javascript:alert(1)">blocked</a><img src="https://example.com/a.png" alt="remote"><image src="local.png"><table><tr><td colspan="9000">cell</td></tr></table><pre><code class="language-js">code</code></pre><input type="checkbox">',
-      headings: [{ id: 'doc-allowed', level: 2, text: 'Allowed' }],
-      parseMs: 0,
-    },
+    '<input type="text"><h2 id="doc-allowed">Allowed</h2><h2 id="doc-allowed">Duplicate</h2><a href="javascript:alert(1)">blocked</a><img src="https://example.com/a.png" alt="remote"><image src="local.png"><table><tr><td colspan="9000">cell</td></tr></table><pre><code class="language-js">code</code></pre><input type="checkbox">',
+    [{ id: 'doc-allowed', level: 2, text: 'Allowed' }],
     file,
     gateway,
   );
@@ -52,25 +46,85 @@ it('applies the same attribute policy when replaying the op buffer', () => {
     id: '1',
     name: 'a.md',
     path: '/a.md',
-    source: '',
+    digest: '0',
     readMs: 0,
   };
   const gateway = { imageUrl: () => null } as unknown as DocumentGateway;
   const headings = [{ id: 'doc-allowed', level: 2, text: 'Allowed' }];
-  // Structurally sound markup inside the encodable tables, so the replay — not
-  // the fallback — has to enforce every value rule DOMPurify and the walk did.
-  const html =
-    '<input type="text"><h2 id="doc-allowed">Allowed</h2>' +
-    '<h2 id="doc-allowed">Duplicate</h2><p id="doc-allowed">Absatz</p>' +
-    '<a href="javascript:alert(1)">blocked</a>' +
-    '<a href=" javascript:alert(1)">spaced</a>' +
-    '<a href="https://example.com/x">extern</a>' +
-    '<img src="https://example.com/a.png" alt="remote">' +
-    '<img src="local.png" alt="lokal">' +
-    '<table><tbody><tr><td colspan="9000" rowspan="2">cell</td></tr></tbody></table>' +
-    '<pre><code class="language-js">code</code></pre>' +
-    '<p class="evil">Klasse</p><input type="checkbox">';
-  const buffer = encodeDocument([{ html, headings }], headings);
+  // A buffer written by hand, so the replay — not the fallback — has to enforce
+  // every value rule on markup the parser would never produce.
+  const buffer = buildBuffer([
+    [
+      { tag: 'input', attrs: [['type', 'text']] },
+      { tag: 'h2', attrs: [['id', 'doc-allowed']], children: ['Allowed'] },
+      { tag: 'h2', attrs: [['id', 'doc-allowed']], children: ['Duplicate'] },
+      { tag: 'p', attrs: [['id', 'doc-allowed']], children: ['Absatz'] },
+      {
+        tag: 'a',
+        attrs: [['href', 'javascript:alert(1)']],
+        children: ['blocked'],
+      },
+      {
+        tag: 'a',
+        attrs: [['href', ' javascript:alert(1)']],
+        children: ['spaced'],
+      },
+      {
+        tag: 'a',
+        attrs: [['href', 'https://example.com/x']],
+        children: ['extern'],
+      },
+      {
+        tag: 'img',
+        attrs: [
+          ['src', 'https://example.com/a.png'],
+          ['alt', 'remote'],
+        ],
+      },
+      {
+        tag: 'img',
+        attrs: [
+          ['src', 'local.png'],
+          ['alt', 'lokal'],
+        ],
+      },
+      {
+        tag: 'table',
+        children: [
+          {
+            tag: 'tbody',
+            children: [
+              {
+                tag: 'tr',
+                children: [
+                  {
+                    tag: 'td',
+                    attrs: [
+                      ['colspan', '9000'],
+                      ['rowspan', '2'],
+                    ],
+                    children: ['cell'],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        tag: 'pre',
+        children: [
+          {
+            tag: 'code',
+            attrs: [['class', 'language-js']],
+            children: ['code'],
+          },
+        ],
+      },
+      { tag: 'p', attrs: [['class', 'evil']], children: ['Klasse'] },
+      { tag: 'input', attrs: [['type', 'checkbox']] },
+    ],
+  ]);
   expect(sectionEncoded(buffer, 0)).toBe(true);
   const clean = replayFragment(
     buffer,

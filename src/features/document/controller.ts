@@ -1,14 +1,14 @@
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
-import type { MarkdownService } from '../../core/markdown/service';
 import type { OpBuffer } from '../../core/markdown/opbuffer';
 import type { Heading, MarkdownSection } from '../../core/markdown/types';
 
 export interface RenderDocument {
   readonly file: FileDocument;
   readonly sections: readonly MarkdownSection[];
-  // Replay operations for the same sections; the viewport falls back to the
-  // sanitized HTML path per section where they are missing.
-  readonly ops?: OpBuffer;
+  /** Replay operations for the same sections. */
+  readonly ops: OpBuffer;
+  /** The buffer's string blob, decoded once per document. */
+  readonly text: string;
   readonly openedAt: number;
   readonly headings: readonly Heading[];
   readonly revision: number;
@@ -28,10 +28,7 @@ export class DocumentController {
   private reloadTimer?: ReturnType<typeof setTimeout>;
   private retryPath?: string;
   private dirtyPath?: string;
-  constructor(
-    private gateway: DocumentGateway,
-    private markdown: MarkdownService,
-  ) {}
+  constructor(private gateway: DocumentGateway) {}
   getSnapshot = (): DocumentState => this.state;
   subscribe = (callback: () => void): (() => void) => {
     this.listeners.add(callback);
@@ -66,7 +63,6 @@ export class DocumentController {
   };
   async open(path: string): Promise<void> {
     const request = ++this.requestId;
-    this.markdown.cancel();
     this.retryPath = path;
     this.dirtyPath = undefined;
     clearTimeout(this.reloadTimer);
@@ -80,28 +76,27 @@ export class DocumentController {
     });
     let file: FileDocument | undefined;
     try {
-      file = await this.gateway.read(path);
+      // Parsing happens where the file is read — natively for the desktop, in
+      // the WebAssembly build for the browser preview. There is no worker and
+      // no second pass over the source (docs/decisions/007, P2.3).
+      const read = await this.gateway.read(path);
+      file = read.file;
       if (request !== this.requestId) {
         await this.gateway.release(file.id);
         return;
       }
       if (
         previous?.file.path === file.path &&
-        previous.file.source === file.source
+        previous.file.digest === file.digest
       ) {
         await this.gateway.release(file.id);
         this.update({ ...this.state, status: 'ready', refreshing: false });
         return;
       }
-      const parsed = await this.markdown.parse(file.source);
-      if (request !== this.requestId) {
-        await this.gateway.release(file.id);
-        return;
-      }
       performance.measure('hashline.read', { start: 0, duration: file.readMs });
       performance.measure('hashline.parse', {
         start: 0,
-        duration: parsed.parseMs,
+        duration: read.parsed.parseMs,
       });
       performance.measure('hashline.open-to-content', {
         start,
@@ -111,12 +106,11 @@ export class DocumentController {
       this.unwatch = undefined;
       const doc: RenderDocument = Object.freeze({
         file,
-        sections: parsed.sections || [
-          { html: parsed.html, headings: parsed.headings },
-        ],
-        ops: parsed.ops,
+        sections: read.parsed.sections,
+        ops: read.parsed.ops,
+        text: read.parsed.text,
         openedAt: start,
-        headings: parsed.headings,
+        headings: read.parsed.headings,
         revision: request,
       });
       this.update({
@@ -180,7 +174,6 @@ export class DocumentController {
     this.requestId++;
     clearTimeout(this.reloadTimer);
     this.unwatch?.();
-    this.markdown.dispose();
     if (this.state.document)
       void this.gateway.release(this.state.document.file.id).catch(() => {});
     this.listeners.clear();
