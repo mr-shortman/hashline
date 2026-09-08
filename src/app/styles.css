@@ -50,6 +50,7 @@
 }
 * {
   box-sizing: border-box;
+  scroll-behavior: auto;
 }
 body {
   margin: 0;

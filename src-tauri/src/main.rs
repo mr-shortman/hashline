@@ -376,6 +376,17 @@ fn main() {
             }
         })
         .setup(move |app| {
+            #[cfg(target_os = "linux")]
+            if let Some(window) = app.get_webview_window("main") {
+                window.with_webview(|webview| {
+                    use webkit2gtk::{SettingsExt, WebViewExt};
+
+                    if let Some(settings) = webview.inner().settings() {
+                        // Disable native wheel/keyboard animation; CSS only controls scroll APIs.
+                        settings.set_enable_smooth_scrolling(false);
+                    }
+                })?;
+            }
             let cwd = std::env::current_dir()?;
             enqueue(
                 app.handle(),

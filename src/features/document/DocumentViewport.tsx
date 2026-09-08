@@ -121,12 +121,13 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
     };
     const capture = () => {
       const list = headings.current;
+      const top = viewport.scrollTop;
       let low = 0;
       let high = list.length - 1;
       let found = -1;
       while (low <= high) {
         const mid = (low + high) >> 1;
-        if (list[mid].top <= viewport.scrollTop + 96) {
+        if (list[mid].top <= top + 96) {
           found = mid;
           low = mid + 1;
         } else high = mid - 1;
@@ -136,10 +137,9 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         path: doc.file.path,
         heading: h?.id || '',
         previous: list[found - 1]?.id || '',
-        offset: h ? h.top - viewport.scrollTop : 0,
+        offset: h ? h.top - top : 0,
         progress:
-          viewport.scrollTop /
-          Math.max(1, viewport.scrollHeight - viewport.clientHeight),
+          top / Math.max(1, viewport.scrollHeight - viewport.clientHeight),
       };
       position.current = saved;
       latest.current.onHeading(h?.id || list[0]?.id || '');
@@ -160,8 +160,9 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
     });
     resize.observe(article);
     const onScroll = () => {
-      cancelAnimationFrame(scrollFrame);
+      if (scrollFrame) return;
       scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
         capture();
         clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
@@ -310,9 +311,9 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
 
   function drawFallback() {
     const layer = overlay.current;
-    if (!layer) return;
+    if (!layer || hasHighlights()) return;
+    if (!layer.hasChildNodes() && !ranges.current.length) return;
     layer.replaceChildren();
-    if (hasHighlights()) return;
     const range = ranges.current[current.current];
     if (!range || !scroll.current) return;
     const base = scroll.current.getBoundingClientRect();
