@@ -1,0 +1,16 @@
+<p>Vor <strong>inline</strong> nach</p>
+<details>
+  <summary>Zu <em>sichtbar</em><button>ignoriert</button></summary>
+  verborgen
+  <details open><summary>Verschachtelte Zusammenfassung</summary><p>weiter verborgen</p></details>
+</details>
+<details open>
+  <summary>Offen</summary>
+  <p>sichtbarer Inhalt <span hidden>versteckt</span><span data-search-ignore>ignoriert</span></p>
+  <details><summary>Innen zu</summary><p>verborgen</p></details>
+</details>
+<summary>Zusammenfassung <details><summary>innen</summary><p>Legacy: sichtbar im Summary-Kontext</p></details></summary>
+<button><p>ignorierter Block</p></button>
+<div hidden><details><summary>versteckte Zusammenfassung</summary></details></div>
+<div data-search-ignore><p>ignorierter Bereich</p></div>
+<p>A<span></span><!-- Kommentar -->B<br>C</p>zwischen<dl><dt>Begriff</dt><dd>Erklärung</dd></dl>

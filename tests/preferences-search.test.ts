@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { parseMarkdown } from '../src/core/markdown/parser';
 import { describe, expect, it } from 'vitest';
 import { validatePreferences } from '../src/features/preferences/preferences';
 import { findRanges, indexText } from '../src/features/search';
@@ -49,5 +51,44 @@ describe('visible text search', () => {
     const root = document.createElement('article');
     root.textContent = 'İ 🐈 Nadel';
     expect(findRanges(indexText(root), 'nadel')[0].toString()).toBe('Nadel');
+  });
+});
+
+describe('search traversal contract', () => {
+  it.each(['hostile.md', 'reader.md', 'search-context.html'])(
+    'preserves text, document order and UTF-16 part boundaries: %s',
+    (fixture) => {
+      const root = document.createElement('section');
+      root.innerHTML = parseMarkdown(
+        readFileSync(`tests/fixtures/${fixture}`, 'utf8'),
+      ).html;
+      const index = indexText(root);
+      expect({
+        text: index.text,
+        parts: index.parts.map(({ node, start, end }) => ({
+          text: node.data,
+          start,
+          end,
+        })),
+      }).toMatchSnapshot();
+    },
+  );
+  it('indexes the deep-list stress fixture without call-stack recursion', () => {
+    const root = document.createElement('section');
+    root.innerHTML = parseMarkdown(
+      readFileSync('tests/fixtures/deep-list.md', 'utf8'),
+    ).html;
+    const index = indexText(root);
+    expect(index.parts.length).toBeGreaterThan(100);
+    expect(index.parts.map((part) => part.node.data).join('')).toBe(
+      root.textContent,
+    );
+  });
+  it('honors context on the indexed root itself', () => {
+    const root = document.createElement('details');
+    root.innerHTML = '<summary>visible</summary><p>closed</p>';
+    expect(indexText(root).text).toBe('visible');
+    root.hidden = true;
+    expect(indexText(root).parts).toEqual([]);
   });
 });

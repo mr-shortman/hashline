@@ -360,3 +360,14 @@ Indizes weiterhin bei Bedarf. Das reduziert den vollständigen 10-MiB-Aufbau um
 Lint, Release-Build sowie native Abschnittsverträge und Desktop-Smoke bestehen.
 Rohdaten: [Ausgangsverträge](results/phase1-baseline-contracts.json),
 [P1.1-Verträge](results/phase1-p11-contracts.json).
+
+P1.2: Der Suchindex durchläuft den DOM-Baum einmal mit einem expliziten
+Kontextstapel; `closest()` pro Textknoten entfällt. Die Annahme über die
+Abschnittswurzel ist im Code dokumentiert. Die alte Implementierung wurde auf
+`hostile.md`, `reader.md`, der neuen verschachtelten Suchkontext-Fixture und der
+eingefrorenen tiefen Liste gegen die neue verglichen und anschließend entfernt.
+Lesbare Snapshots sichern Text, Reihenfolge und UTF-16-Grenzen. 1.367
+TypeScript-Tests, alle 18 Browser-Tests und native Verträge bestehen.
+[Öffnungen](results/phase1-p12-open.json),
+[Suchinteraktion](results/phase1-p12-interaction.json),
+[Suchspeicher vor P1.3](results/phase1-p12-search-memory.json).

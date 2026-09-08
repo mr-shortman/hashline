@@ -8,30 +8,78 @@ export interface TextIndex {
   parts: TextPart[];
 }
 
+const BLOCKS = new Set([
+  'P',
+  'LI',
+  'PRE',
+  'TD',
+  'TH',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'SUMMARY',
+  'DT',
+  'DD',
+]);
+
 export function indexText(root: HTMLElement): TextIndex {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent || parent.closest('button, [hidden], [data-search-ignore]'))
-        return NodeFilter.FILTER_REJECT;
-      const closed = parent.closest('details:not([open])');
-      if (closed && !parent.closest('summary')) return NodeFilter.FILTER_REJECT;
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
   let text = '';
   let lastBlock: Element | null = null;
   const parts: TextPart[] = [];
-  while (walker.nextNode()) {
-    const node = walker.currentNode as Text;
-    const block = node.parentElement!.closest(
-      'p,li,pre,td,th,h1,h2,h3,h4,h5,h6,summary,dt,dd',
-    );
-    if (lastBlock && block !== lastBlock) text += '\n';
-    lastBlock = block;
-    const start = text.length;
-    text += node.data;
-    parts.push({ node, start, end: text.length });
+  interface Context {
+    next: ChildNode | null;
+    block: Element | null;
+    closed: boolean;
+    summary: boolean;
+  }
+  // Callers index a markdown-section inside article.markdown: ancestors outside
+  // root have no block, hidden, button, details or search-ignore semantics.
+  // Carry context in an explicit stack so even untrusted deep DOM cannot exhaust
+  // the JS call stack. Ignored subtrees need not be visited at all.
+  const ignored = (el: Element) =>
+    el.tagName === 'BUTTON' ||
+    el.hasAttribute('hidden') ||
+    el.hasAttribute('data-search-ignore');
+  if (ignored(root)) return { text, parts };
+  const stack: Context[] = [
+    {
+      next: root.firstChild,
+      block: BLOCKS.has(root.tagName) ? root : null,
+      closed: root.tagName === 'DETAILS' && !root.hasAttribute('open'),
+      summary: root.tagName === 'SUMMARY',
+    },
+  ];
+  while (stack.length) {
+    const context = stack[stack.length - 1];
+    const child = context.next;
+    if (!child) {
+      stack.pop();
+      continue;
+    }
+    context.next = child.nextSibling;
+    if (child.nodeType === Node.TEXT_NODE) {
+      if (context.closed && !context.summary) continue;
+      const node = child as Text;
+      if (lastBlock && context.block !== lastBlock) text += '\n';
+      lastBlock = context.block;
+      const start = text.length;
+      text += node.data;
+      parts.push({ node, start, end: text.length });
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const el = child as Element;
+      if (ignored(el)) continue;
+      stack.push({
+        next: el.firstChild,
+        block: BLOCKS.has(el.tagName) ? el : context.block,
+        closed:
+          context.closed ||
+          (el.tagName === 'DETAILS' && !el.hasAttribute('open')),
+        summary: context.summary || el.tagName === 'SUMMARY',
+      });
+    }
   }
   return { text, parts };
 }
