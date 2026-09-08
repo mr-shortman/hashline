@@ -464,6 +464,25 @@ CLI, Instanzübergabe, Desktop-Eintrag, MIME-Zuordnung, GSettings-Schema, Icon u
 
 **Abnahme:** Installation und Öffnen per Dateimanager auf einer sauberen unterstützten Umgebung funktionieren. Build-Anleitung, bekannte Einschränkungen und Benchmarkbericht liegen vor. Alle v1-Funktionen sowie Performance- und Darstellungsziele sind überprüft.
 
+### Stand der ergänzten Migration (8. September 2026)
+
+Die folgenden Lücken der nativen Fassung sind umgesetzt. **M3 bleibt ausdrücklich offen**; die Änderungen an den vorhandenen Öffnen-Handlern und am bestehenden Einstellungsschema sind keine Installations- oder Paketierungsabnahme.
+
+| Punkt | Umsetzung |
+| --- | --- |
+| Eine aktive Datei in einem Fenster | `open` und `activate` verwenden denselben Fenstercontroller. Ein weiterer Aufruf ersetzt die Datei und aktiviert das vorhandene Fenster. |
+| Aktueller Abschnitt im Inhaltsverzeichnis | Überschriften werden beim Dokumentwechsel aufgebaut; die aktive Zeile folgt Scrollposition, Abschnittssprüngen und Layoutkorrekturen. |
+| Menü in der HeaderBar | Öffnen, Nachladen, Inhaltsverzeichnis, Suche, Darstellungsmodus und Zoom verwenden Fensteraktionen. |
+| System-, Hell- und Dunkelmodus | Zustandsbehaftete Themenaktion mit GSettings-Präferenz; Systemmodus liest den Desktop-Settings-Portalwert mit GTK-Fallback. Das erste Fenster wartet auf die initiale Themenauflösung. |
+| Escape | Schließt zuerst ein geöffnetes Menü, sonst das zuletzt geöffnete Inhaltsverzeichnis oder die Suche; Fokus geht an die verbleibende Ansicht zurück. |
+| Mehrere Dateien | Erster Eintrag aus CLI/Dateimanager oder Drag-and-drop wird geöffnet; ein kurz sichtbarer Hinweis bleibt auch nach erfolgreichem Laden erhalten und ist als zugängliche Statusmeldung ausgezeichnet. |
+| AT-SPI | Dokumentrolle und `GtkAccessibleText` liefern Text, Unicode-Zeichenoffsets, Textbereiche, visuelle Zeilen, Auswahl und Cursor; Änderungen werden gemeldet. |
+| Textauswahl | Markierung verwendet Pango-Layoutkoordinaten je visueller Zeile, einschließlich Bidi-Bereichen. Auswahl bleibt nach Loslassen erhalten; Doppelklick wählt ein Wort, Dreifachklick einen Block, Shift-Klick erweitert die Auswahl. Links werden erst beim Loslassen ohne Auswahl geöffnet. |
+
+Nachweise: Rust-Workspace-Tests, Pango-Regressionstest für umgebrochene Auswahl, GTK-Integrationstest und ein nativer AT-SPI-Test mit zwei echten Anwendungsaufrufen. Reproduzierbare Befehle stehen unter [Native Migration](docs/testing.md#native-migration).
+
+Diese Funktionsprüfungen ersetzen weder den vollständigen visuellen Vergleich und die Performance-Messreihen aus M0–M2 noch die Abschlussprüfung von M3. Der historische WebView-Stand bleibt entsprechend Abschnitt 13 als Vergleichsbasis erhalten, solange die M0-Abnahme nicht belegt ist.
+
 ## 15. Definition of Done
 
 v1 ist abgeschlossen, wenn der beschriebene Funktionsumfang im installierten Linux-Build funktioniert, die Architekturgrenzen eingehalten werden und die Abnahmekriterien aus M0–M3 erfüllt sind.

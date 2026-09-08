@@ -1,5 +1,6 @@
 //! The document view.
 
+mod accessibility;
 mod document;
 mod images;
 mod selection;

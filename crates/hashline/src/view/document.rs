@@ -38,6 +38,7 @@ pub(crate) struct State {
     zoom: i32,
     selection: Option<Selection>,
     outline: Outline,
+    accessible: super::accessibility::Text,
     images: Rc<ImageCache>,
     /// Search hits over the whole document, in document order, and which of
     /// them is the current one.
@@ -80,6 +81,7 @@ impl State {
             zoom: 100,
             selection: None,
             outline: Outline::default(),
+            accessible: super::accessibility::Text::default(),
             images: Rc::new(ImageCache::default()),
             hits: Vec::new(),
             current_hit: None,
@@ -119,6 +121,7 @@ mod imp {
         #[property(get, set, override_interface = gtk::Scrollable, builder(gtk::ScrollablePolicy::Minimum))]
         pub hscroll_policy: RefCell<gtk::ScrollablePolicy>,
         pub(crate) state: RefCell<State>,
+        pub navigation: std::cell::Cell<Option<(i32, Option<usize>)>>,
     }
 
     impl Default for DocumentView {
@@ -129,6 +132,7 @@ mod imp {
                 vscroll_policy: RefCell::new(gtk::ScrollablePolicy::Minimum),
                 hscroll_policy: RefCell::new(gtk::ScrollablePolicy::Minimum),
                 state: RefCell::new(State::empty()),
+                navigation: std::cell::Cell::new(None),
             }
         }
     }
@@ -138,17 +142,33 @@ mod imp {
         const NAME: &'static str = "HashlineDocumentView";
         type Type = super::DocumentView;
         type ParentType = gtk::Widget;
-        type Interfaces = (gtk::Scrollable,);
+        type Interfaces = (gtk::Scrollable, gtk::AccessibleText);
+
+        fn class_init(klass: &mut Self::Class) {
+            klass.set_accessible_role(gtk::AccessibleRole::Document);
+        }
     }
 
     #[glib::derived_properties]
     impl ObjectImpl for DocumentView {
+        fn signals() -> &'static [glib::subclass::Signal] {
+            static SIGNALS: std::sync::OnceLock<Vec<glib::subclass::Signal>> =
+                std::sync::OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                vec![glib::subclass::Signal::builder("active-section-changed").build()]
+            })
+        }
+
         fn constructed(&self) {
             self.parent_constructed();
             let widget = self.obj();
             widget.set_focusable(true);
             widget.set_can_focus(true);
             widget.setup_gestures();
+            widget.update_property(&[
+                gtk::accessible::Property::Label("Markdown-Dokument"),
+                gtk::accessible::Property::ReadOnly(true),
+            ]);
         }
     }
 
@@ -160,8 +180,9 @@ mod imp {
                     #[weak]
                     widget,
                     move |_| {
-                        if !widget.imp().state.borrow().adjusting {
+                        if widget.imp().state.try_borrow().is_ok_and(|s| !s.adjusting) {
                             widget.queue_draw();
+                            widget.emit_by_name::<()>("active-section-changed", &[]);
                         }
                     }
                 ));
@@ -185,6 +206,7 @@ mod imp {
             let widget = self.obj();
             widget.reflow_for(width as f64);
             widget.update_adjustment(width as f64, height as f64);
+            widget.notify_navigation();
         }
 
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
@@ -193,12 +215,90 @@ mod imp {
     }
 
     impl ScrollableImpl for DocumentView {}
+
+    impl AccessibleTextImpl for DocumentView {
+        fn contents(&self, start: u32, end: u32) -> Option<glib::Bytes> {
+            Some(glib::Bytes::from_owned(
+                self.state
+                    .borrow()
+                    .accessible
+                    .slice(start, end)
+                    .into_bytes(),
+            ))
+        }
+        fn contents_at(
+            &self,
+            offset: u32,
+            granularity: gtk::AccessibleTextGranularity,
+        ) -> Option<(u32, u32, glib::Bytes)> {
+            if granularity == gtk::AccessibleTextGranularity::Line {
+                if let Some((start, end)) = self.obj().accessible_line(offset) {
+                    return Some((
+                        start,
+                        end,
+                        glib::Bytes::from_owned(
+                            self.state
+                                .borrow()
+                                .accessible
+                                .slice(start, end)
+                                .into_bytes(),
+                        ),
+                    ));
+                }
+            }
+            let state = self.state.borrow();
+            let (start, end) =
+                super::super::accessibility::span(&state.accessible.content, offset, granularity);
+            Some((
+                start,
+                end,
+                glib::Bytes::from_owned(state.accessible.slice(start, end).into_bytes()),
+            ))
+        }
+        fn caret_position(&self) -> u32 {
+            let state = self.state.borrow();
+            state
+                .selection
+                .map(|s| {
+                    state
+                        .accessible
+                        .offset(s.cursor, &state.plan, &state.document.text)
+                })
+                .unwrap_or(0)
+        }
+        fn selection(&self) -> Vec<gtk::AccessibleTextRange> {
+            let state = self.state.borrow();
+            let Some(selection) = state.selection.filter(|s| !s.is_empty()) else {
+                return vec![];
+            };
+            let (start, end) = selection.range();
+            let start = state
+                .accessible
+                .offset(start, &state.plan, &state.document.text);
+            let end = state
+                .accessible
+                .offset(end, &state.plan, &state.document.text);
+            vec![gtk::AccessibleTextRange::new(
+                start as usize,
+                (end - start) as usize,
+            )]
+        }
+        fn attributes(
+            &self,
+            _offset: u32,
+        ) -> Vec<(gtk::AccessibleTextRange, glib::GString, glib::GString)> {
+            vec![]
+        }
+        fn default_attributes(&self) -> Vec<(glib::GString, glib::GString)> {
+            vec![]
+        }
+    }
 }
 
 glib::wrapper! {
     pub struct DocumentView(ObjectSubclass<imp::DocumentView>)
         @extends gtk::Widget,
-        @implements gtk::Scrollable, gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+        @implements gtk::Scrollable, gtk::AccessibleText, gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 impl Default for DocumentView {
@@ -221,6 +321,10 @@ impl DocumentView {
 
     /// Shows a parsed document, from the top.
     pub fn set_document(&self, document: Rc<OpDocument>) {
+        let old_len = self.imp().state.borrow().accessible.len;
+        if old_len > 0 {
+            self.update_contents(gtk::AccessibleTextContentChange::Remove, 0, old_len);
+        }
         {
             let mut state = self.imp().state.borrow_mut();
             state.document = document;
@@ -234,6 +338,16 @@ impl DocumentView {
         }
         let width = self.view_width().max(1.0);
         self.reflow_for(width);
+        {
+            let mut state = self.imp().state.borrow_mut();
+            state.outline = Outline::build(&state.document, &state.plan);
+            state.accessible = super::accessibility::Text::build(&state.plan, &state.document.text);
+        }
+        let len = self.imp().state.borrow().accessible.len;
+        if len > 0 {
+            self.update_contents(gtk::AccessibleTextContentChange::Insert, 0, len);
+        }
+        self.selection_changed();
         if let Some(adjustment) = self.vadjustment() {
             adjustment.set_value(0.0);
         }
@@ -606,6 +720,8 @@ impl DocumentView {
                 snapshot.pop();
             }
         }
+        drop(state);
+        self.notify_navigation();
     }
 
     /// The document position under a point in widget coordinates.
@@ -659,37 +775,160 @@ impl DocumentView {
         Some(Position::new(index, in_document.saturating_sub(start)))
     }
 
+    /// Set only the requested block for offscreen screen-reader queries.
+    fn accessible_line(&self, offset: u32) -> Option<(u32, u32)> {
+        let state = self.imp().state.borrow();
+        let position = state
+            .accessible
+            .position(offset, &state.plan, &state.document.text)?;
+        let block = state.plan.block(position.block);
+        let temporary;
+        let set = if let Some(set) = state.cache.get(&position.block) {
+            set
+        } else {
+            temporary = set_block(
+                &self.pango_context(),
+                &state.document,
+                block,
+                &state.style,
+                state.plan.width(),
+                state.images.as_ref(),
+            );
+            &temporary
+        };
+        let document_offset = position.in_document(&state.plan);
+        for piece in set.pieces.iter().filter(|p| !p.control) {
+            let Some((start, end)) = piece.map.document_range() else {
+                continue;
+            };
+            if document_offset < start || document_offset > end {
+                continue;
+            }
+            let layout_offset = piece.map.to_layout(document_offset)?;
+            for line in piece.layout.lines_readonly() {
+                let start = line.start_index() as u32;
+                let end = start + line.length() as u32;
+                if layout_offset >= start
+                    && (layout_offset < end || document_offset == block.text_start + block.text_len)
+                {
+                    let convert = |byte| {
+                        let byte = piece
+                            .map
+                            .to_document(byte)?
+                            .saturating_sub(block.text_start);
+                        Some(state.accessible.offset(
+                            Position::new(position.block, byte),
+                            &state.plan,
+                            &state.document.text,
+                        ))
+                    };
+                    return Some((convert(start)?, convert(end)?));
+                }
+            }
+        }
+        None
+    }
+
+    fn selection_changed(&self) {
+        self.update_caret_position();
+        self.update_selection_bound();
+        self.queue_draw();
+    }
+
+    fn set_selection_at(&self, position: Position, clicks: i32, extend: bool) {
+        let mut state = self.imp().state.borrow_mut();
+        let selection = if clicks >= 3 {
+            Selection::at(Position::new(position.block, 0)).to(Position::new(
+                position.block,
+                state.plan.block(position.block).text_len,
+            ))
+        } else if clicks == 2 {
+            let block = state.plan.block(position.block);
+            let text = &state.document.text
+                [block.text_start as usize..(block.text_start + block.text_len) as usize];
+            let offset = text[..position.offset as usize].chars().count() as u32;
+            let (from, to) =
+                super::accessibility::span(text, offset, gtk::AccessibleTextGranularity::Word);
+            let to = from
+                + text
+                    .chars()
+                    .skip(from as usize)
+                    .take((to - from) as usize)
+                    .collect::<String>()
+                    .trim_end()
+                    .chars()
+                    .count() as u32;
+            let byte = |offset| {
+                text.char_indices()
+                    .nth(offset as usize)
+                    .map(|(b, _)| b)
+                    .unwrap_or(text.len()) as u32
+            };
+            Selection::at(Position::new(position.block, byte(from)))
+                .to(Position::new(position.block, byte(to)))
+        } else if extend {
+            state
+                .selection
+                .unwrap_or(Selection::at(position))
+                .to(position)
+        } else {
+            Selection::at(position)
+        };
+        state.selection = Some(selection);
+        drop(state);
+        self.selection_changed();
+    }
+
     fn setup_gestures(&self) {
         let click = gtk::GestureClick::new();
+        click.set_button(gtk::gdk::BUTTON_PRIMARY);
         click.connect_pressed(glib::clone!(
             #[weak(rename_to = widget)]
             self,
-            move |_, clicks, x, y| {
+            move |gesture, clicks, x, y| {
                 widget.grab_focus();
-                // A link is followed rather than selected — but only on a
-                // single click, so that double-clicking to select a word
-                // inside a link still works.
-                if clicks == 1 {
-                    if widget.copy_code_at(x, y) {
-                        return;
-                    }
-                    if let Some(href) = widget.link_at(x, y) {
-                        let handler = widget.imp().state.borrow().on_link.clone();
-                        if let Some(handler) = handler {
-                            handler(&href);
-                            return;
-                        }
-                    }
-                }
                 if let Some(position) = widget.position_at(x, y) {
-                    widget.imp().state.borrow_mut().selection = Some(Selection::at(position));
-                    widget.queue_draw();
+                    widget.set_selection_at(
+                        position,
+                        clicks,
+                        gesture
+                            .current_event_state()
+                            .contains(gtk::gdk::ModifierType::SHIFT_MASK),
+                    );
                 }
             }
         ));
-        self.add_controller(click);
-
+        click.connect_released(glib::clone!(
+            #[weak(rename_to = widget)]
+            self,
+            move |_, clicks, x, y| {
+                let empty = widget
+                    .imp()
+                    .state
+                    .borrow()
+                    .selection
+                    .is_none_or(|s| s.is_empty());
+                if clicks != 1 || !empty {
+                    return;
+                }
+                if widget.copy_code_at(x, y) {
+                    return;
+                }
+                if let Some(href) = widget.link_at(x, y) {
+                    let handler = widget.imp().state.borrow().on_link.clone();
+                    if let Some(handler) = handler {
+                        handler(&href);
+                    }
+                }
+            }
+        ));
+        self.add_controller(click.clone());
         let drag = gtk::GestureDrag::new();
+        drag.set_button(gtk::gdk::BUTTON_PRIMARY);
+        self.add_controller(drag.clone());
+        // Both gestures must observe the same sequence; claiming a drag must
+        // not cancel the click that established its anchor.
+        drag.group_with(&click);
         drag.connect_drag_update(glib::clone!(
             #[weak(rename_to = widget)]
             self,
@@ -697,17 +936,27 @@ impl DocumentView {
                 let Some((x, y)) = gesture.start_point() else {
                     return;
                 };
+                if dx.abs() + dy.abs() < 3.0 {
+                    return;
+                }
+                gesture.set_state(gtk::EventSequenceState::Claimed);
                 if let Some(cursor) = widget.position_at(x + dx, y + dy) {
                     let mut state = widget.imp().state.borrow_mut();
                     if let Some(selection) = state.selection {
                         state.selection = Some(selection.to(cursor));
                     }
                     drop(state);
-                    widget.queue_draw();
+                    widget.selection_changed();
                 }
             }
         ));
-        self.add_controller(drag);
+        drag.connect_drag_end(glib::clone!(
+            #[weak(rename_to = widget)]
+            self,
+            move |_, _, _| {
+                widget.selection_changed();
+            }
+        ));
 
         // The pointer says what is clickable, which is the only affordance a
         // link has in a document that renders no controls of its own.
@@ -721,6 +970,29 @@ impl DocumentView {
             }
         ));
         self.add_controller(motion);
+    }
+
+    fn notify_navigation(&self) {
+        let current = (self.width(), self.active_section());
+        if self.imp().navigation.replace(Some(current)) != Some(current) {
+            glib::idle_add_local_once(glib::clone!(
+                #[weak(rename_to = view)]
+                self,
+                move || {
+                    view.emit_by_name::<()>("active-section-changed", &[]);
+                }
+            ));
+        }
+    }
+
+    pub fn active_section(&self) -> Option<usize> {
+        let state = self.imp().state.borrow();
+        if state.plan.is_empty() {
+            return None;
+        }
+        state
+            .outline
+            .active_for_block(state.plan.block_at(self.scroll_top() + tokens::PAD_TOP))
     }
 
     pub fn outline(&self) -> Outline {
@@ -950,7 +1222,7 @@ impl DocumentView {
         let end = state.plan.block(last).text_len;
         state.selection = Some(Selection::at(Position::new(0, 0)).to(Position::new(last, end)));
         drop(state);
-        self.queue_draw();
+        self.selection_changed();
     }
 
     /// The selected text, in document order.
@@ -1035,30 +1307,47 @@ fn draw_ranges(
     colour: crate::theme::Color,
 ) {
     let colour = colour.to_gdk();
-    let mut line_index = 0;
-    while let Some(line) = piece.layout.line(line_index) {
-        let start = line.start_index() as u32;
-        let end = start + line.length() as u32;
-        let overlap_from = from.max(start);
-        let overlap_to = to.min(end);
-        if overlap_from < overlap_to {
-            let (_, extents) = line.extents();
-            let x0 = line.index_to_x(overlap_from as i32, false) as f64 / pango::SCALE as f64;
-            let x1 = line.index_to_x(overlap_to as i32, false) as f64 / pango::SCALE as f64;
-            let line_top = extents.y() as f64 / pango::SCALE as f64;
-            let line_height = extents.height() as f64 / pango::SCALE as f64;
-            snapshot.append_color(
-                &colour,
-                &gtk::graphene::Rect::new(
-                    (x + x0.min(x1)) as f32,
-                    (y + line_top) as f32,
-                    (x1 - x0).abs().max(1.0) as f32,
-                    line_height as f32,
-                ),
-            );
-        }
-        line_index += 1;
+    for rect in selection_rects(&piece.layout, from, to) {
+        snapshot.append_color(
+            &colour,
+            &gtk::graphene::Rect::new(
+                x as f32 + rect.x(),
+                y as f32 + rect.y(),
+                rect.width(),
+                rect.height(),
+            ),
+        );
     }
+}
+
+/// LayoutIter extents are relative to the layout origin. LayoutLine extents
+/// are relative to the baseline and cannot be used to paint a selection.
+fn selection_rects(layout: &pango::Layout, from: u32, to: u32) -> Vec<gtk::graphene::Rect> {
+    let mut result = Vec::new();
+    let mut iter = layout.iter();
+    loop {
+        if let Some(line) = iter.line_readonly() {
+            let start = from.max(line.start_index() as u32);
+            let end = to.min((line.start_index() + line.length()) as u32);
+            if start < end {
+                let (_, logical) = iter.line_extents();
+                // One logical range can occupy multiple visual ranges in bidi text.
+                for range in line.x_ranges(start as i32, end as i32).as_chunks::<2>().0 {
+                    let scale = pango::SCALE as f32;
+                    result.push(gtk::graphene::Rect::new(
+                        range[0] as f32 / scale,
+                        logical.y() as f32 / scale,
+                        (range[1] - range[0]) as f32 / scale,
+                        logical.height() as f32 / scale,
+                    ));
+                }
+            }
+        }
+        if !iter.next_line() {
+            break;
+        }
+    }
+    result
 }
 
 /// The body font comes from the system; code uses the fontconfig `monospace`
@@ -1073,4 +1362,92 @@ fn font_families() -> (String, String) {
         })
         .unwrap_or_else(|| "sans".to_string());
     (body, "monospace".to_string())
+}
+
+#[cfg(test)]
+impl DocumentView {
+    pub(crate) fn verify_accessibility_and_selection(&self) {
+        self.set_document(Rc::new(hashline_markdown::parse(
+            "# Grüße 🌍\n\nÄpfel und Öl.\n",
+        )));
+        assert_eq!(self.accessible_role(), gtk::AccessibleRole::Document);
+        assert!(self.is::<gtk::AccessibleText>());
+        assert_eq!(
+            self.imp().contents(4, 7).unwrap().as_ref(),
+            "e 🌍".as_bytes()
+        );
+        self.set_selection_at(Position::new(0, 0), 1, false);
+        self.set_selection_at(Position::new(1, 2), 1, true);
+        assert_eq!(self.imp().caret_position(), 10);
+        let ranges = self.imp().selection();
+        assert_eq!((ranges[0].start(), ranges[0].length()), (0, 10));
+        assert_eq!(self.selected_text(), "Grüße 🌍\n\nÄ");
+        self.set_selection_at(Position::new(1, 3), 2, false);
+        assert_eq!(self.selected_text(), "Äpfel");
+        self.set_selection_at(Position::new(1, 3), 3, false);
+        assert_eq!(self.selected_text(), "Äpfel und Öl.");
+        let selection = self.selected_text();
+        // Releasing a click/drag must never clear an existing selection.
+        let controllers = self.observe_controllers();
+        for i in 0..controllers.n_items() {
+            let controller = controllers.item(i).unwrap();
+            if let Some(click) = controller.downcast_ref::<gtk::GestureClick>() {
+                click.emit_by_name::<()>("released", &[&1i32, &60.0f64, &100.0f64]);
+            }
+            if let Some(drag) = controller.downcast_ref::<gtk::GestureDrag>() {
+                drag.emit_by_name::<()>("drag-end", &[&30.0f64, &0.0f64]);
+            }
+        }
+        assert_eq!(self.selected_text(), selection);
+        let original = self.imp().state.borrow().document.clone();
+        let body = "Grüße aus Berlin und Äpfel mit Öl. ".repeat(20);
+        self.set_document(Rc::new(hashline_markdown::parse(&body)));
+        let len = self.imp().state.borrow().accessible.len;
+        let mut offset = 0;
+        let mut lines = 0;
+        while offset < len {
+            let (start, end, _) = self
+                .imp()
+                .contents_at(offset, gtk::AccessibleTextGranularity::Line)
+                .unwrap();
+            assert_eq!(start, offset);
+            assert!(end > start);
+            offset = end;
+            lines += 1;
+        }
+        assert!(
+            lines > 1,
+            "screen-reader queries must follow visual wrapping"
+        );
+        self.set_document(original);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selection_covers_each_wrapped_line_at_its_actual_position() {
+        let context = pangocairo::FontMap::default().create_context();
+        let layout = pango::Layout::new(&context);
+        layout.set_text("Grüße aus Berlin, mit genügend Text für mehrere umgebrochene Zeilen und eine letzte Zeile.");
+        layout.set_width(180 * pango::SCALE);
+        layout.set_line_spacing(1.65);
+        let rects = selection_rects(&layout, 0, layout.text().len() as u32);
+        assert!(rects.len() >= 3);
+        for pair in rects.windows(2) {
+            assert!(pair[1].y() > pair[0].y());
+        }
+        for rect in rects {
+            assert!(rect.y() >= 0.0);
+            let (_, index, _) = layout.xy_to_index(
+                ((rect.x() + rect.width() / 2.0) * pango::SCALE as f32) as i32,
+                ((rect.y() + rect.height() / 2.0) * pango::SCALE as f32) as i32,
+            );
+            let caret = layout.index_to_pos(index);
+            let caret_y = caret.y() as f32 / pango::SCALE as f32;
+            assert!(caret_y >= rect.y() - 1.0 && caret_y <= rect.y() + rect.height());
+        }
+    }
 }

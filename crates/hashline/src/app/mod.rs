@@ -33,22 +33,36 @@ pub fn run() -> glib::ExitCode {
         .flags(gio::ApplicationFlags::HANDLES_OPEN)
         .build();
 
-    application.connect_open(|application, files, _| {
-        if files.len() > 1 {
-            eprintln!("hashline: opening only the first of {} files", files.len());
-        }
-        let ui = Ui::build(application);
-        if let Some(path) = files.first().and_then(|file| file.path()) {
-            ui.open(&path);
-        }
-        ui.window.present();
-    });
-    application.connect_activate(|application| {
-        let ui = Ui::build(application);
-        ui.window.present();
-    });
-
+    install_application(&application);
     application.run()
+}
+
+fn install_application(application: &gtk::Application) {
+    // Keep one controller for the application's one window. GApplication
+    // forwards later invocations here, including paths resolved by the caller.
+    let current: Rc<RefCell<Option<Rc<Ui>>>> = Rc::new(RefCell::new(None));
+    let get_ui = move |application: &gtk::Application| {
+        if let Some(ui) = current.borrow().as_ref() {
+            return ui.clone();
+        }
+        let ui = Ui::build(application);
+        let current_on_close = current.clone();
+        ui.window.connect_close_request(move |_| {
+            current_on_close.borrow_mut().take();
+            glib::Propagation::Proceed
+        });
+        *current.borrow_mut() = Some(ui.clone());
+        ui
+    };
+    let activate_ui = get_ui.clone();
+    application.connect_open(move |application, files, _| {
+        let ui = get_ui(application);
+        ui.open_files(files);
+        ui.present();
+    });
+    application.connect_activate(move |application| {
+        activate_ui(application).present();
+    });
 }
 
 /// What a load produced, handed back to the main thread.
@@ -67,6 +81,15 @@ struct Ui {
     search_bar: gtk::SearchBar,
     search_entry: gtk::SearchEntry,
     search_count: gtk::Label,
+    menu_button: gtk::MenuButton,
+    notice: gtk::Revealer,
+    notice_label: gtk::Label,
+    notice_generation: Cell<u64>,
+    overlay_order: RefCell<Vec<&'static str>>,
+    theme_mode: RefCell<String>,
+    system_dark: Cell<bool>,
+    theme_ready: Cell<bool>,
+    present_requested: Cell<bool>,
     outline_revealer: gtk::Revealer,
     outline_list: gtk::ListBox,
     /// The document area, indented when the outline shows as a sidebar.
@@ -197,6 +220,14 @@ impl Ui {
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(&search_bar);
         content.append(&banner);
+        let notice_label = gtk::Label::builder()
+            .accessible_role(gtk::AccessibleRole::Status)
+            .build();
+        notice_label.set_wrap(true);
+        notice_label.set_margin_top(8);
+        notice_label.set_margin_bottom(8);
+        let notice = gtk::Revealer::builder().child(&notice_label).build();
+        content.append(&notice);
         content.append(&stack);
 
         let overlay = gtk::Overlay::new();
@@ -209,6 +240,29 @@ impl Ui {
         let search_button = gtk::ToggleButton::new();
         search_button.set_icon_name("system-search-symbolic");
         search_button.set_tooltip_text(Some("Suchen (Ctrl+F)"));
+        let menu = gio::Menu::new();
+        menu.append(Some("Datei öffnen …"), Some("win.open"));
+        menu.append(Some("Neu laden"), Some("win.reload"));
+        let navigation = gio::Menu::new();
+        navigation.append(Some("Inhaltsverzeichnis"), Some("win.outline"));
+        navigation.append(Some("Suchen"), Some("win.find"));
+        menu.append_section(None, &navigation);
+        let appearance = gio::Menu::new();
+        appearance.append(Some("System"), Some("win.theme::system"));
+        appearance.append(Some("Hell"), Some("win.theme::light"));
+        appearance.append(Some("Dunkel"), Some("win.theme::dark"));
+        menu.append_section(Some("Darstellung"), &appearance);
+        let zoom = gio::Menu::new();
+        zoom.append(Some("Text vergrößern"), Some("win.zoom-in"));
+        zoom.append(Some("Text verkleinern"), Some("win.zoom-out"));
+        zoom.append(Some("Originalgröße"), Some("win.zoom-reset"));
+        menu.append_section(None, &zoom);
+        let menu_button = gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .tooltip_text("Menü")
+            .menu_model(&menu)
+            .build();
+        header.pack_end(&menu_button);
         header.pack_end(&search_button);
         header.pack_end(&outline_button);
 
@@ -225,6 +279,19 @@ impl Ui {
             search_bar: search_bar.clone(),
             search_entry: search_entry.clone(),
             search_count,
+            menu_button,
+            notice,
+            notice_label,
+            notice_generation: Cell::new(0),
+            overlay_order: RefCell::new(Vec::new()),
+            theme_ready: Cell::new(preferences.theme() != "system"),
+            present_requested: Cell::new(false),
+            theme_mode: RefCell::new(preferences.theme()),
+            system_dark: Cell::new(gtk::Settings::default().is_some_and(|s| {
+                s.is_gtk_application_prefer_dark_theme()
+                    || s.gtk_theme_name()
+                        .is_some_and(|n| n.to_lowercase().contains("dark"))
+            })),
             outline_revealer: outline_revealer.clone(),
             outline_list,
             content,
@@ -236,7 +303,8 @@ impl Ui {
             request: Cell::new(0),
         });
 
-        ui.apply_theme();
+        ui.install_theme();
+        ui.install_escape();
         ui.install_search(&previous_hit, &next_hit);
         ui.install_outline();
         ui.install_actions(application);
@@ -279,6 +347,8 @@ impl Ui {
             ui,
             move |window| {
                 ui.remember_position();
+                ui.watch.borrow_mut().take();
+                ui.request.set(ui.request.get() + 1);
                 ui.preferences.set_window_size(
                     window.width(),
                     window.height(),
@@ -381,6 +451,15 @@ impl Ui {
     }
 
     fn install_outline(self: &Rc<Self>) {
+        let ui = Rc::downgrade(self);
+        self.view
+            .connect_local("active-section-changed", false, move |_| {
+                if let Some(ui) = ui.upgrade() {
+                    ui.update_active_section();
+                    ui.update_outline_mode();
+                }
+                None
+            });
         let ui = self.clone();
         self.outline_list.connect_row_activated(move |_, row| {
             let index = row.index();
@@ -396,9 +475,6 @@ impl Ui {
         let ui = self.clone();
         self.outline_revealer
             .connect_child_revealed_notify(move |_| ui.update_outline_mode());
-        let ui = self.clone();
-        self.window
-            .connect_default_width_notify(move |_| ui.update_outline_mode());
     }
 
     fn update_outline_mode(&self) {
@@ -427,6 +503,30 @@ impl Ui {
             blocks.push(entry.block);
         }
         *self.outline_blocks.borrow_mut() = blocks;
+        self.update_active_section();
+    }
+
+    fn update_active_section(&self) {
+        let row = self
+            .view
+            .active_section()
+            .and_then(|index| self.outline_list.row_at_index(index as i32));
+        if self.outline_list.selected_row() != row {
+            self.outline_list.select_row(row.as_ref());
+        }
+    }
+
+    fn open_files(self: &Rc<Self>, files: &[gio::File]) {
+        if let Some(file) = files.first() {
+            if let Some(path) = file.path() {
+                self.open(&path);
+            } else {
+                self.note("Nur lokale Markdown-Dateien können geöffnet werden.");
+            }
+        }
+        if files.len() > 1 {
+            self.note("Es kann nur eine Datei geöffnet sein. Die erste Datei wurde gewählt.");
+        }
     }
 
     /// Reads and parses off the main thread, then applies the result if it is
@@ -557,14 +657,15 @@ impl Ui {
     }
 
     fn install_drop_target(self: &Rc<Self>) {
-        let target = gtk::DropTarget::new(gio::File::static_type(), gtk::gdk::DragAction::COPY);
+        let target = gtk::DropTarget::new(
+            gtk::gdk::FileList::static_type(),
+            gtk::gdk::DragAction::COPY,
+        );
         let ui = self.clone();
         target.connect_drop(move |_, value, _, _| {
-            if let Ok(file) = value.get::<gio::File>() {
-                if let Some(path) = file.path() {
-                    ui.open(&path);
-                    return true;
-                }
+            if let Ok(files) = value.get::<gtk::gdk::FileList>() {
+                ui.open_files(&files.files());
+                return true;
             }
             false
         });
@@ -637,38 +738,197 @@ impl Ui {
         });
     }
 
-    fn note(&self, message: &str) {
-        self.banner_label.set_text(message);
-        self.banner.set_reveal_child(true);
+    fn note(self: &Rc<Self>, message: &str) {
+        self.notice_label.set_text(message);
+        self.notice_label
+            .update_property(&[gtk::accessible::Property::Label(message)]);
+        self.notice.set_reveal_child(true);
+        let generation = self.notice_generation.get() + 1;
+        self.notice_generation.set(generation);
+        let ui = Rc::downgrade(self);
+        glib::timeout_add_local_once(std::time::Duration::from_secs(6), move || {
+            if let Some(ui) = ui.upgrade() {
+                if ui.notice_generation.get() == generation {
+                    ui.notice.set_reveal_child(false);
+                }
+            }
+        });
     }
 
-    /// The theme is settled before the window shows content, so no wrong
-    /// colour scheme flashes on start (SPEC.md, section 3).
-    fn apply_theme(&self) {
-        let settings = gtk::Settings::default();
-        let dark = settings
-            .as_ref()
-            .map(|settings| settings.is_gtk_application_prefer_dark_theme())
-            .unwrap_or(false);
-        self.view.set_palette(if dark { DARK } else { LIGHT });
-        if let Some(settings) = settings {
-            settings.connect_gtk_application_prefer_dark_theme_notify(glib::clone!(
-                #[weak(rename_to = view)]
-                self.view,
-                move |settings| {
-                    view.set_palette(if settings.is_gtk_application_prefer_dark_theme() {
-                        DARK
-                    } else {
-                        LIGHT
-                    });
-                }
-            ));
+    fn track_overlay(&self, name: &'static str, open: bool) {
+        let mut order = self.overlay_order.borrow_mut();
+        order.retain(|item| *item != name);
+        if open {
+            order.push(name);
         }
+    }
+
+    fn install_escape(self: &Rc<Self>) {
+        let ui = Rc::downgrade(self);
+        self.search_bar
+            .connect_search_mode_enabled_notify(move |bar| {
+                if let Some(ui) = ui.upgrade() {
+                    ui.track_overlay("search", bar.is_search_mode());
+                }
+            });
+        let ui = Rc::downgrade(self);
+        self.outline_revealer
+            .connect_reveal_child_notify(move |revealer| {
+                if let Some(ui) = ui.upgrade() {
+                    ui.track_overlay("outline", revealer.reveals_child());
+                    ui.update_outline_mode();
+                }
+            });
+        let keys = gtk::EventControllerKey::new();
+        keys.set_name(Some("close-overlay"));
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let ui = Rc::downgrade(self);
+        keys.connect_key_pressed(move |_, key, _, _| {
+            let Some(ui) = ui.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+            if key != gtk::gdk::Key::Escape {
+                return glib::Propagation::Proceed;
+            }
+            if ui.menu_button.popover().is_some_and(|p| p.is_visible()) {
+                ui.menu_button.popdown();
+                ui.menu_button.grab_focus();
+                return glib::Propagation::Stop;
+            }
+            let top = ui.overlay_order.borrow().last().copied();
+            match top {
+                Some("search") => ui.search_bar.set_search_mode(false),
+                Some("outline") => ui.outline_revealer.set_reveal_child(false),
+                _ => return glib::Propagation::Proceed,
+            }
+            if ui.overlay_order.borrow().last() == Some(&"search") {
+                ui.search_entry.grab_focus();
+            } else if ui.outline_revealer.reveals_child() {
+                ui.outline_list.grab_focus();
+            } else {
+                ui.view.grab_focus();
+            }
+            glib::Propagation::Stop
+        });
+        self.window.add_controller(keys);
+    }
+
+    fn present(&self) {
+        self.present_requested.set(true);
+        if self.theme_ready.get() {
+            self.window.present();
+        }
+    }
+
+    fn theme_ready(&self) {
+        self.theme_ready.set(true);
+        if self.present_requested.get() {
+            self.window.present();
+        }
+    }
+
+    fn apply_theme(&self) {
+        let dark = match self.theme_mode.borrow().as_str() {
+            "dark" => true,
+            "light" => false,
+            _ => self.system_dark.get(),
+        };
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_gtk_application_prefer_dark_theme(dark);
+        }
+        self.view.set_palette(if dark { DARK } else { LIGHT });
+    }
+
+    fn install_theme(self: &Rc<Self>) {
+        self.apply_theme();
+        if let Some(settings) = gtk::Settings::default() {
+            let ui = Rc::downgrade(self);
+            settings.connect_gtk_theme_name_notify(move |settings| {
+                if let Some(ui) = ui.upgrade() {
+                    ui.system_dark.set(
+                        settings
+                            .gtk_theme_name()
+                            .is_some_and(|n| n.to_lowercase().contains("dark")),
+                    );
+                    ui.apply_theme();
+                }
+            });
+        }
+        // The desktop portal reports the system preference independently of
+        // the application's override of GtkSettings.
+        let ui = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(proxy) = gio::DBusProxy::for_bus_future(
+                gio::BusType::Session,
+                gio::DBusProxyFlags::DO_NOT_AUTO_START
+                    | gio::DBusProxyFlags::DO_NOT_LOAD_PROPERTIES,
+                None,
+                "org.freedesktop.portal.Desktop",
+                "/org/freedesktop/portal/desktop",
+                "org.freedesktop.portal.Settings",
+            )
+            .await
+            else {
+                if let Some(ui) = ui.upgrade() {
+                    ui.theme_ready();
+                }
+                return;
+            };
+            let weak = ui.clone();
+            proxy.connect_local("g-signal", false, move |values| {
+                let signal = values[2].get::<String>().unwrap();
+                let parameters = values[3].get::<glib::Variant>().unwrap();
+                if signal != "SettingChanged" {
+                    return None;
+                }
+                if let Some((namespace, key, value)) =
+                    parameters.get::<(String, String, glib::Variant)>()
+                {
+                    if namespace == "org.freedesktop.appearance" && key == "color-scheme" {
+                        if let (Some(ui), Some(value)) = (weak.upgrade(), value.get::<u32>()) {
+                            ui.system_dark.set(value == 1);
+                            ui.apply_theme();
+                        }
+                    }
+                }
+                None
+            });
+            if let Ok(reply) = proxy
+                .call_future(
+                    "Read",
+                    Some(&("org.freedesktop.appearance", "color-scheme").to_variant()),
+                    gio::DBusCallFlags::NO_AUTO_START,
+                    250,
+                )
+                .await
+            {
+                let value = reply
+                    .child_value(0)
+                    .as_variant()
+                    .and_then(|v| v.get::<u32>());
+                if let (Some(ui), Some(value)) = (ui.upgrade(), value) {
+                    ui.system_dark.set(value == 1);
+                    ui.apply_theme();
+                }
+            }
+            // Keep the signal subscription alive for this window's lifetime.
+            if let Some(ui) = ui.upgrade() {
+                ui.theme_ready();
+                ui.window.connect_destroy(move |_| {
+                    let _ = &proxy;
+                });
+            }
+        });
     }
 
     /// Actions are registered once and bound to keys through the application,
     /// so menu, keyboard and accessibility share one source
     /// (SPEC.md, section 3).
+    fn focused_editable(&self) -> Option<gtk::Editable> {
+        gtk::prelude::GtkWindowExt::focus(&self.window)
+            .and_then(|w| w.downcast::<gtk::Editable>().ok())
+    }
+
     fn install_actions(self: &Rc<Self>, application: &gtk::Application) {
         let add = |name: &str, keys: &[&str], callback: Box<dyn Fn()>| {
             let action = gio::SimpleAction::new(name, None);
@@ -677,6 +937,27 @@ impl Ui {
             application.set_accels_for_action(&format!("win.{name}"), keys);
         };
 
+        let theme = gio::SimpleAction::new_stateful(
+            "theme",
+            Some(glib::VariantTy::STRING),
+            &self.theme_mode.borrow().to_variant(),
+        );
+        let ui = Rc::downgrade(self);
+        theme.connect_activate(move |action, value| {
+            let Some(mode) = value.and_then(|v| v.str()) else {
+                return;
+            };
+            if !matches!(mode, "system" | "light" | "dark") {
+                return;
+            }
+            if let Some(ui) = ui.upgrade() {
+                *ui.theme_mode.borrow_mut() = mode.to_string();
+                ui.preferences.set_theme(mode);
+                action.set_state(&mode.to_variant());
+                ui.apply_theme();
+            }
+        });
+        self.window.add_action(&theme);
         let view = &self.view;
         add(
             "open",
@@ -691,18 +972,30 @@ impl Ui {
             "copy",
             &["<Control>c"],
             Box::new(glib::clone!(
-                #[weak]
-                view,
-                move || view.copy_selection()
+                #[weak(rename_to = ui)]
+                self,
+                move || {
+                    if let Some(editable) = ui.focused_editable() {
+                        editable.emit_by_name::<()>("copy-clipboard", &[]);
+                    } else {
+                        ui.view.copy_selection();
+                    }
+                }
             )),
         );
         add(
             "select-all",
             &["<Control>a"],
             Box::new(glib::clone!(
-                #[weak]
-                view,
-                move || view.select_all()
+                #[weak(rename_to = ui)]
+                self,
+                move || {
+                    if let Some(editable) = ui.focused_editable() {
+                        editable.select_region(0, -1);
+                    } else {
+                        ui.view.select_all();
+                    }
+                }
             )),
         );
         add(
@@ -850,4 +1143,113 @@ fn place_on_monitor(window: &gtk::ApplicationWindow) {
         window,
         move || window.unfullscreen()
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pump() {
+        let context = glib::MainContext::default();
+        let until = std::time::Instant::now() + std::time::Duration::from_millis(100);
+        while std::time::Instant::now() < until {
+            while context.pending() {
+                context.iteration(false);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    #[ignore = "requires a GTK display; run with gtk4-broadwayd and GDK_BACKEND=broadway"]
+    fn native_ui() {
+        gtk::init().expect("GTK display");
+        let application = gtk::Application::builder()
+            .application_id("de.kalendium.Hashline.Test")
+            .flags(gio::ApplicationFlags::NON_UNIQUE | gio::ApplicationFlags::HANDLES_OPEN)
+            .build();
+        application.register(gio::Cancellable::NONE).unwrap();
+        let ui = Ui::build(&application);
+        ui.window.present();
+        pump();
+        ui.view.verify_accessibility_and_selection();
+        ui.fill_outline();
+        assert!(ui.outline_list.row_at_index(0).is_some());
+        assert_eq!(ui.outline_list.selected_row().unwrap().index(), 0);
+        for mode in ["dark", "light", "system"] {
+            let action = ui.window.lookup_action("theme").unwrap();
+            action.activate(Some(&mode.to_variant()));
+            assert_eq!(action.state().unwrap().str(), Some(mode));
+            assert_eq!(ui.theme_mode.borrow().as_str(), mode);
+        }
+        assert!(ui.menu_button.menu_model().unwrap().n_items() >= 4);
+        ui.search_bar.set_search_mode(true);
+        ui.outline_revealer.set_reveal_child(true);
+        assert_eq!(*ui.overlay_order.borrow(), vec!["search", "outline"]);
+        let keys = ui.window.observe_controllers();
+        let escape = || {
+            for i in 0..keys.n_items() {
+                if let Some(key) = keys.item(i).and_downcast::<gtk::EventControllerKey>() {
+                    if key.name().as_deref() != Some("close-overlay") {
+                        continue;
+                    }
+                    let _: bool = key.emit_by_name(
+                        "key-pressed",
+                        &[
+                            &gtk::gdk::Key::Escape,
+                            &0u32,
+                            &gtk::gdk::ModifierType::empty(),
+                        ],
+                    );
+                }
+            }
+        };
+        escape();
+        assert!(!ui.outline_revealer.reveals_child());
+        assert!(ui.search_bar.is_search_mode());
+        escape();
+        assert!(!ui.search_bar.is_search_mode());
+        ui.menu_button.popup();
+        pump();
+        escape();
+        assert!(!ui.menu_button.popover().unwrap().is_visible());
+        let dir = std::env::temp_dir().join(format!("hashline-native-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let first = dir.join("eins.md");
+        let second = dir.join("zwei.md");
+        std::fs::write(&first, "# Eins\n\nText\n").unwrap();
+        std::fs::write(&second, "# Zwei\n\nAnderer Text\n").unwrap();
+        ui.open_files(&[gio::File::for_path(&first), gio::File::for_path(&second)]);
+        pump();
+        assert_eq!(ui.current.borrow().as_ref(), Some(&first));
+        assert!(
+            ui.notice.reveals_child(),
+            "loading must not hide the multiple-file notice"
+        );
+        ui.open_files(&[gio::File::for_path(&second)]);
+        pump();
+        assert_eq!(ui.current.borrow().as_ref(), Some(&second));
+        assert_eq!(application.windows().len(), 1);
+        ui.window.close();
+        // Exercise the real activation/open handlers, including a fresh
+        // activation after closing the only window.
+        install_application(&application);
+        application.activate();
+        application.activate();
+        pump();
+        assert_eq!(application.windows().len(), 1);
+        let window = application.active_window().unwrap();
+        application.open(&[gio::File::for_path(&first)], "");
+        application.open(&[gio::File::for_path(&second)], "");
+        pump();
+        assert_eq!(application.windows().len(), 1);
+        assert_eq!(application.active_window().unwrap(), window);
+        assert_eq!(window.tooltip_text().as_deref(), second.to_str());
+        window.close();
+        application.activate();
+        pump();
+        assert_eq!(application.windows().len(), 1);
+        application.active_window().unwrap().close();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

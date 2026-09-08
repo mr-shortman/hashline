@@ -89,13 +89,11 @@ fn hit_testing_maps_points_across_a_wrapped_block() {
     assert!(piece.layout.line_count() > 1, "the fixture must wrap");
 
     let (_, logical) = piece.layout.pixel_extents();
-    for line in 0..piece.layout.line_count() {
-        let Some(y) = piece.layout.line(line).map(|line| {
-            let (_, extents) = line.extents();
-            extents.y() + extents.height() / 2
-        }) else {
-            continue;
-        };
+    let mut iter = piece.layout.iter();
+    loop {
+        let (_, extents) = iter.line_extents();
+        let y = extents.y() + extents.height() / 2;
+        let line = iter.line_readonly().unwrap();
         let mut previous = -1;
         for step in 0..40 {
             let x = (logical.width() * pango::SCALE * step / 40).max(0);
@@ -105,7 +103,11 @@ fn hit_testing_maps_points_across_a_wrapped_block() {
                 "index {index} splits a character"
             );
             assert!(index >= previous, "moving right moved back");
+            assert!(index >= line.start_index() && index <= line.start_index() + line.length());
             previous = index;
+        }
+        if !iter.next_line() {
+            break;
         }
     }
 }

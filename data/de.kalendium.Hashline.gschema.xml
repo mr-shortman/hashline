@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="de.kalendium.Hashline" path="/de/kalendium/Hashline/">
+    <key name="theme" type="s">
+      <default>'system'</default>
+      <choices><choice value="system"/><choice value="light"/><choice value="dark"/></choices>
+      <summary>Preferred color scheme</summary>
+    </key>
     <key name="zoom" type="i">
       <default>100</default>
       <range min="80" max="200"/>

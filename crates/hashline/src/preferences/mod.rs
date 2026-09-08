@@ -18,19 +18,35 @@ const MAX_POSITIONS: usize = 100;
 
 #[derive(Clone)]
 pub struct Preferences {
+    schema: Option<gio::SettingsSchema>,
     settings: Option<gio::Settings>,
 }
 
+/// The schema, from the installed location or from the build tree.
+fn find_schema() -> Option<gio::SettingsSchema> {
+    if let Some(schema) =
+        gio::SettingsSchemaSource::default().and_then(|source| source.lookup(SCHEMA_ID, true))
+    {
+        return Some(schema);
+    }
+    let directory = std::path::Path::new(env!("HASHLINE_DEV_SCHEMA_DIR"));
+    gio::SettingsSchemaSource::from_directory(directory, None, true)
+        .ok()?
+        .lookup(SCHEMA_ID, true)
+}
+
 impl Preferences {
-    /// Opens the store, or an inert one when the schema is not installed —
-    /// which is the normal state in a development tree until the schema is
-    /// installed with the application in M3.
+    /// Opens the store, or an inert one when no schema can be found.
+    ///
+    /// An installed Hashline finds its schema in the system directory. A build
+    /// tree falls back to the copy `build.rs` compiled, so `cargo run` behaves
+    /// like the installed program without anyone having to set
+    /// `GSETTINGS_SCHEMA_DIR`.
     pub fn load() -> Self {
-        let installed = gio::SettingsSchemaSource::default()
-            .and_then(|source| source.lookup(SCHEMA_ID, true))
-            .is_some();
         Preferences {
-            settings: installed.then(|| gio::Settings::new(SCHEMA_ID)),
+            schema: find_schema(),
+            settings: find_schema()
+                .map(|schema| gio::Settings::new_full(&schema, gio::SettingsBackend::NONE, None)),
         }
     }
 
@@ -38,32 +54,52 @@ impl Preferences {
         self.settings.is_some()
     }
 
+    /// A schema that exists but lacks a key is a *stale* schema, and reading
+    /// that key would abort the process rather than return a default — GIO
+    /// treats it as a programming error. A build tree hits this whenever the
+    /// schema source gains a key, so every access is guarded and a stale
+    /// schema degrades instead of killing the program (SPEC.md, section 7).
+    fn get(&self, key: &str) -> Option<&gio::Settings> {
+        let schema = self.schema.as_ref()?;
+        schema.has_key(key).then_some(())?;
+        self.settings.as_ref()
+    }
+
+    pub fn theme(&self) -> String {
+        self.get("theme")
+            .map(|settings| settings.string("theme").to_string())
+            .unwrap_or_else(|| "system".into())
+    }
+    pub fn set_theme(&self, mode: &str) {
+        if let Some(settings) = self.get("theme") {
+            let _ = settings.set_string("theme", mode);
+        }
+    }
+
     pub fn zoom(&self) -> i32 {
-        self.settings
-            .as_ref()
+        self.get("zoom")
             .map(|settings| settings.int("zoom"))
             .unwrap_or(100)
     }
     pub fn set_zoom(&self, percent: i32) {
-        if let Some(settings) = &self.settings {
+        if let Some(settings) = self.get("zoom") {
             let _ = settings.set_int("zoom", percent);
         }
     }
 
     pub fn outline_visible(&self) -> bool {
-        self.settings
-            .as_ref()
+        self.get("outline-visible")
             .map(|settings| settings.boolean("outline-visible"))
             .unwrap_or(false)
     }
     pub fn set_outline_visible(&self, visible: bool) {
-        if let Some(settings) = &self.settings {
+        if let Some(settings) = self.get("outline-visible") {
             let _ = settings.set_boolean("outline-visible", visible);
         }
     }
 
     pub fn window_size(&self) -> (i32, i32, bool) {
-        match &self.settings {
+        match self.get("window-width") {
             Some(settings) => (
                 settings.int("window-width"),
                 settings.int("window-height"),
@@ -73,7 +109,7 @@ impl Preferences {
         }
     }
     pub fn set_window_size(&self, width: i32, height: i32, maximized: bool) {
-        if let Some(settings) = &self.settings {
+        if let Some(settings) = self.get("window-width") {
             // A maximized window's own size is not worth recording; the size
             // to restore is the one it had before.
             if !maximized {
@@ -99,7 +135,7 @@ impl Preferences {
 
     /// Records where reading stopped, newest first, bounded in length.
     pub fn remember_position(&self, path: &Path, anchor: &Anchor) {
-        let Some(settings) = &self.settings else {
+        let Some(settings) = self.get("reading-positions") else {
             return;
         };
         let wanted = path.to_string_lossy().to_string();
@@ -123,8 +159,7 @@ impl Preferences {
     }
 
     fn positions(&self) -> Vec<(String, String, u64)> {
-        self.settings
-            .as_ref()
+        self.get("reading-positions")
             .and_then(|settings| {
                 settings
                     .value("reading-positions")
@@ -164,6 +199,10 @@ mod tests {
             .reading_position(std::path::Path::new("/docs/anderes.md"))
             .is_none());
 
+        for theme in ["dark", "light", "system"] {
+            preferences.set_theme(theme);
+            assert_eq!(preferences.theme(), theme);
+        }
         preferences.set_zoom(140);
         assert_eq!(preferences.zoom(), 140);
         preferences.set_outline_visible(true);
