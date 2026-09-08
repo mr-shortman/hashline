@@ -19,6 +19,7 @@
     "allow-choose-file",
     "allow-read-document",
     "allow-release-document",
+    "allow-allow-remote-images",
     "allow-watch-document",
     "allow-unwatch-document",
     "allow-follow-link",

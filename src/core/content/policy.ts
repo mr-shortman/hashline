@@ -39,11 +39,28 @@ export function classifyUrl(
   return 'local';
 }
 
-export function sanitizeContent(
+// WebKit does not reliably paint alt text for an <img> without src.
+// Keep the resource node for deferred loading; expose a real text placeholder.
+export function unavailableImage(img: HTMLImageElement, message: string): void {
+  img.removeAttribute('src');
+  img.dataset.unavailable = '';
+  img.hidden = true;
+  img.setAttribute('aria-hidden', 'true');
+  let label = img.nextElementSibling;
+  if (!label?.classList.contains('image-placeholder')) {
+    label = document.createElement('span');
+    label.className = 'image-placeholder';
+    label.setAttribute('data-search-ignore', '');
+    img.after(label);
+  }
+  label.textContent = `${img.alt || 'Bild'} — ${message}`;
+}
+
+export function sanitizeFragment(
   parsed: ParsedMarkdown,
   file: FileDocument,
   gateway: DocumentGateway,
-): CleanContent {
+): { fragment: DocumentFragment; blockedImages: number } {
   const fragment = DOMPurify.sanitize(parsed.html, {
     RETURN_DOM_FRAGMENT: true,
     ALLOWED_TAGS: [
@@ -124,7 +141,9 @@ export function sanitizeContent(
   });
   // Only parser-generated heading IDs survive; even passive HTML cannot claim app IDs.
   const remaining = new Map(parsed.headings.map((h) => [h.id, h.level]));
-  for (const element of fragment.querySelectorAll('*')) {
+  for (const element of fragment.querySelectorAll(
+    '[id], [class], input, [width], [height], [colspan], [rowspan]',
+  )) {
     const id = element.getAttribute('id');
     if (id) {
       if (
@@ -135,7 +154,7 @@ export function sanitizeContent(
       else element.removeAttribute('id');
     }
     const cls = element.getAttribute('class');
-    element.removeAttribute('class');
+    if (cls !== null) element.removeAttribute('class');
     if (
       element.tagName === 'CODE' &&
       cls &&
@@ -171,6 +190,10 @@ export function sanitizeContent(
   for (const img of fragment.querySelectorAll('img')) {
     const source = img.getAttribute('src') || '';
     img.removeAttribute('src');
+    if (/^https?:/i.test(source) && classifyUrl(source) === 'external') {
+      img.dataset.remoteSource = source;
+      img.dataset.remoteAlt = img.alt;
+    }
     const url =
       classifyUrl(source) === 'local' ? gateway.imageUrl(file, source) : null;
     if (url && /^(hashline-image:\/\/localhost\/|blob:)/.test(url)) {
@@ -179,10 +202,20 @@ export function sanitizeContent(
       img.decoding = 'async';
     } else {
       blockedImages++;
-      img.setAttribute('data-unavailable', '');
-      img.alt = `${img.alt || 'Bild'} — Bildzugriff nicht freigegeben`;
+      unavailableImage(img, 'Bildzugriff nicht freigegeben');
     }
   }
+  return { fragment, blockedImages };
+}
+
+// String adapter for contract comparisons; the renderer inserts the fragment
+// directly, avoiding serialization and a second HTML parse.
+export function sanitizeContent(
+  parsed: ParsedMarkdown,
+  file: FileDocument,
+  gateway: DocumentGateway,
+): CleanContent {
+  const { fragment, blockedImages } = sanitizeFragment(parsed, file, gateway);
   const container = document.createElement('div');
   container.append(fragment);
   return { html: container.innerHTML as SanitizedHtml, blockedImages };

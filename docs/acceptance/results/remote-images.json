@@ -1,0 +1,629 @@
+{
+  "binary": "/home/big-linus/.local/lib/hashline/hashline",
+  "sha256": "db78bf8996d57124d90b92557075518fc7b98f18919231e731b224b09227d8e1",
+  "completed": true,
+  "passed": [
+    "No network before explicit approval, including native protocol bypass attempt",
+    "Keyboard approval preserves DOM; raster/redirect load; SVG, forged MIME, >16 MiB, >24 MP and redirect loop rejected; no cookie/referrer/auth",
+    "Changed revision resets consent without network requests",
+    "File switch and reopening reset consent; approval grants no access to another document",
+    "Native approval rejects unknown/closed document handles",
+    "64-request limit and at most four simultaneous downloads enforced in native protocol",
+    "Switch during active download keeps new document blocked and rejects stale image results"
+  ],
+  "concurrency": {
+    "active": 0,
+    "maximum": 4
+  },
+  "requests": [
+    {
+      "path": "/fake.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixel.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/redirect",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/vector.svg",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixel.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/large.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixels.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixel.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/fake.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/vector.svg",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/redirect",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixel.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/large.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/pixels.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/loop",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-0.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-1.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-3.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-2.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-6.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-7.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-5.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-4.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-9.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-8.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-10.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-11.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-13.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-12.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-14.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-15.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-16.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-18.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-19.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-17.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-20.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-21.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-22.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-23.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-24.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-26.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-25.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-27.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-28.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-31.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-29.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-30.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-34.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-33.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-32.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-35.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-37.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-38.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-36.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-39.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-41.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-42.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-40.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-43.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-44.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-45.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-46.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-47.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-49.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-48.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-50.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-51.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-52.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-53.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-54.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-55.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-56.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-57.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-59.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-58.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-61.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-60.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-63.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/budget-62.png",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    },
+    {
+      "path": "/slow",
+      "headers": {
+        "accept": "*/*",
+        "host": "127.0.0.1:33773"
+      }
+    }
+  ]
+}

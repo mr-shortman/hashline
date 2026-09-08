@@ -1,14 +1,13 @@
 import type { DocumentGateway, FileDocument } from '../../platform/gateway';
 import type { MarkdownService } from '../../core/markdown/service';
-import type { Heading } from '../../core/markdown/types';
-import { sanitizeContent, type SanitizedHtml } from '../../core/content/policy';
+import type { Heading, MarkdownSection } from '../../core/markdown/types';
 
 export interface RenderDocument {
   readonly file: FileDocument;
-  readonly html: SanitizedHtml;
+  readonly sections: readonly MarkdownSection[];
+  readonly openedAt: number;
   readonly headings: readonly Heading[];
   readonly revision: number;
-  readonly blockedImages: number;
 }
 export interface DocumentState {
   status: 'empty' | 'loading' | 'ready' | 'error';
@@ -95,12 +94,6 @@ export class DocumentController {
         await this.gateway.release(file.id);
         return;
       }
-      const sanitizeStart = performance.now();
-      const content = sanitizeContent(parsed, file, this.gateway);
-      performance.measure('hashline.sanitize', {
-        start: sanitizeStart,
-        end: performance.now(),
-      });
       performance.measure('hashline.read', { start: 0, duration: file.readMs });
       performance.measure('hashline.parse', {
         start: 0,
@@ -114,9 +107,11 @@ export class DocumentController {
       this.unwatch = undefined;
       const doc: RenderDocument = Object.freeze({
         file,
-        html: content.html,
+        sections: parsed.sections || [
+          { html: parsed.html, headings: parsed.headings },
+        ],
+        openedAt: start,
         headings: parsed.headings,
-        blockedImages: content.blockedImages,
         revision: request,
       });
       this.update({

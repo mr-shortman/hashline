@@ -59,8 +59,11 @@ Die App verändert keine geöffneten Markdown-Dateien. Aufgabenlisten bleiben sc
 
 ### Fensteraufbau
 
-- Native Fensterdekoration für Fensterbewegung, Größenänderung und Systemaktionen.
-- Darunter eine kompakte Werkzeugleiste: Datei öffnen, Dateiname, Inhaltsverzeichnis, Suche und ein kleines Menü.
+- Vorerst eine selbst gestaltete Fensterleiste (Custom Titlebar) ohne native Fensterdekoration. Die aktuelle Umsetzung ist die Grundlage für v1; die Entscheidung ist in [006-custom-titlebar.md](docs/decisions/006-custom-titlebar.md) festgehalten.
+- Die kompakte Leiste vereint Datei öffnen, Dateiname, Inhaltsverzeichnis, Suche, ein kleines Menü und Fenstersteuerung. Sie folgt dem gewählten Theme und zeigt den Fensterfokus an.
+- Dateiname und freie Leistenflächen dienen zum Verschieben; ein Doppelklick maximiert das Fenster oder stellt es wieder her. Bedienelemente lösen keine Fensterbewegung aus.
+- Unter Linux stehen Minimieren, Maximieren/Wiederherstellen und Schließen rechts in der Leiste zur Verfügung. Größenänderungen an Fensterrändern und -ecken bleiben möglich. Fensteraktionen laufen über den nativen Tauri-Adapter.
+- Fensterknöpfe besitzen zugängliche Namen, sichtbaren Tastaturfokus und Tastaturbedienung. In der Browser-Vorschau werden native Fensterknöpfe und Resize-Flächen ausgeblendet.
 - Der vollständige Pfad ist bei Bedarf abrufbar, aber kein dauerhaftes Gestaltungselement.
 - Der Dokumentbereich nimmt den verbleibenden Platz ein. Keine permanente Statusleiste.
 - Inhaltsverzeichnis initial geschlossen. Die gewählte Sichtbarkeit wird gespeichert.
@@ -140,7 +143,7 @@ DocumentController
 - **DocumentController:** Öffnen, Nachladen, Ladezustände, Versionsverwaltung, Fehler und Aufräumen. Er koordiniert, implementiert aber weder Parser noch DOM-Manipulation.
 - **MarkdownService:** Reine Verarbeitung von Markdown zu HTML und Metadaten. Kennt weder React noch Tauri. Der Parser-Adapter kapselt die konkrete Bibliothek.
 - **DocumentGateway:** Lesen, Metadaten, Beobachtung und Ressourcenfreigabe. Der Tauri-Adapter ist die einzige Frontend-Schicht mit Zugriff auf native APIs.
-- **DocumentViewport:** Eigentümer des erzeugten Dokument-DOMs, der Auswahl, Suchmarkierungen und Scrollanker. Es erhält bereits bereinigte Inhalte.
+- **DocumentViewport:** Eigentümer des erzeugten Dokument-DOMs, der Auswahl, Suchmarkierungen und Scrollanker. Es erhält eine unveränderliche Parserrevision und bereinigt jeden Abschnitt unmittelbar vor dessen DOM-Einfügung.
 - **Preferences:** Kleines versioniertes Einstellungsobjekt mit validierten Werten. Beschädigte Daten fallen auf Defaults zurück.
 
 Diese Grenzen werden mit wenigen Modulen und expliziten Funktionen umgesetzt. Kein allgemeines Plugin-System, kein Dependency-Injection-Framework, kein globaler Event-Bus und keine vorsorgliche Datenbank.
@@ -201,13 +204,13 @@ Absätze, Überschriften H1–H6, Hervorhebungen, durchgestrichener Text, Inline
 2. Datei asynchron lesen, UTF-8 inklusive BOM unterstützen; ungültige Kodierung verständlich melden.
 3. Markdown im wiederverwendeten Worker parsen; HTML, Überschriften und Ressourcenmetadaten erzeugen.
 4. HTML auf dem Hauptthread mit DOMPurify bereinigen und Links/Bildquellen nach Inhaltsrichtlinie auflösen. DOMPurify nicht ohne DOM-Unterstützung im Worker voraussetzen.
-5. Bereinigtes Ergebnis als unveränderliche Dokumentrevision an den Viewport geben.
-6. Dokument einfügen und erste lesbare Darstellung messen.
+5. Parserergebnis als unveränderliche Dokumentrevision an den Viewport geben; die Bereinigung aus Schritt 4 erfolgt dort abschnittsweise unmittelbar vor dem Einfügen.
+6. Den ersten Abschnitt beziehungsweise Leseanker einfügen, erste lesbare Darstellung messen und weitere Abschnitte in abbrechbaren Aufgaben ergänzen.
 7. Bilder, Suchindex und Syntaxhervorhebung nach Priorität ergänzen; Dokumentrevision bei jedem Ergebnis prüfen.
 
-Nur der Viewport darf bereinigtes HTML über Reacts HTML-Einfügung einsetzen. Ungeprüftes Parser-HTML darf keinen anderen Weg in den DOM erhalten. Die Bereinigung kapselt auch den Umgang mit IDs, Attributen und Ressourcen-URLs.
+Nur der Viewport darf bereinigte Dokumentfragmente in seinen Dokument-DOM einfügen. Ungeprüftes Parser-HTML darf keinen anderen Weg in den DOM erhalten. Die Bereinigung kapselt auch den Umgang mit IDs, Attributen und Ressourcen-URLs.
 
-Der Markdown-Inhalt wird als zusammenhängendes semantisches HTML gerendert. Eine React-Komponente pro Markdown-Token ist nicht der Standard. Normale UI-Updates dürfen den Dokument-DOM nicht neu erzeugen. Nachladungen ersetzen zunächst die Dokumentrevision vollständig; ein inkrementeller Renderer folgt nur bei nachgewiesenem Bedarf.
+Der Markdown-Inhalt wird als zusammenhängendes semantisches HTML gerendert. Eine React-Komponente pro Markdown-Token ist nicht der Standard. Normale UI-Updates dürfen den Dokument-DOM nicht neu erzeugen. Nachladungen ersetzen die Dokumentrevision vollständig; Bereinigung und DOM-Aufbau erfolgen nach Entscheidung 004 abschnittsweise und abbrechbar. Vorhandene Textknoten derselben Revision bleiben für Auswahl und Suche erhalten.
 
 ## 7. Dateien, Ressourcen und Aktualisierung
 
@@ -219,7 +222,7 @@ Der Markdown-Inhalt wird als zusammenhängendes semantisches HTML gerendert. Ein
 - Sonstige Dateitypen und unbekannte URL-Schemata erhalten einen verständlichen Hinweis; kein Shell-Aufruf aus Dokumentinhalt.
 - Lokale Bilder werden über kontrollierte Ressourcen-URLs bereitgestellt, nicht pauschal als große Base64-Daten über IPC kopiert.
 - Automatischer Bildzugriff gilt für das Dokumentverzeichnis und dessen Unterverzeichnisse. Pfade außerhalb, einschließlich entweichender Symlinks, werden nicht automatisch freigegeben. Ein expliziter Datei-Öffnungsvorgang darf einen neuen Dokumentbereich wählen.
-- Remote-Bilder laden standardmäßig nicht. Eine kompakte Aktion kann sie für das aktuelle Dokument freigeben; Textdarstellung wartet niemals darauf. Die Freigabe gewährt keine nativen API-Rechte.
+- Remote-Bilder laden standardmäßig nicht. Eine kompakte Aktion gibt sie nach Benutzerbetätigung für die aktuelle Dokumentrevision frei; Textdarstellung wartet niemals darauf. Die Freigabe gewährt keine nativen API-Rechte.
 
 Dateiänderungen werden ereignisbasiert beobachtet und ungefähr 150 ms gebündelt. Ein Inhaltsvergleich verhindert unnötiges Neurendern. Auch das Ersetzen der Datei muss die Beobachtung überleben; dafür bei Bedarf das Elternverzeichnis mit Filter auf die aktive Datei beobachten. Watcher-Fehler lassen manuelles Nachladen verfügbar.
 

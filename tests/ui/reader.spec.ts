@@ -6,6 +6,10 @@ async function open(page: Page, path = 'tests/fixtures/reader.md') {
     .getByRole('button', { name: 'Markdown-Datei öffnen', exact: true })
     .click();
   await (await chooser).setFiles(path);
+  await expect(page.locator('article')).toHaveAttribute(
+    'data-render-state',
+    'complete',
+  );
   await expect(page.locator('article h1')).toBeVisible();
 }
 test('opens, searches across content, preserves DOM and supports outline navigation', async ({

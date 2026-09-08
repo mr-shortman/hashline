@@ -1,19 +1,23 @@
-import { Marked } from 'marked';
-import type { Heading, ParsedMarkdown } from './types';
+import { Marked, Parser } from 'marked';
+import type { Heading, MarkdownSection, ParsedMarkdown } from './types';
 import { BoundedTokenizer } from './tokenizer';
+import { isClosedHtml } from './html-boundary';
 
 export function slugBase(text: string): string {
   return (
     text
       .normalize('NFKC')
-      .toLocaleLowerCase('und')
+      .toLowerCase()
       .replace(/[^\p{L}\p{N}\s_-]/gu, '')
       .trim()
       .replace(/[\s_]+/g, '-') || 'section'
   );
 }
 
-export function parseMarkdown(source: string): ParsedMarkdown {
+export function parseMarkdown(
+  source: string,
+  sectioned = false,
+): ParsedMarkdown {
   const start = performance.now();
   const headings: Heading[] = [];
   const used = new Set<string>();
@@ -22,7 +26,7 @@ export function parseMarkdown(source: string): ParsedMarkdown {
     breaks: false,
     async: false,
   });
-  parser.setOptions({ tokenizer: new BoundedTokenizer() });
+  parser.setOptions({ tokenizer: new BoundedTokenizer(!source.includes('<')) });
   parser.use({
     renderer: {
       html({ text }) {
@@ -56,6 +60,33 @@ export function parseMarkdown(source: string): ParsedMarkdown {
       },
     },
   });
+  if (sectioned) {
+    // Lex the entire source first: reference definitions are document-wide.
+    const tokens = parser.lexer(source);
+    const sections: MarkdownSection[] = [];
+    let html = '';
+    let headingStart = 0;
+    const flush = () => {
+      if (!html) return;
+      sections.push({ html, headings: headings.slice(headingStart) });
+      html = '';
+      headingStart = headings.length;
+    };
+    // Raw HTML can span Markdown tokens. Keep that document in one semantic
+    // fragment rather than changing the HTML tree at an artificial boundary.
+    let rawHtml = false;
+    if (source.includes('<'))
+      parser.walkTokens(tokens, (token) => {
+        if (token.type === 'html' && !isClosedHtml(token.text)) rawHtml = true;
+      });
+    const renderer = new Parser(parser.defaults);
+    for (const token of tokens) {
+      html += renderer.parse([token]);
+      if (!rawHtml && html.length >= 16_384) flush();
+    }
+    flush();
+    return { html: '', sections, headings, parseMs: performance.now() - start };
+  }
   return {
     html: parser.parse(source) as string,
     headings,

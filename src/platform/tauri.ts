@@ -1,4 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { decodeDocument } from './document-packet';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DocumentGateway, FileDocument, OpenRequest } from './gateway';
@@ -6,9 +7,11 @@ import type { DocumentGateway, FileDocument, OpenRequest } from './gateway';
 class TauriGateway implements DocumentGateway {
   private restoredDevFile = false;
   choose = (): Promise<string[]> => invoke('choose_file');
-  read = (path: string): Promise<FileDocument> =>
-    invoke('read_document', { path });
+  read = async (path: string): Promise<FileDocument> =>
+    decodeDocument(await invoke<ArrayBuffer>('read_document', { path }));
   release = (id: string): Promise<void> => invoke('release_document', { id });
+  allowRemoteImages = (file: FileDocument): Promise<void> =>
+    invoke('allow_remote_images', { id: file.id });
   imageUrl = (file: FileDocument, source: string): string =>
     `hashline-image://localhost/${file.id}/${encodeURIComponent(source)}`;
   followLink = (

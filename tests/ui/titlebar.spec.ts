@@ -39,6 +39,10 @@ for (const platform of ['windows', 'macos', 'linux']) {
       mimeType: 'text/markdown',
       buffer: Buffer.from('# Architektur\n\nEin Dokument zum Lesen.'),
     });
+    await expect(page.locator('article')).toHaveAttribute(
+      'data-render-state',
+      'complete',
+    );
     await expect(page.locator('article h1')).toBeVisible();
     await expect(page.locator('.titlebar')).toHaveAttribute(
       'data-platform',

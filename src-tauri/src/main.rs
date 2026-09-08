@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod files;
+mod remote;
 
 use cap_std::fs::Dir;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -10,19 +11,22 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
     },
-    time::Instant,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+static PROCESS_START: OnceLock<SystemTime> = OnceLock::new();
+
 struct Session {
     path: PathBuf,
     dir: Arc<Dir>,
     watcher: Option<RecommendedWatcher>,
+    remote: Arc<remote::Access>,
 }
 #[derive(Default)]
 struct Documents {
@@ -40,6 +44,7 @@ struct FileDocument {
     name: String,
     source: String,
     read_ms: f64,
+    process_started_at_ms: f64,
 }
 #[derive(Clone, Serialize)]
 struct Change {
@@ -108,7 +113,10 @@ async fn choose_file(app: tauri::AppHandle) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn read_document(app: tauri::AppHandle, path: String) -> Result<FileDocument, String> {
+async fn read_document(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let start = Instant::now();
         let path = PathBuf::from(path);
@@ -143,18 +151,34 @@ async fn read_document(app: tauri::AppHandle, path: String) -> Result<FileDocume
         let bytes = files::read_bounded(&dir, Path::new(name), files::MARKDOWN_LIMIT)?;
         let source = String::from_utf8(bytes)
             .map_err(|_| "Die Datei ist nicht gültig UTF-8-kodiert.".to_string())?;
-        let source = source
-            .strip_prefix('\u{feff}')
-            .unwrap_or(&source)
-            .to_owned();
+        let source = if source.starts_with('\u{feff}') {
+            source['\u{feff}'.len_utf8()..].to_owned()
+        } else {
+            source
+        };
         let id = state.sequence.fetch_add(1, Ordering::Relaxed).to_string();
-        let result = FileDocument {
+        let mut result = FileDocument {
             id: id.clone(),
             path: path.to_string_lossy().into_owned(),
             name: name.to_string_lossy().into_owned(),
             source,
             read_ms: start.elapsed().as_secs_f64() * 1000.0,
+            process_started_at_ms: PROCESS_START
+                .get()
+                .unwrap()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs_f64()
+                * 1000.0,
         };
+        // Binary IPC avoids escaping/reparsing the entire Markdown as JSON.
+        // Only the small metadata header is JSON; the source remains UTF-8.
+        let source = std::mem::take(&mut result.source);
+        let header = serde_json::to_vec(&result).map_err(|_| "Dokumentmetadaten sind ungültig.")?;
+        let mut packet = Vec::with_capacity(4 + header.len() + source.len());
+        packet.extend_from_slice(&(header.len() as u32).to_le_bytes());
+        packet.extend_from_slice(&header);
+        packet.extend_from_slice(source.as_bytes());
         let mut sessions = state.sessions.lock().unwrap();
         if sessions.len() >= 8 {
             return Err("Zu viele gleichzeitige Dateiöffnungen. Bitte erneut versuchen.".into());
@@ -165,9 +189,10 @@ async fn read_document(app: tauri::AppHandle, path: String) -> Result<FileDocume
                 path,
                 dir,
                 watcher: None,
+                remote: Arc::new(remote::Access::default()),
             },
         );
-        Ok(result)
+        Ok(tauri::ipc::Response::new(packet))
     })
     .await
     .map_err(|_| "Das Lesen wurde unterbrochen.".to_string())?
@@ -175,8 +200,18 @@ async fn read_document(app: tauri::AppHandle, path: String) -> Result<FileDocume
 
 #[tauri::command]
 fn release_document(state: State<'_, Documents>, id: String) {
-    state.sessions.lock().unwrap().remove(&id);
+    if let Some(session) = state.sessions.lock().unwrap().remove(&id) {
+        session.remote.close();
+    }
 }
+#[tauri::command]
+fn allow_remote_images(state: State<'_, Documents>, id: String) -> Result<(), String> {
+    let sessions = state.sessions.lock().unwrap();
+    let session = sessions.get(&id).ok_or("Dokument geschlossen.")?;
+    session.remote.approved.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
 #[tauri::command]
 fn unwatch_document(state: State<'_, Documents>, id: String) {
     if let Some(session) = state.sessions.lock().unwrap().get_mut(&id) {
@@ -291,6 +326,7 @@ fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
 }
 
 fn main() {
+    let _ = PROCESS_START.set(SystemTime::now());
     let started = Instant::now();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
@@ -302,9 +338,24 @@ fn main() {
                     .collect(),
             );
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
+                #[cfg(target_os = "linux")]
+                {
+                    // Tao's set_focus can still see the old minimized state after
+                    // queuing unminimize. GTK presents/restores in one native action.
+                    let target = window.clone();
+                    let _ = window.run_on_main_thread(move || {
+                        use gtk::prelude::GtkWindowExt;
+                        if let Ok(native) = target.gtk_window() {
+                            native.present();
+                        }
+                    });
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
             }
         }))
         .plugin(
@@ -335,24 +386,31 @@ fn main() {
             "hashline-image",
             |context, request, responder| {
                 let app = context.app_handle().clone();
-                tauri::async_runtime::spawn_blocking(move || {
-                    let result = (|| {
+                tauri::async_runtime::spawn(async move {
+                    let result = async {
                         let path = request.uri().path().trim_start_matches('/');
                         let (id, source) = path.split_once('/').ok_or("Ungültige Ressource.")?;
                         let source = percent_encoding::percent_decode_str(source)
                             .decode_utf8()
-                            .map_err(|_| "Ungültige Ressource.")?;
-                        let state = app.state::<Documents>();
-                        let dir = state
-                            .sessions
-                            .lock()
-                            .unwrap()
-                            .get(id)
-                            .ok_or("Dokument geschlossen.")?
-                            .dir
-                            .clone();
-                        files::image_bytes(&dir, &source)
-                    })();
+                            .map_err(|_| "Ungültige Ressource.")?
+                            .into_owned();
+                        let (dir, remote) = {
+                            let state = app.state::<Documents>();
+                            let sessions = state.sessions.lock().unwrap();
+                            let session = sessions.get(id).ok_or("Dokument geschlossen.")?;
+                            (session.dir.clone(), session.remote.clone())
+                        };
+                        if url::Url::parse(&source).is_ok() {
+                            remote.image(&source).await
+                        } else {
+                            tauri::async_runtime::spawn_blocking(move || {
+                                files::image_bytes(&dir, &source)
+                            })
+                            .await
+                            .map_err(|_| "Bildladen unterbrochen.")?
+                        }
+                    }
+                    .await;
                     let response = match result {
                         Ok((body, mime)) => tauri::http::Response::builder()
                             .header("Content-Type", mime)
@@ -409,6 +467,7 @@ fn main() {
             choose_file,
             read_document,
             release_document,
+            allow_remote_images,
             watch_document,
             unwatch_document,
             follow_link,

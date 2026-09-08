@@ -17,52 +17,50 @@ export function languageOf(code: HTMLElement): string | undefined {
     .toLowerCase();
   return language ? aliases[language] || language : undefined;
 }
-async function load() {
-  const [
-    core,
-    javascript,
-    typescript,
-    json,
-    bash,
-    python,
-    rust,
-    css,
-    xml,
-    yaml,
-  ] = await Promise.all([
-    import('highlight.js/lib/core'),
-    import('highlight.js/lib/languages/javascript'),
-    import('highlight.js/lib/languages/typescript'),
-    import('highlight.js/lib/languages/json'),
-    import('highlight.js/lib/languages/bash'),
-    import('highlight.js/lib/languages/python'),
-    import('highlight.js/lib/languages/rust'),
-    import('highlight.js/lib/languages/css'),
-    import('highlight.js/lib/languages/xml'),
-    import('highlight.js/lib/languages/yaml'),
-  ]);
-  for (const [name, module] of Object.entries({
-    javascript,
-    typescript,
-    json,
-    bash,
-    python,
-    rust,
-    css,
-    xml,
-    yaml,
-  }))
-    core.default.registerLanguage(name, module.default);
-  return core.default;
+const loaders: Record<
+  string,
+  () => Promise<{ default: import('highlight.js').LanguageFn }>
+> = {
+  javascript: () => import('highlight.js/lib/languages/javascript'),
+  typescript: () => import('highlight.js/lib/languages/typescript'),
+  json: () => import('highlight.js/lib/languages/json'),
+  bash: () => import('highlight.js/lib/languages/bash'),
+  python: () => import('highlight.js/lib/languages/python'),
+  rust: () => import('highlight.js/lib/languages/rust'),
+  css: () => import('highlight.js/lib/languages/css'),
+  xml: () => import('highlight.js/lib/languages/xml'),
+  yaml: () => import('highlight.js/lib/languages/yaml'),
+};
+const loading = new Map<string, Promise<void>>();
+async function load(language: string) {
+  engine ??= import('highlight.js/lib/core').then((module) => module.default);
+  const hljs = await engine;
+  if (!hljs.getLanguage(language)) {
+    let pending = loading.get(language);
+    if (!pending) {
+      pending = loaders[language]()
+        .then((module) => {
+          hljs.registerLanguage(language, module.default);
+        })
+        .finally(() => loading.delete(language));
+      loading.set(language, pending);
+    }
+    await pending;
+  }
+  return hljs;
 }
 export async function highlightCode(
   code: HTMLElement,
   allowed: () => boolean = () => true,
 ): Promise<boolean> {
   const language = languageOf(code);
-  if (!language || (code.textContent?.length || 0) > 12_000) return false;
-  engine ??= load();
-  const hljs = await engine;
+  if (
+    !language ||
+    !Object.hasOwn(loaders, language) ||
+    (code.textContent?.length || 0) > 12_000
+  )
+    return false;
+  const hljs = await load(language);
   if (!code.isConnected || !allowed() || !hljs.getLanguage(language))
     return false;
   const selection = getSelection();

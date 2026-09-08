@@ -1,0 +1,563 @@
+{
+  "schemaVersion": 2,
+  "mode": "open",
+  "environment": {
+    "binary": "/home/big-linus/gitpp/markdown-view/benchmarks/generated/final-release/hashline",
+    "binarySha256": "e09a02b9d346a5334354c560f006daafb2083e45dd8cca41450903ebaee98b19",
+    "kernel": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "distribution": {
+      "NAME": "Ubuntu",
+      "ID": "ubuntu",
+      "PRETTY_NAME": "Ubuntu 26.04 LTS",
+      "VERSION_ID": "26.04",
+      "VERSION": "26.04 LTS (Resolute Raccoon)",
+      "VERSION_CODENAME": "resolute",
+      "ID_LIKE": "debian",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "UBUNTU_CODENAME": "resolute",
+      "LOGO": "ubuntu-logo"
+    },
+    "sessionType": "wayland",
+    "gdkBackend": null,
+    "cpu": {
+      "command": ["lscpu"],
+      "exitCode": 0,
+      "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  24\nOn-line CPU(s) list:                     0-23\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 9 9900X 12-Core Processor\nCPU family:                              26\nModel:                                   68\nThread(s) per core:                      2\nCore(s) per socket:                      12\nSocket(s):                               1\nStepping:                                0\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      88%\nCPU max MHz:                             5662.0161\nCPU min MHz:                             613.9540\nBogoMIPS:                                8800.31\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualization:                          AMD-V\nL1d cache:                               576 KiB (12 instances)\nL1i cache:                               384 KiB (12 instances)\nL2 cache:                                12 MiB (12 instances)\nL3 cache:                                64 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-23\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB on VMEXIT",
+      "stderr": ""
+    },
+    "memory": "MemTotal:       31967216 kB\nMemFree:         3499868 kB\nMemAvailable:   18615352 kB\nBuffers:          430468 kB\nCached:         16120688 kB\nSwapCached:        21868 kB\nActive:         10350248 kB\nInactive:       14551860 kB\nActive(anon):    6343732 kB\nInactive(anon):  4430920 kB\nActive(file):    4006516 kB\nInactive(file): 10120940 kB\nUnevictable:         200 kB\nMlocked:             200 kB\nSwapTotal:       8388604 kB\nSwapFree:        8342516 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             17340 kB\nWriteback:             0 kB\nAnonPages:       8331436 kB\nMapped:          2901236 kB\nShmem:           2424144 kB\nKReclaimable:    1454236 kB\nSlab:            1779796 kB\nSReclaimable:    1167604 kB\nSUnreclaim:       612192 kB\nKernelStack:       44844 kB\nPageTables:       115916 kB\nSecPageTables:      6956 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    24372212 kB\nCommitted_AS:   44245496 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      141296 kB\nVmallocChunk:          0 kB\nPercpu:            48096 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    317440 kB\nFilePmdMapped:      4096 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     2250580 kB\nDirectMap2M:    24647680 kB\nDirectMap1G:     6291456 kB\n",
+    "graphics": {
+      "command": ["lspci", "-nn"],
+      "exitCode": 0,
+      "stdout": "00:00.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Root Complex [1022:14d8]\n00:00.2 IOMMU [0806]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge IOMMU [1022:14d9]\n00:01.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:01.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:02.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.2 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:03.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:04.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:08.3 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:14.0 SMBus [0c05]: Advanced Micro Devices, Inc. [AMD] FCH SMBus Controller [1022:790b] (rev 71)\n00:14.3 ISA bridge [0601]: Advanced Micro Devices, Inc. [AMD] FCH LPC Bridge [1022:790e] (rev 51)\n00:18.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 0 [1022:14e0]\n00:18.1 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 1 [1022:14e1]\n00:18.2 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 2 [1022:14e2]\n00:18.3 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 3 [1022:14e3]\n00:18.4 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 4 [1022:14e4]\n00:18.5 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 5 [1022:14e5]\n00:18.6 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 6 [1022:14e6]\n00:18.7 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 7 [1022:14e7]\n01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA106 [GeForce RTX 3060 Lite Hash Rate] [10de:2504] (rev a1)\n01:00.1 Audio device [0403]: NVIDIA Corporation GA106 High Definition Audio Controller [10de:228e] (rev a1)\n02:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Upstream Port [1022:43f4] (rev 01)\n03:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:08.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:09.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0a.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0b.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0c.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0d.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n07:00.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller [10ec:8125] (rev 05)\n09:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset USB 3.2 Controller [1022:43f7] (rev 01)\n0a:00.0 SATA controller [0106]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset SATA Controller [1022:43f6] (rev 01)\n0b:00.0 Non-Volatile memory controller [0108]: Samsung Electronics Co Ltd NVMe SSD Controller SM981/PM981/PM983 [144d:a808]\n0c:00.0 Non-Essential Instrumentation [1300]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge PCIe Dummy Function [1022:14de] (rev c2)\n0c:00.2 Encryption controller [1080]: Advanced Micro Devices, Inc. [AMD] Family 19h PSP/CCP [1022:1649]\n0c:00.3 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b6]\n0c:00.4 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b7]\n0c:00.6 Audio device [0403]: Advanced Micro Devices, Inc. [AMD] Ryzen HD Audio Controller [1022:15e3]\n0d:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 2.0 xHCI [1022:15b8]",
+      "stderr": ""
+    },
+    "storage": {
+      "command": ["lsblk", "-d", "-o", "NAME,MODEL,ROTA,SIZE"],
+      "exitCode": 0,
+      "stdout": "NAME    MODEL                     ROTA    SIZE\nloop0                                0   55.5M\nloop1                                0      4K\nloop2                                0   63.8M\nloop3                                0  519.4M\nloop4                                0     74M\nloop5                                0   66.8M\nloop6                                0   66.8M\nloop7                                0  521.1M\nloop8                                0     74M\nloop9                                0   49.1M\nloop10                               0   47.9M\nloop11                               0   19.6M\nloop12                               0  266.9M\nloop13                               0     20M\nloop14                               0  265.4M\nloop15                               0  257.7M\nloop16                               0  260.3M\nloop17                               0   16.5M\nloop18                               0  164.8M\nloop19                               0  349.7M\nloop20                               0  531.5M\nloop21                               0  606.1M\nloop22                               0  614.5M\nloop23                               0   91.7M\nloop24                               0   72.8M\nloop25                               0    395M\nloop26                               0    402M\nloop27                               0 1009.1M\nloop28                               0   18.8M\nloop29                               0   18.8M\nloop30                               0   73.8M\nloop31                               0   11.8M\nloop32                               0   15.7M\nloop34                               0   50.1M\nloop35                               0    828K\nloop36                               0    828K\nloop37                               0  219.9M\nloop38                               0  221.1M\nloop39                               0  321.1M\nloop40                               0   50.3M\nsda     Samsung SSD 870 QVO 1TB      0  931.5G\nnvme0n1 Samsung SSD 970 EVO 500GB    0  465.8G",
+      "stderr": ""
+    },
+    "webkit": {
+      "command": ["dpkg-query", "-W", "libwebkit2gtk-4.1-0"],
+      "exitCode": 0,
+      "stdout": "libwebkit2gtk-4.1-0:amd64\t2.52.6-0ubuntu0.26.04.1",
+      "stderr": ""
+    },
+    "displays": {
+      "command": [
+        "gdbus",
+        "call",
+        "--session",
+        "--dest",
+        "org.gnome.Mutter.DisplayConfig",
+        "--object-path",
+        "/org/gnome/Mutter/DisplayConfig",
+        "--method",
+        "org.gnome.Mutter.DisplayConfig.GetCurrentState"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "Error: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.Mutter.DisplayConfig was not provided by any .service files"
+    },
+    "installedPackage": {
+      "command": ["dpkg-query", "-W", "hashline"],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "dpkg-query: no packages found matching hashline"
+    },
+    "referenceVerified": false
+  },
+  "method": "Release WebKitGTK WebDriver. JS double-rAF is a layout/frame helper, NOT actual presentation. CLI/session observations include driver costs. OS file cache uncontrolled. No reference acceptance without external presentation/compositor evidence.",
+  "physicalRefreshHzDeclared": null,
+  "repetitions": 2,
+  "startedAtUtc": "2026-09-08T10:30:41Z",
+  "fixtures": {
+    "medium": {
+      "bytes": 1048581,
+      "sha256": "638011c98a6b1fdc8879123ff1eeffafaa173f1fb014a4c3d53c4dec708e59fa"
+    },
+    "large": {
+      "bytes": 10486101,
+      "sha256": "330d8fb7e3ba07225fff00815257c8f2dab07eb075ce3735d6e4e89efa69ce57"
+    }
+  },
+  "raw": [
+    {
+      "fixture": "medium",
+      "iteration": 0,
+      "driverToObservedFirstFrameMs": 493.0718089963193,
+      "hashline.native-main-to-frontend": 1473.751708984375,
+      "hashline.max-retire-task": 0,
+      "hashline.open-to-first-frame": 423,
+      "hashline.sanitize": 295.9999999999998,
+      "hashline.native-main-to-first-frame": 2175.751708984375,
+      "hashline.retire-wall": 0,
+      "hashline.content-to-frame": 232,
+      "hashline.max-render-task": 13.999999999999886,
+      "hashline.open-to-complete": 1286,
+      "hashline.insert": 239.00000000000023,
+      "hashline.parse": 163,
+      "hashline.open-to-content": 188,
+      "hashline.read": 0.42144600000000004,
+      "hashline.search": 231,
+      "hashline.prepare-sections": 221,
+      "eventLoopDelaysMs": [
+        5.684341886080802e-14, 0, 0, 0, 1.0000000000000568, 0, 3, 4, 4, 4, 32,
+        224, 14, 3, 10, 1.0000000000001137, 7.999999999999886, 11, 14, 4,
+        10.000000000000114, 7.999999999999886, 0, 1.0000000000001137,
+        17.999999999999886, 10, 13, 10, 5, 11, 5, 14, 2, 1, 13, 15, 1, 7, 4, 15,
+        0, 12, 18, 7, 0, 12, 7, 7
+      ],
+      "maxEventLoopDelayMs": 224
+    },
+    {
+      "fixture": "medium",
+      "iteration": 1,
+      "driverToObservedFirstFrameMs": 335.15812500263564,
+      "hashline.native-main-to-frontend": 1473.751708984375,
+      "hashline.max-retire-task": 6,
+      "hashline.open-to-first-frame": 263.9999999999998,
+      "hashline.sanitize": 304.9999999999977,
+      "hashline.native-main-to-first-frame": 3368.751708984375,
+      "hashline.retire-wall": 50.00000000000023,
+      "hashline.content-to-frame": 19.999999999999773,
+      "hashline.max-render-task": 14,
+      "hashline.open-to-complete": 1146.9999999999998,
+      "hashline.insert": 232.00000000000182,
+      "hashline.parse": 168.00000000000003,
+      "hashline.open-to-content": 190.99999999999977,
+      "hashline.read": 0.182228,
+      "hashline.search": 31,
+      "hashline.prepare-sections": 12.999999999999773,
+      "eventLoopDelaysMs": [
+        2.2737367544323206e-13, 0, 0, 0, 0, 0, 3, 4.000000000000227, 4,
+        3.9999999999997726, 5, 3, 10, 4, 4, 8, 3, 15, 15, 10.000000000000227,
+        4.999999999999773, 12, 1, 8, 13, 0, 5, 11, 13, 0, 10, 2, 4, 17, 11,
+        2.0000000000004547, 4, 19.999999999999545, 4, 4, 12, 16, 9, 4, 3, 13,
+        10, 6, 10, 5, 0, 13, 4, 7, 15
+      ],
+      "maxEventLoopDelayMs": 19.999999999999545
+    },
+    {
+      "fixture": "large",
+      "iteration": 0,
+      "driverToObservedFirstFrameMs": 1819.2580319955596,
+      "hashline.native-main-to-frontend": 1473.751708984375,
+      "hashline.max-retire-task": 6.9999999999990905,
+      "hashline.open-to-first-frame": 1748,
+      "hashline.sanitize": 2914.000000000008,
+      "hashline.native-main-to-first-frame": 6118.751708984375,
+      "hashline.retire-wall": 47,
+      "hashline.content-to-frame": 37,
+      "hashline.max-render-task": 22,
+      "hashline.open-to-complete": 17240,
+      "hashline.insert": 2221.000000000019,
+      "hashline.parse": 1464,
+      "hashline.open-to-content": 1663,
+      "hashline.read": 4.265874999999999,
+      "hashline.search": 32,
+      "hashline.prepare-sections": 25,
+      "eventLoopDelaysMs": [
+        0, 0, 0, 0, 13, 0, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4.000000000000455, 4, 4, 3.9999999999995453, 4, 4, 4, 4, 4,
+        5.000000000000455, 2.9999999999995453, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+        4, 4, 4, 4.000000000000455, 4, 4, 4, 3.9999999999995453, 4,
+        4.000000000000455, 3.9999999999995453, 4.000000000000455,
+        3.9999999999995453, 4, 4, 4, 4, 4.0000000000009095, 3.9999999999990905,
+        4.0000000000009095, 3.9999999999990905, 10, 2, 4, 5, 3, 4, 4, 4, 4, 5,
+        3, 4, 4, 4, 7.0000000000009095, 0.9999999999990905, 23.00000000000091,
+        3.9999999999990905, 3, 22.00000000000091, 6.9999999999990905, 7, 6, 6,
+        7, 7, 5.0000000000009095, 6.9999999999990905, 18, 12.00000000000091,
+        6.9999999999990905, 14, 0, 11, 16, 2, 11, 7.0000000000009095,
+        23.99999999999909, 0, 0, 19, 13, 0, 13, 14, 20, 14, 19, 13,
+        9.00000000000091, 11.99999999999909, 4, 14, 4, 0, 9, 8, 11, 4, 4,
+        5.0000000000009095, 3.9999999999990905, 19, 4, 16, 0, 18, 6, 17, 0, 15,
+        16, 6, 5, 1, 3.0000000000009095, 5.9999999999990905, 4, 15, 1,
+        11.00000000000091, 14.99999999999909, 6, 6, 6, 4.0000000000009095,
+        12.99999999999909, 18, 5, 5, 5, 5, 5, 5.0000000000009095, 5,
+        9.99999999999909, 2, 0, 11.99999999999909, 12.00000000000091,
+        0.9999999999990905, 11, 12, 11, 19, 7, 11, 8, 0, 12, 11.00000000000091,
+        16, 6.9999999999990905, 16, 12, 5, 13.00000000000091,
+        4.9999999999990905, 7, 7, 7, 16, 31, 30, 17, 11, 8, 1, 13, 8, 18, 0, 19,
+        0, 28, 9, 8, 24, 14, 13, 1, 16, 6, 9, 19.00000000000091, 8,
+        26.99999999999909, 0, 5, 21, 9.00000000000091, 32.99999999999909, 6, 10,
+        24.00000000000091, 1, 19.99999999999909, 0, 6, 10, 6, 24, 19, 0, 6, 10,
+        6, 25, 10, 5, 21, 5, 22, 8, 18, 9, 20, 0, 19, 0, 8, 6, 9, 24, 17, 9, 19,
+        0, 19, 0, 6.999999999998181, 21, 4.000000000001819, 20.99999999999818,
+        16, 10, 10, 20.00000000000182, 0.999999999998181, 10, 12,
+        3.000000000001819, 23.99999999999818, 3, 19, 11, 19, 2, 10, 11, 8, 8,
+        28, 10, 21, 1, 12, 8, 24, 5, 24, 11, 21, 2, 11, 21, 2, 11, 12, 12, 11,
+        8, 31, 12, 5, 26, 5, 25, 13, 20, 11, 11, 11, 11, 11.000000000001819,
+        7.999999999998181, 7, 11, 11, 11.000000000001819, 11.999999999998181,
+        11, 11, 11.000000000001819, 11.999999999998181, 11, 12, 11, 2, 21, 11,
+        12, 12, 12, 12, 8, 0, 22, 13, 13, 13, 14, 8, 5, 0, 39, 20, 4, 15, 45,
+        14, 13.000000000001819, 9.999999999998181, 3.000000000001819,
+        7.999999999998181, 14, 15, 14, 9, 3, 3, 5, 17, 14, 13, 6, 7, 2,
+        5.000000000001819, 3.999999999998181, 16, 15, 14, 10, 9, 11, 8, 15, 14,
+        15, 15, 15, 23, 20, 11.000000000001819, 16, 14.999999999998181, 15,
+        15.000000000001819, 13.999999999998181, 5, 0, 11, 15, 14, 15,
+        15.000000000001819, 13.999999999998181, 14, 15, 16, 14, 15, 14, 14, 15,
+        14, 15, 14, 15, 14, 15.000000000001819, 14.999999999998181, 15, 14, 15,
+        15.000000000001819, 14.999999999998181, 15, 15.000000000001819, 16, 16,
+        16, 14.999999999998181, 16, 16, 6, 48, 49, 46.00000000000182,
+        48.99999999999818, 47.00000000000182, 48.99999999999818, 6, 18, 10, 12,
+        13, 18, 18, 18, 12, 1, 13, 7, 12, 18.00000000000182, 16.99999999999818,
+        13, 19, 23, 12, 18, 18, 13, 12, 17, 8.000000000001819,
+        26.99999999999818, 18.00000000000182, 16.99999999999818,
+        18.00000000000182, 17.99999999999818, 26, 23, 14, 14, 13, 18, 18, 27,
+        21, 9, 13, 18, 19, 18, 26, 25, 20, 19, 41, 28, 9, 29, 18, 19, 19, 19,
+        19, 19, 19, 18, 43, 28.99999999999818, 19.00000000000182, 19, 20, 42,
+        29.000000000003638, 19, 18.999999999996362, 18, 19, 19, 19, 19, 19, 20,
+        42, 31, 21, 21, 20, 20, 20, 11, 33, 21, 20, 20, 19, 11.000000000003638,
+        55.99999999999636, 30, 21, 34, 7, 20, 17, 11, 18, 18, 12, 7, 35, 17, 45,
+        23, 20, 18, 18, 18, 17, 39, 24, 19, 46, 23.000000000003638,
+        22.999999999996362, 24, 24, 20, 14, 42, 37, 23, 22, 48, 32, 14, 59, 36,
+        22, 48, 33, 23, 24.000000000003638, 48.99999999999636, 33, 14,
+        32.00000000000364, 23.999999999996362, 23, 49, 24, 15.000000000003638,
+        43.99999999999636, 30, 14, 27, 17, 23, 24, 24, 50, 20, 61
+      ],
+      "maxEventLoopDelayMs": 61
+    },
+    {
+      "fixture": "large",
+      "iteration": 1,
+      "driverToObservedFirstFrameMs": 7789.427012998203,
+      "hashline.native-main-to-frontend": 1473.751708984375,
+      "hashline.max-retire-task": 6.999999999996362,
+      "hashline.open-to-first-frame": 7702,
+      "hashline.sanitize": 3190.000000000029,
+      "hashline.native-main-to-first-frame": 29435.751708984375,
+      "hashline.retire-wall": 619,
+      "hashline.content-to-frame": 36.99999999999636,
+      "hashline.max-render-task": 35.000000000007276,
+      "hashline.open-to-complete": 27855,
+      "hashline.insert": 2208.000000000022,
+      "hashline.parse": 1425,
+      "hashline.open-to-content": 7044,
+      "hashline.read": 4.445603,
+      "hashline.search": 80.99999999999636,
+      "hashline.prepare-sections": 22.999999999996362,
+      "eventLoopDelaysMs": [
+        0, 0, 0, 25, 3, 0, 2, 4, 4, 21, 3, 4, 4, 4, 4, 5, 3, 4, 4, 4, 4, 4, 4,
+        4, 4.000000000003638, 3.999999999996362, 4, 4, 4, 4, 4, 4,
+        4.000000000003638, 3.999999999996362, 4, 4, 4, 4, 4, 4,
+        4.000000000003638, 3.999999999996362, 4, 4, 4, 4, 4, 4, 4,
+        4.000000000003638, 3.999999999996362, 4, 4, 4, 4, 4, 4,
+        4.000000000003638, 3.999999999996362, 4, 4, 4, 4, 4, 4,
+        4.000000000003638, 3.999999999996362, 4, 4, 4, 1849, 3705, 119, 14, 1,
+        11.000000000003638, 0, 4, 10, 0, 10, 3, 4, 2, 10, 7, 1,
+        7.000000000003638, 0.999999999996362, 7, 7, 4, 5, 4, 4, 5,
+        2.000000000003638, 3.999999999996362, 3, 8, 22, 7, 6, 2, 14, 12, 2, 2,
+        1, 19, 15, 11, 15, 2, 12.000000000003638, 20.999999999996362, 0, 11, 8,
+        7, 9, 15, 3, 7, 18.000000000003638, 17.999999999996362, 4, 3, 14, 12,
+        4.000000000003638, 11.999999999996362, 16, 3, 3, 13, 40.00000000000364,
+        152.99999999999636, 15, 4, 14.000000000003638, 13.999999999996362, 4,
+        4.000000000003638, 2.999999999996362, 1, 0, 12, 13, 0, 10,
+        15.000000000003638, 3.999999999996362, 6, 4, 5, 6.000000000003638, 0,
+        10, 17, 6, 11, 4, 5, 13, 1, 0, 4.000000000003638, 10.999999999996362,
+        16, 10, 0, 10, 16, 1, 0, 1, 7, 13, 12.000000000003638, 0, 7,
+        5.000000000003638, 3.999999999996362, 28.000000000003638,
+        16.999999999996362, 5, 6, 6, 6, 1, 4.000000000003638, 5.999999999996362,
+        0, 10.000000000003638, 16, 0, 17, 0, 17.000000000003638, 0, 17, 0, 13,
+        6, 16, 8, 8, 14, 6, 17, 18, 0, 34.00000000000364, 11.999999999996362,
+        17.000000000003638, 5.999999999996362, 14, 0, 12, 0, 6, 8, 15, 7, 5, 23,
+        9, 22, 18, 1.000000000003638, 13, 10, 19, 10, 19.999999999996362, 24,
+        20, 3.637978807091713e-12, 19.999999999996362, 0, 37, 21, 0, 21, 0, 11,
+        18, 22, 0, 38, 22.999999999996362, 2.000000000003638,
+        13.000000000003638, 21.999999999996362, 11.999999999996362, 2,
+        37.000000000007276, 20.999999999996362, 2.000000000003638, 11, 21, 2,
+        11, 21, 2, 12, 21.999999999996362, 2, 12, 38, 21, 2, 12,
+        20.999999999996362, 3.000000000007276, 12, 21.999999999996362, 2, 11,
+        22, 12, 2.000000000007276, 37.999999999992724, 23, 2, 12, 13, 22, 3,
+        12.000000000007276, 21.999999999992724, 31, 23, 2, 13, 22, 3, 13, 22,
+        13, 4, 73, 13, 29, 11, 11.000000000007276, 7.999999999992724, 12, 14, 4,
+        7.000000000007276, 11.999999999992724, 2, 31, 26, 4, 3,
+        2.000000000007276, 10.999999999992724, 9, 32, 14, 13, 9, 8, 8, 7, 11, 0,
+        9, 8, 8, 3, 11, 5.000000000007276, 10.999999999992724, 10, 15, 15, 14,
+        10, 8.000000000007276, 14.999999999992724, 11.000000000007276,
+        16.999999999992724, 12.000000000007276, 19.999999999992724,
+        15.000000000007276, 13.999999999992724, 10, 10, 14, 14, 15, 10, 8, 10,
+        5, 4, 9, 23, 11.000000000007276, 31.999999999992724, 27, 10, 5, 9, 11,
+        0, 26.000000000007276, 11.999999999992724, 10, 11, 5, 6, 7, 12, 16, 12,
+        6, 6, 11, 17, 17.000000000007276, 5.999999999992724, 0, 10, 13, 11, 17,
+        19, 17, 17.000000000007276, 51.999999999992724, 5, 35, 41, 24, 13, 14,
+        12, 14, 12, 14, 21, 6, 37, 13, 8, 13, 13, 8, 2, 29, 14, 12, 14, 12, 14,
+        3.000000000007276, 23.999999999992724, 14, 14, 8, 13, 15, 9, 10, 14,
+        21.000000000007276, 14.999999999992724, 14.000000000007276,
+        18.999999999992724, 10.000000000007276, 54, 34.999999999992724, 16, 10,
+        12, 3, 16, 14, 21, 21, 17, 41, 56, 30.000000000007276,
+        15.999999999992724, 15, 20, 28, 13, 16, 15, 21, 16, 15, 28, 13,
+        21.000000000007276, 17.999999999992724, 16, 23, 22, 23, 22, 22, 47, 22,
+        24, 23, 23, 31, 47, 32, 23.000000000007276, 48.999999999992724, 34, 16,
+        11, 38, 42, 19, 13, 13, 14, 13, 14, 18, 19, 13, 8, 34.000000000007276,
+        24.999999999992724, 51, 35, 24, 44, 20, 14, 20, 22, 6.000000000007276,
+        31.999999999992724, 15.000000000007276, 19.999999999992724, 25, 21, 9,
+        27, 49.000000000007276, 37.999999999992724, 32, 1984, 40,
+        12.000000000007276, 46.999999999992724, 16, 80, 30, 17, 18, 16, 16, 16,
+        18, 7, 23, 16, 22, 29, 26, 17.000000000007276, 25.999999999992724, 26,
+        25.000000000007276, 52.999999999992724, 26, 22, 53, 50, 61, 38, 16, 73,
+        34, 14.000000000007276, 18.999999999992724, 38, 18, 19, 71, 35, 13, 20,
+        46, 17, 13, 39, 20.000000000007276, 33, 73.99999999999272, 40,
+        30.000000000007276, 19.999999999992724, 65, 35, 23, 28, 19,
+        24.000000000007276, 18.999999999992724, 23, 24, 51, 39, 25, 60, 35,
+        19.000000000007276, 23.999999999992724, 29, 30, 30.000000000007276,
+        18.999999999992724, 36, 24, 61, 41, 30, 64, 38, 26, 64, 31, 29, 22, 27,
+        26, 32, 29, 18, 79.00000000000728, 39.999999999992724, 23, 12,
+        44.000000000007276, 33.999999999992724, 24, 35, 44.000000000007276,
+        21.999999999992724, 33, 29, 28, 23, 24, 30, 18, 25, 33, 29, 16, 29, 27,
+        24, 83, 48.000000000007276, 23.999999999992724, 23.000000000007276,
+        17.999999999992724
+      ],
+      "maxEventLoopDelayMs": 3705
+    }
+  ],
+  "completed": true,
+  "summary": {
+    "medium": {
+      "driverToObservedFirstFrameMs": {
+        "n": 2,
+        "median": 414.1149669994775,
+        "p95": 493.0718089963193,
+        "max": 493.0718089963193,
+        "regularSeries": false
+      },
+      "hashline.content-to-frame": {
+        "n": 2,
+        "median": 125.99999999999989,
+        "p95": 232,
+        "max": 232,
+        "regularSeries": false
+      },
+      "hashline.insert": {
+        "n": 2,
+        "median": 235.50000000000102,
+        "p95": 239.00000000000023,
+        "max": 239.00000000000023,
+        "regularSeries": false
+      },
+      "hashline.max-render-task": {
+        "n": 2,
+        "median": 13.999999999999943,
+        "p95": 14,
+        "max": 14,
+        "regularSeries": false
+      },
+      "hashline.max-retire-task": {
+        "n": 2,
+        "median": 3.0,
+        "p95": 6,
+        "max": 6,
+        "regularSeries": false
+      },
+      "hashline.native-main-to-first-frame": {
+        "n": 2,
+        "median": 2772.251708984375,
+        "p95": 3368.751708984375,
+        "max": 3368.751708984375,
+        "regularSeries": false
+      },
+      "hashline.native-main-to-frontend": {
+        "n": 2,
+        "median": 1473.751708984375,
+        "p95": 1473.751708984375,
+        "max": 1473.751708984375,
+        "regularSeries": false
+      },
+      "hashline.open-to-complete": {
+        "n": 2,
+        "median": 1216.5,
+        "p95": 1286,
+        "max": 1286,
+        "regularSeries": false
+      },
+      "hashline.open-to-content": {
+        "n": 2,
+        "median": 189.4999999999999,
+        "p95": 190.99999999999977,
+        "max": 190.99999999999977,
+        "regularSeries": false
+      },
+      "hashline.open-to-first-frame": {
+        "n": 2,
+        "median": 343.4999999999999,
+        "p95": 423,
+        "max": 423,
+        "regularSeries": false
+      },
+      "hashline.parse": {
+        "n": 2,
+        "median": 165.5,
+        "p95": 168.00000000000003,
+        "max": 168.00000000000003,
+        "regularSeries": false
+      },
+      "hashline.prepare-sections": {
+        "n": 2,
+        "median": 116.99999999999989,
+        "p95": 221,
+        "max": 221,
+        "regularSeries": false
+      },
+      "hashline.read": {
+        "n": 2,
+        "median": 0.301837,
+        "p95": 0.42144600000000004,
+        "max": 0.42144600000000004,
+        "regularSeries": false
+      },
+      "hashline.retire-wall": {
+        "n": 2,
+        "median": 25.000000000000114,
+        "p95": 50.00000000000023,
+        "max": 50.00000000000023,
+        "regularSeries": false
+      },
+      "hashline.sanitize": {
+        "n": 2,
+        "median": 300.49999999999875,
+        "p95": 304.9999999999977,
+        "max": 304.9999999999977,
+        "regularSeries": false
+      },
+      "hashline.search": {
+        "n": 2,
+        "median": 131.0,
+        "p95": 231,
+        "max": 231,
+        "regularSeries": false
+      },
+      "maxEventLoopDelayMs": {
+        "n": 2,
+        "median": 121.99999999999977,
+        "p95": 224,
+        "max": 224,
+        "regularSeries": false
+      }
+    },
+    "large": {
+      "driverToObservedFirstFrameMs": {
+        "n": 2,
+        "median": 4804.342522496881,
+        "p95": 7789.427012998203,
+        "max": 7789.427012998203,
+        "regularSeries": false
+      },
+      "hashline.content-to-frame": {
+        "n": 2,
+        "median": 36.99999999999818,
+        "p95": 37,
+        "max": 37,
+        "regularSeries": false
+      },
+      "hashline.insert": {
+        "n": 2,
+        "median": 2214.5000000000205,
+        "p95": 2221.000000000019,
+        "max": 2221.000000000019,
+        "regularSeries": false
+      },
+      "hashline.max-render-task": {
+        "n": 2,
+        "median": 28.500000000003638,
+        "p95": 35.000000000007276,
+        "max": 35.000000000007276,
+        "regularSeries": false
+      },
+      "hashline.max-retire-task": {
+        "n": 2,
+        "median": 6.999999999997726,
+        "p95": 6.9999999999990905,
+        "max": 6.9999999999990905,
+        "regularSeries": false
+      },
+      "hashline.native-main-to-first-frame": {
+        "n": 2,
+        "median": 17777.251708984375,
+        "p95": 29435.751708984375,
+        "max": 29435.751708984375,
+        "regularSeries": false
+      },
+      "hashline.native-main-to-frontend": {
+        "n": 2,
+        "median": 1473.751708984375,
+        "p95": 1473.751708984375,
+        "max": 1473.751708984375,
+        "regularSeries": false
+      },
+      "hashline.open-to-complete": {
+        "n": 2,
+        "median": 22547.5,
+        "p95": 27855,
+        "max": 27855,
+        "regularSeries": false
+      },
+      "hashline.open-to-content": {
+        "n": 2,
+        "median": 4353.5,
+        "p95": 7044,
+        "max": 7044,
+        "regularSeries": false
+      },
+      "hashline.open-to-first-frame": {
+        "n": 2,
+        "median": 4725.0,
+        "p95": 7702,
+        "max": 7702,
+        "regularSeries": false
+      },
+      "hashline.parse": {
+        "n": 2,
+        "median": 1444.5,
+        "p95": 1464,
+        "max": 1464,
+        "regularSeries": false
+      },
+      "hashline.prepare-sections": {
+        "n": 2,
+        "median": 23.99999999999818,
+        "p95": 25,
+        "max": 25,
+        "regularSeries": false
+      },
+      "hashline.read": {
+        "n": 2,
+        "median": 4.355739,
+        "p95": 4.445603,
+        "max": 4.445603,
+        "regularSeries": false
+      },
+      "hashline.retire-wall": {
+        "n": 2,
+        "median": 333.0,
+        "p95": 619,
+        "max": 619,
+        "regularSeries": false
+      },
+      "hashline.sanitize": {
+        "n": 2,
+        "median": 3052.0000000000186,
+        "p95": 3190.000000000029,
+        "max": 3190.000000000029,
+        "regularSeries": false
+      },
+      "hashline.search": {
+        "n": 2,
+        "median": 56.49999999999818,
+        "p95": 80.99999999999636,
+        "max": 80.99999999999636,
+        "regularSeries": false
+      },
+      "maxEventLoopDelayMs": {
+        "n": 2,
+        "median": 1883.0,
+        "p95": 3705,
+        "max": 3705,
+        "regularSeries": false
+      }
+    }
+  }
+}

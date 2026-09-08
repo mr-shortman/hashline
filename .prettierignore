@@ -9,3 +9,4 @@ test-results
 playwright-report
 benchmarks/generated
 tests/fixtures
+pnpm-lock.yaml

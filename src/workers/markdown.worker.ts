@@ -4,7 +4,7 @@ import type { ParseRequest, ParseResponse } from '../core/markdown/types';
 self.onmessage = ({ data }: MessageEvent<ParseRequest>) => {
   let response: ParseResponse;
   try {
-    response = { id: data.id, result: parseMarkdown(data.source) };
+    response = { id: data.id, result: parseMarkdown(data.source, true) };
   } catch {
     response = {
       id: data.id,

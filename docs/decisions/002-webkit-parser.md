@@ -25,3 +25,11 @@ separates Hauptthread-Budget; der Parser-Fix beweist dessen Einhaltung nicht.
 
 Referenzen: [Marked-Erweiterungen](https://marked.js.org/using_pro),
 [CommonMark-Testdaten](https://spec.commonmark.org/0.31.2/).
+
+Nachtrag Abschnittsrenderer: Auch Absatzregeln erhalten höchstens den Präfix bis
+zur nächsten Leerzeile. Setext-Regeln werden nur aufgerufen, wenn eine mögliche
+Unterstreichungszeile vorkommt; GFM-Tabellen benötigen mindestens ein Pipe-Zeichen
+im Präfix. Das WebKit-Profil hatte insbesondere aussichtslose Setext-Prüfungen
+als verbleibenden Schwerpunkt identifiziert. Dieselben 652 Vergleichsfälle sowie
+der neue Vergleich des bereinigten Abschnittspfads sichern diese Guards ab.
+Die neuen Release-Rohdaten sind im Benchmarkbericht separat verlinkt.

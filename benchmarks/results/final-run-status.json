@@ -1,0 +1,38 @@
+{
+  "binarySha256": "e09a02b9d346a5334354c560f006daafb2083e45dd8cca41450903ebaee98b19",
+  "referenceAcceptance": false,
+  "controlledDesktopSession": false,
+  "limitations": [
+    "Discrete GPU; no integrated reference available",
+    "Concurrent desktop acceptance windows observed; focus and occlusion not controlled",
+    "Double-rAF values are helpers; actual first visible text not validated",
+    "Compositor marks identify monitor, not application surface",
+    "Final memory and startup budgets exceeded"
+  ],
+  "interrupted": [
+    "final-images.json: stopped intentionally after native contract failure for diagnosis; superseded by final-images-complete.json",
+    "First final-open attempt lost when session ended; no result retained; a fresh complete series is required"
+  ],
+  "failedContracts": [
+    "Initial select-all assertion failed; diagnostic and repeated run succeeded. Test now waits for search UI closure before Ctrl+A."
+  ],
+  "passedContracts": "final-contracts-settled.json",
+  "openSeries": "final-open.json: completed:true, 90 rows, 30 per fixture",
+  "postMeasurementCorrection": "Ignore clicks on old links during retirement; benchmark binary unchanged, corrected build separately validated",
+  "verification": {
+    "npmCheck": true,
+    "unitContracts": 1342,
+    "browserTests": 16,
+    "benchmarkContracts": 3,
+    "all3000SelectedHeadingsInBrowser": true,
+    "retiredLinkContextTest": true,
+    "rustfmt": true,
+    "clippyWarningsDenied": true,
+    "rustTests": 4,
+    "releaseBuild": true,
+    "correctedReleaseSectionContracts": 6,
+    "all3000SelectedHeadingsInWebKit": true,
+    "correctedReleaseSmokeContracts": 7
+  },
+  "correctedBinarySha256": "5fc27e95a7d6af39d2f2d52cba7ada1c8841cf3d0f808ba90ca1e868d1c00e11"
+}

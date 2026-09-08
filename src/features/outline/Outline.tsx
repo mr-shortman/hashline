@@ -18,7 +18,15 @@ export function Outline({
     root.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const panel = root.current!;
     const media = window.matchMedia('(max-width: 899px)');
+    const background = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.titlebar, .search-bar, .viewport-shell, .settings, .error-banner',
+      ),
+    );
     const mode = () => {
+      background.forEach((element) => {
+        element.inert = media.matches;
+      });
       if (media.matches) {
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'true');
@@ -44,6 +52,9 @@ export function Outline({
     media.addEventListener('change', mode);
     panel.addEventListener('keydown', trap);
     return () => {
+      background.forEach((element) => {
+        element.inert = false;
+      });
       media.removeEventListener('change', mode);
       panel.removeEventListener('keydown', trap);
     };

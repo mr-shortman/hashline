@@ -88,3 +88,19 @@ describe('Markdown contract', () => {
     expect(classifyUrl(url)).not.toBe('blocked'),
   );
 });
+
+it('keeps locale-independent Unicode heading case mapping', () => {
+  const headings = ['I İ ı i', 'Σ ΟΣ', 'ẞ Straße', 'ＡＢＣ ﬁ', 'GRÜẞE 日本語'];
+  for (const heading of headings) {
+    const expected =
+      heading
+        .normalize('NFKC')
+        .toLocaleLowerCase('und')
+        .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+        .trim()
+        .replace(/[\s_]+/g, '-') || 'section';
+    expect(parseMarkdown('# ' + heading).headings[0].id).toBe(
+      'doc-' + expected,
+    );
+  }
+});

@@ -6,6 +6,7 @@ export function SearchBar({
   setQuery,
   count,
   active,
+  pending,
   step,
   close,
 }: {
@@ -13,6 +14,7 @@ export function SearchBar({
   setQuery(value: string): void;
   count: number;
   active: number;
+  pending: boolean;
   step(delta: number): void;
   close(): void;
 }) {
@@ -36,13 +38,19 @@ export function SearchBar({
           }
         }}
       />
-      <span className="search-count" role="status">
-        {query ? (count ? `${active + 1} / ${count}` : 'Keine Treffer') : ''}
+      <span className="search-count" role="status" aria-busy={pending}>
+        {query
+          ? pending
+            ? 'Suche läuft …'
+            : count
+              ? `${active + 1} / ${count}`
+              : 'Keine Treffer'
+          : ''}
       </span>
       <button
         className="icon-button"
         aria-label="Vorheriger Treffer"
-        disabled={!count}
+        disabled={pending || !count}
         onClick={() => step(-1)}
       >
         <Icon name="up" />
@@ -50,7 +58,7 @@ export function SearchBar({
       <button
         className="icon-button"
         aria-label="Nächster Treffer"
-        disabled={!count}
+        disabled={pending || !count}
         onClick={() => step(1)}
       >
         <Icon name="down" />

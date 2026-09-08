@@ -40,7 +40,11 @@ export function App({
   const [search, setSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [matchStep, setMatchStep] = useState(0);
-  const [matches, setMatches] = useState({ count: 0, active: 0 });
+  const [matches, setMatches] = useState({
+    count: 0,
+    active: 0,
+    pending: false,
+  });
   const [activeHeading, setActiveHeading] = useState('');
   const [menu, setMenu] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,7 +63,8 @@ export function App({
     // Reading position is deliberately not React state: scrolling does not rerender UI.
   }, []);
   const onMatches = useCallback(
-    (count: number, active: number) => setMatches({ count, active }),
+    (count: number, active: number, pending = false) =>
+      setMatches({ count, active, pending }),
     [],
   );
   const onLink = useCallback(
@@ -76,7 +81,11 @@ export function App({
   }, []);
   const closeOutline = useCallback(() => {
     setPrefs((p) => ({ ...p, outline: false }));
-    outlineTrigger.current?.focus();
+    // WebKit refuses focus while the narrow dialog's background is still inert.
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body)
+        outlineTrigger.current?.focus();
+    });
   }, []);
   const closeMenu = useCallback(() => {
     setMenu(false);
@@ -170,6 +179,13 @@ export function App({
         return;
       }
       if (!event.ctrlKey || event.altKey) return;
+      if (
+        prefs.outline &&
+        window.matchMedia('(max-width: 899px)').matches &&
+        ['f', 'o'].includes(event.key.toLowerCase()) &&
+        !event.shiftKey
+      )
+        closeOutline();
       const key = event.key.toLowerCase();
       if (key === 'o') {
         event.preventDefault();
@@ -178,6 +194,11 @@ export function App({
       } else if (key === 'f') {
         event.preventDefault();
         setSearch(true);
+        requestAnimationFrame(() => {
+          document
+            .querySelector<HTMLInputElement>('.search-bar input')
+            ?.focus();
+        });
       } else if (key === 'r') {
         event.preventDefault();
         void controller.reload();
@@ -269,6 +290,23 @@ export function App({
         <div
           className="settings"
           ref={menuRoot}
+          onKeyDown={(event) => {
+            if (event.key !== 'Tab') return;
+            const buttons = Array.from(
+              menuRoot.current!.querySelectorAll<HTMLButtonElement>(
+                'button:not(:disabled)',
+              ),
+            );
+            const first = buttons[0];
+            const last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
+          }}
           role="dialog"
           aria-label="Darstellung und Optionen"
         >
@@ -350,6 +388,7 @@ export function App({
           setQuery={setQuery}
           count={matches.count}
           active={matches.active}
+          pending={matches.pending}
           step={(delta) => setMatchStep((v) => v + delta)}
           close={closeSearch}
         />

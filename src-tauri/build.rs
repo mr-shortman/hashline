@@ -4,6 +4,7 @@ fn main() {
             "choose_file",
             "read_document",
             "release_document",
+            "allow_remote_images",
             "watch_document",
             "unwatch_document",
             "follow_link",

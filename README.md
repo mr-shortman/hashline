@@ -5,7 +5,7 @@ Tauri 2, React und TypeScript. Ein Fenster, eine Datei, keine Konten oder Teleme
 
 Dateien lassen sich per Dialog, Drag-and-drop, Dateimanager oder `hashline datei.md`
 öffnen. Hashline bietet GFM-Darstellung, Inhaltsverzeichnis, Textsuche, Code-Kopieren,
-lokale Bilder, relative Markdown-Links, automatische Aktualisierung, Lesepositionen,
+lokale Bilder, Remote-Bilder nach dokumentbezogener Freigabe, relative Markdown-Links, automatische Aktualisierung, Lesepositionen,
 Themes und Textzoom.
 
 **Status:** Implementierung und Linux-Release-Paket vorhanden. Die vollständige
@@ -96,13 +96,20 @@ Lesepositionen werden erst beim erneuten Öffnen einer Datei angewendet.
 - Markdown: UTF-8 einschließlich BOM, höchstens 20 MiB. Dateien werden nie verändert.
 - Lokale PNG-, JPEG-, GIF- und WebP-Bilder: höchstens 16 MiB und 24 Megapixel je Bild.
   Automatischer Zugriff bleibt im Dokumentverzeichnis einschließlich Unterordnern.
-- Remote-Bilder und SVG werden derzeit als Platzhalter dargestellt. Es gibt keine
-  Remote-Freigabeaktion. Diese Einschränkung ist in der Ressourcenentscheidung dokumentiert.
+- Remote-Bilder bleiben zunächst blockiert. „Remote-Bilder für dieses Dokument
+  laden“ gibt HTTP(S)-Bilder für die aktuelle Dokumentversion frei und weist auf
+  die Übertragung der IP-Adresse hin. Dateiwechsel und geänderte Revisionen setzen
+  die Freigabe zurück. Es gelten die lokalen Bildlimits sowie 64 Bilder/64 MiB
+  insgesamt, vier gleichzeitige Downloads und 15 Sekunden je Download.
+- SVG bleibt bewusst unimplementiert: lokale und entfernte SVG-Dateien sowie
+  eingebettetes SVG erscheinen nicht als Bild. Die Begründung und die Grenzen
+  der Remote-Freigabe stehen in der [Ressourcenentscheidung](docs/decisions/001-resources.md).
 - Links zu Markdown öffnen im selben Fenster. HTTP(S) und Mail öffnen nach einem
   Klick in der Systemanwendung. Andere Schemata und Dateitypen werden abgewiesen.
 - Passive HTML-Auswahl; keine Dokument-Styles, Skripte, Formulare oder Frames.
   Aufgabenlisten bleiben deaktiviert. Frontmatter steuert keine App-Funktionen.
 
+[Visuelle und Zugänglichkeitsabnahme](docs/acceptance/REPORT.md) ·
 [Architektur und Rendering-Vertrag](docs/architecture.md) ·
 [Entscheidungen](docs/decisions/001-resources.md) ·
 [Benchmarkbericht](benchmarks/REPORT.md)

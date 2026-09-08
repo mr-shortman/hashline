@@ -4,6 +4,7 @@ export interface FileDocument {
   readonly name: string;
   readonly source: string;
   readonly readMs: number;
+  readonly processStartedAtMs?: number;
 }
 export interface OpenRequest {
   paths: string[];
@@ -17,6 +18,7 @@ export interface DocumentGateway {
     failed: () => void,
   ): Promise<() => void>;
   release(id: string): Promise<void>;
+  allowRemoteImages?(file: FileDocument): Promise<void>;
   imageUrl(file: FileDocument, source: string): string | null;
   followLink(
     file: FileDocument,

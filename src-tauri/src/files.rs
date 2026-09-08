@@ -74,6 +74,10 @@ pub fn image_bytes(dir: &Dir, source: &str) -> Result<(Vec<u8>, &'static str), S
         return Err("Absolute Bildpfade sind nicht freigegeben.".into());
     }
     let bytes = read_bounded(dir, &path, IMAGE_LIMIT)?;
+    validate_image(bytes)
+}
+
+pub fn validate_image(bytes: Vec<u8>) -> Result<(Vec<u8>, &'static str), String> {
     let format = image::guess_format(&bytes).map_err(|_| "Unbekanntes Bildformat.".to_string())?;
     let mime = match format {
         image::ImageFormat::Png => "image/png",
