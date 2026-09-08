@@ -1,81 +1,132 @@
 # Prüfungen und reproduzierbare Desktop-Tests
 
-Die regulären Befehle stehen im README. CI baut zusätzlich ein Debian-Paket auf
-Ubuntu 24.04. Das ist ein Build-Kompatibilitätscheck; die gemessene lokale
-Entwicklungsumgebung mit diskreter Grafik ist Ubuntu 26.04 mit WebKitGTK 2.52.6.
+Die Anwendung ist ein einziger nativer Prozess. Es gibt keine Node-Toolchain,
+keinen WebDriver und keine WebView mehr; alles unten läuft mit Rust, GTK4 und
+`python3-gi`.
 
-## Echte WebView
-
-```sh
-cargo install tauri-driver --locked
-sudo apt install webkitgtk-webdriver  # auf Ubuntu 24.04: webkit2gtk-driver
-npm run bundle
-tauri-driver --native-driver /usr/bin/WebKitWebDriver
-```
-
-In einem weiteren Terminal derselben grafischen Sitzung:
+## Werkstatt
 
 ```sh
-python3 tests/desktop/smoke.py src-tauri/target/release/hashline
-npm run fixtures
-python3 tests/desktop/sections.py src-tauri/target/release/hashline /tmp/hashline-sections.json
-python3 tests/benchmark.test.py
-python3 benchmarks/desktop.py src-tauri/target/release/hashline --repetitions 30 --output /tmp/hashline-open.json
-python3 benchmarks/stability.py src-tauri/target/release/hashline
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build --release --workspace
 ```
 
-Der Smoke-Test verwendet ausschließlich temporäre Dokumente. Er prüft CLI und
-Single-Instance samt aufruferspezifischem Arbeitsverzeichnis, Unicode-/Leerzeichen,
-relative Links und Fragmente, lokale Bilder, Suche in Code/Tabellen, Auswahl,
-atomisches Speichern, Löschen/Wiederanlegen, Leseposition und native Zugriffssperre.
-Screenshot und Ergebnis stehen danach in `test-results/`.
+`build.rs` übersetzt `data/de.kalendium.Hashline.gschema.xml` bei jedem Bau in
+das Ausgabeverzeichnis, und die Anwendung findet es dort, wenn kein Schema
+installiert ist. `GSETTINGS_SCHEMA_DIR` ist damit nur nötig, wenn man
+absichtlich ein anderes Schema prüfen will.
 
-Für einen separaten Sitzungstest den Treiber mit `GDK_BACKEND=wayland` bzw.
-`GDK_BACKEND=x11` starten. Nicht gleichzeitig dieselbe Hashline-Anwendungs-ID in
-zwei Sitzungen testen. Für isolierte Präferenzen vor dem Treiberstart
-`XDG_CONFIG_HOME`, `XDG_DATA_HOME` und `XDG_CACHE_HOME` auf eigene Testverzeichnisse
-setzen; `XDG_RUNTIME_DIR` und den Session-D-Bus unverändert lassen.
+## Aussehen ohne Fenster
+
+`examples/render` setzt ein Dokument über denselben Layout-Code wie das Widget
+in ein PNG. Das ist der einzige Weg, das Ergebnis auf Maschinen zu beurteilen,
+auf denen Bildschirmaufnahmen nicht erlaubt sind, und es taugt für den
+visuellen Vergleich zweier Stände:
+
+```sh
+cargo run --release -p hashline --example render -- SPEC.md /tmp/spec.png 900
+cargo run --release -p hashline --example render -- SPEC.md /tmp/spec-dark.png 900 dark
+```
 
 ## Performance
 
-`npm run fixtures` erzeugt deterministische 100-KiB-, 1-MiB- und 10-MiB-Dateien sowie
-lange Zeile, tiefe Liste, große Tabelle, großen Codeblock und viele kleine Blöcke.
-Dazu kommen 100 verschiedene 256×256-PNGs und vier verschiedene 2048×2048-PNGs. `metadata.json`
-enthält exakte Bytes, Tokenblöcke, erwartete Parser-DOM-Knoten und SHA-256.
-Die DOM-Zahl umfasst Element-/Textknoten des ungeänderten Marked-HTMLs, nicht die
-zusätzlichen Viewport-Bedienelemente. Bildlast muss separat gemessen werden.
+Die Fixtures liegen deterministisch unter `benchmarks/generated/` und bleiben
+unverändert, damit Reihen über den Stackwechsel hinweg vergleichbar sind
+(SPEC.md, Abschnitt 9). `benchmarks/generate.mjs` hat sie erzeugt und ist
+historisch: es braucht die entfernte Node-Toolchain und wird nicht mehr
+ausgeführt — neu zu generieren würde die Messreihe entwerten.
 
-Der Desktop-Benchmark speichert Rohdaten, Median und p95. Die CLI-Hilfszeit enthält
-Testtreiber-/Prozessaufrufkosten. `content-to-frame` endet nach zwei Animation-
-Frames; sie beweist keine tatsächlich präsentierten Compositor-Frames. Die
-Spezifikation verlangt zusätzlich externe Start-/Darstellungsaufnahme und
-Compositor-/Profiler-Auswertung. Keine dieser Hilfszeiten wird als bestandene
-Start- oder Scroll-Abnahme ausgegeben. Alle Modi, die kontrollierte
-Referenzdurchführung und die Compositor-Auswertung stehen im
-[Performance-Protokoll](../benchmarks/REFERENCE.md).
+Der eigene Anteil an der Öffnungszeit — Parsen, Blockplan, erstes Setzen —
+getrennt instrumentiert, ohne Fenster:
 
 ```sh
-HASHLINE_DIAGNOSTICS=1 hashline benchmarks/generated/small.md
-python3 benchmarks/process-sample.py <hashline-pid> 30 > /tmp/hashline-memory.json
+cargo build --release -p hashline --example measure
+./target/release/examples/measure benchmarks/generated/{small,medium,large}.md
+```
+
+Speicher der laufenden Anwendung als PSS der Prozessgruppe:
+
+```sh
+./target/release/hashline benchmarks/generated/large.md &
+python3 benchmarks/process-sample.py <pid> 30 > /tmp/hashline-memory.json
 ```
 
 Der Sampler erfasst die rekursive Prozessgruppe über `/proc`, summiert PSS und
-CPU-Ticks und kennzeichnet nicht lesbare PSS-Werte. Nach 50 Dateiwechseln dieselbe
-Messung wiederholen und mit der aufgewärmten Ausgangslage vergleichen. Unter
-Sandbox-/Ptrace-Beschränkungen kann `/proc/<pid>/smaps_rollup` nicht lesbar sein;
-fehlende Werte dürfen nicht als Nullverbrauch interpretiert werden.
+CPU-Ticks und kennzeichnet nicht lesbare PSS-Werte. Nach 50 Dateiwechseln
+dieselbe Messung wiederholen und mit der aufgewärmten Ausgangslage vergleichen.
+Unter Sandbox-/Ptrace-Beschränkungen kann `/proc/<pid>/smaps_rollup` nicht
+lesbar sein; fehlende Werte dürfen nicht als Nullverbrauch gelten.
+
+### Scroll-Frametimes
+
+> **Achtung:** `compositor.py` stellt zur Messung vorübergehend die
+> Bildwiederholrate des primären Monitors um und setzt sie danach zurück. Bei
+> einem Wechsel auf 120 Hz kann der Bildschirm mehrfach kurz schwarz werden.
+> Nicht während anderer Arbeit ausführen.
+
+Der Reiz ist echte Zeigereingabe über `org.gnome.Mutter.RemoteDesktop`; in der
+Anwendung ist nichts instrumentiert. `scroll-native.py` sucht das Fenster,
+indem es an Kandidatenpunkten scrollt und die CPU-Zeit der Anwendung prüft —
+ohne diesen Nachweis meldet der Lauf einen Fehler statt einer leeren, sauberen
+Messung. Die Richtung kehrt regelmäßig um, damit ein Dokument nicht am Ende
+liegt und Ruhe statt Scrollen gemessen wird.
+
+```sh
+python3 benchmarks/compositor.py ./target/release/hashline \
+    benchmarks/generated/large.md --refresh-hz 60 --seconds 12 \
+    --output-prefix benchmarks/results/<lauf>/scroll-60
+sysprof-cat --no-callgraph --no-counters benchmarks/results/<lauf>/scroll-60.syscap \
+    > benchmarks/results/<lauf>/scroll-60.dump
+python3 benchmarks/analyze-compositor.py benchmarks/results/<lauf>/scroll-60.dump \
+    --scroll   benchmarks/results/<lauf>/scroll-60-scroll.json \
+    --display  benchmarks/results/<lauf>/scroll-60-display.json \
+    --capture  benchmarks/results/<lauf>/scroll-60.syscap \
+    --output   benchmarks/results/<lauf>/frametimes-60.json
+```
+
+Die Auswertung liest Mutters Präsentationsmarken für den Monitor, **nicht**
+Frames der Anwendung: der Wert schließt alle Clients ein und ist damit keine
+Abnahme der Anwendungsdarstellung, sondern eine Untergrenze für ihre Qualität.
+Das Werkzeug schreibt das selbst in jede Ausgabe.
 
 ## Manuelle Freigabe
 
-Vor einer v1-Freigabe bleiben Installation auf sauberer Zielumgebung, tatsächlicher
-Dateimanager-Aufruf und Drag-and-drop, System-Clipboard/Linköffnen und die
-vollständigen SPEC-Performancebudgets zu
-bestätigen. Die Anwendungs-ID `de.kalendium.Hashline` ist aus der Spezifikation
-übernommen; ihre Herausgeberbestätigung wird nicht aus einem erfolgreichen Build
-abgeleitet.
+Vor einer v1-Freigabe bleiben Installation auf sauberer Zielumgebung,
+tatsächlicher Dateimanager-Aufruf und Drag-and-drop, System-Clipboard und
+Linköffnen sowie die vollständigen SPEC-Performancebudgets zu bestätigen. Die
+Anwendungs-ID `de.kalendium.Hashline` ist aus der Spezifikation übernommen;
+ihre Herausgeberbestätigung wird nicht aus einem erfolgreichen Build abgeleitet.
 
-## Darstellung, Tastatur und Remote-Bilder
+Der [Abnahmebericht](acceptance/REPORT.md) und das
+[Performance-Protokoll](../benchmarks/REFERENCE.md) beschreiben Prüfungen der
+WebView-Fassung. Sie bleiben als Historie und als Vergleichsbasis erhalten; die
+Befehle darin beziehen sich auf einen Stand, der nicht mehr im Baum ist.
 
-Die Prüfung des installierten Builds samt Theme-/Zoom-/Skalierungsmatrix,
-Fenstersteuerung und Remote-Verträgen ist im [Abnahmebericht](acceptance/REPORT.md)
-mit reproduzierbaren Befehlen und gespeicherten Nachweisen beschrieben.
+## Native Migration
+
+Die Rust-Prüfungen benötigen keine Node-Toolchain:
+
+```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo build -p hashline
+mkdir -p /tmp/hashline-test-schemas
+glib-compile-schemas --strict --targetdir=/tmp/hashline-test-schemas data
+GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline preferences::
+```
+
+Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft Fensterwiederverwendung, Dateiwechsel, Menüaktionen, Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen und die Textschnittstelle. Zum isolierten Betrieb kann `gtk4-broadwayd :9` in einem separaten Terminal laufen:
+
+```sh
+dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline native_ui -- --ignored --test-threads=1
+```
+
+Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterstützt diesen GTK-Backendpfad nicht. Der folgende Test verwendet temporäre Dokumente, prüft Dokumentrolle, Unicode-Textoffsets, den zweiten Prozessaufruf mit demselben Fenster und den sichtbaren Mehrdatei-Hinweis und beendet seine Anwendung anschließend. Benötigt werden `python3-gi` und `gir1.2-atspi-2.0`:
+
+```sh
+dbus-run-session -- env GDK_BACKEND=x11 GTK_A11Y=atspi GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory /usr/bin/python3 tests/desktop/native_reader.py target/debug/hashline
+```
+
+Diese Tests sind Entwicklungsprüfungen. Paketinstallation, vollständige Orca-Bedienung, visueller Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen; M3 ist nicht umgesetzt.

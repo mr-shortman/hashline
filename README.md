@@ -1,115 +1,82 @@
 # Hashline
 
-A fast, quiet Markdown viewer for Linux. Lokaler, schreibgeschützter Reader mit
-Tauri 2, React und TypeScript. Ein Fenster, eine Datei, keine Konten oder Telemetrie.
+A fast, quiet Markdown viewer for Linux. Ein nativer, schreibgeschützter Reader
+in Rust auf GTK4 — ein Prozess, ein Fenster, eine Datei, keine Konten, keine
+Telemetrie. Keine WebView, kein HTML, kein CSS und keine JavaScript-Laufzeit im
+ausgelieferten Programm.
 
-Dateien lassen sich per Dialog, Drag-and-drop, Dateimanager oder `hashline datei.md`
-öffnen. Hashline bietet GFM-Darstellung, Inhaltsverzeichnis, Textsuche, Code-Kopieren,
-lokale Bilder, Remote-Bilder nach dokumentbezogener Freigabe, relative Markdown-Links, automatische Aktualisierung, Lesepositionen,
-Themes und Textzoom.
+Dateien lassen sich per Dialog, Drag-and-drop oder `hashline datei.md` öffnen;
+ein weiterer Aufruf übergibt die Datei an das laufende Fenster. Hashline bietet
+GFM-Darstellung, Inhaltsverzeichnis mit Kennzeichnung des aktuellen Abschnitts,
+Textsuche, Code-Kopieren, Syntaxhervorhebung, lokale Bilder, relative
+Markdown-Links, automatische Aktualisierung unter Erhalt der Leseposition,
+Lesepositionen, Themes und Textzoom.
 
-**Status:** Implementierung und Linux-Release-Paket vorhanden. Die vollständige
-v1-Abnahme nach `SPEC.md` ist noch nicht erteilt. Messwerte und offene Abnahmepunkte
-stehen in [benchmarks/REPORT.md](benchmarks/REPORT.md).
+**Status:** M0 bis M2 nach [SPEC.md](SPEC.md) sind umgesetzt. **M3 —
+Installation, Desktop-Eintrag, MIME-Zuordnung, Icon und Paket — ist offen**, und
+die v1-Abnahme ist nicht erteilt. Was aussteht, steht in
+[011](docs/decisions/011-m0-foundation.md) und
+[012](docs/decisions/012-rendering-and-navigation.md).
+
+Der Dokumentbereich ist ein eigenes Widget: es setzt den Op-Buffer des Parsers
+mit Pango und zeichnet mit GSK, blockweise virtualisiert. Für kein Dokument
+existiert ein Zustand, in dem alles gesetzt ist — eine 10-MiB-Datei wird lesbar,
+indem 15 von rund 145 000 Blöcken gesetzt werden.
 
 ## Entwickeln
 
-Referenzumgebung: Ubuntu 26.04 LTS, WebKitGTK 2.52.6. Node.js 22.22.1 und Rust
-1.98.1 sind in `.nvmrc` und `rust-toolchain.toml` festgelegt. npm- und Cargo-Lockfiles
-gehören zum Projekt. Der fertige Reader benötigt keinen Node-Server.
-
 ```sh
-sudo apt-get install build-essential pkg-config libwebkit2gtk-4.1-dev \
-  libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils
-npm ci
-npm run desktop
+sudo apt install libgtk-4-dev build-essential pkg-config
+cargo run -p hashline -- README.md
 ```
 
-Rust mit [rustup](https://rustup.rs/) installieren; die Toolchain-Datei wählt die
-Projektversion. `npm run dev` startet eine Browser-Vorschau. Dort funktionieren
-Dateidialog und Rendering, während Dateibeobachtung, lokale Bildpfade und
-Systemintegration die Desktop-App voraussetzen.
-
-Für den direkten Desktop-Test mit Beispieldokument:
-
-```sh
-npm run dev:demo
-# Oder eine eigene Datei:
-npm run desktop -- --file ./README.md
-```
-
-Der Befehl startet Vite und das native Fenster gemeinsam. CSS und React nutzen
-Live-Updates; Rust-Änderungen bauen die App neu und starten sie erneut. Änderungen
-am geöffneten Markdown lädt der Dateiwatcher automatisch. `npm run dev:doctor`
-prüft die Build-Werkzeuge. Weitere Details zu Reloads, Inspector und lokalen
-Werkzeugpfaden stehen in [docs/development.md](docs/development.md).
-
-## Prüfen und paketieren
-
-```sh
-npm run check
-npm run test:ui               # installiertes Google Chrome erforderlich
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-npm run bundle
-```
-
-Das Debian-Paket liegt anschließend unter
-`src-tauri/target/release/bundle/deb/Hashline_0.1.0_amd64.deb`.
-
-```sh
-sudo apt install ./src-tauri/target/release/bundle/deb/Hashline_0.1.0_amd64.deb
-hashline ./README.md
-```
-
-Installation registriert Desktop-Eintrag, Icon und Markdown-MIME-Typ. Die bevorzugte
-Standardanwendung bleibt eine Benutzereinstellung des Dateimanagers. Native
-Integrationstests und Messabläufe beschreibt [docs/testing.md](docs/testing.md).
+Mehr in [docs/development.md](docs/development.md), Prüfungen in
+[docs/testing.md](docs/testing.md).
 
 ## Bedienung
 
-Die Desktop-App vereint Werkzeuge und Fenstersteuerung in einer selbst gestalteten
-Titelleiste: flache Knöpfe rechts unter Windows, Ampelknöpfe links unter macOS und
-runde Knöpfe rechts unter Linux. Dateiname und freie Flächen lassen sich zum
-Verschieben ziehen; ein Doppelklick maximiert das Fenster oder stellt es wieder her.
-Der grüne macOS-Knopf schaltet Vollbild um. Die Leiste folgt dem gewählten Theme.
-In der Browser-Vorschau werden keine Fensterknöpfe eingeblendet.
+Die Fensterleiste ist die native `GtkHeaderBar` mit den Fensterknöpfen des
+Systems und trägt Öffnen, Dateiname, Inhaltsverzeichnis, Suche und Menü. Das
+Menü enthält Darstellungsmodus, Textgröße, Nachladen und Inhaltsverzeichnis.
+Der vollständige Pfad steht als Tooltip.
 
-| Aktion                                       | Tastatur                           |
-| -------------------------------------------- | ---------------------------------- |
-| Öffnen                                       | Strg+O                             |
-| Suche                                        | Strg+F                             |
-| Nächster / vorheriger Treffer                | Enter / Umschalt+Enter im Suchfeld |
-| Inhaltsverzeichnis                           | Strg+Umschalt+O                    |
-| Text vergrößern / verkleinern / zurücksetzen | Strg++ / Strg+- / Strg+0           |
-| Nachladen                                    | Strg+R                             |
-| Dokument auswählen / kopieren                | Strg+A / Strg+C                    |
-| Suche bzw. oberstes Overlay schließen        | Escape                             |
+| Aktion | Tastatur |
+| --- | --- |
+| Öffnen | `Ctrl+O` |
+| Suche | `Ctrl+F` |
+| Nächster / vorheriger Treffer | `Enter` / `Shift+Enter` im Suchfeld |
+| Inhaltsverzeichnis | `Ctrl+Shift+O` |
+| Text vergrößern / verkleinern / zurücksetzen | `Ctrl++` / `Ctrl+-` / `Ctrl+0` |
+| Nachladen | `Ctrl+R` |
+| Dokument auswählen / kopieren | `Ctrl+A` / `Ctrl+C` |
+| Menü, Inhaltsverzeichnis oder Suche schließen | `Escape` |
 
-Das Menü enthält Theme, Textgröße, Nachladen und „Dateipfad kopieren“. Der Dateiname
-zeigt den vollständigen Pfad als Tooltip. Start ohne Dateiparameter bleibt leer;
-Lesepositionen werden erst beim erneuten Öffnen einer Datei angewendet.
+Doppelklick wählt ein Wort, Dreifachklick einen Block, Shift-Klick erweitert die
+Auswahl; Auswahl reicht über Blockgrenzen. Start ohne Dateiparameter bleibt
+leer. Lesepositionen greifen beim erneuten Öffnen einer Datei.
 
 ## Inhaltsgrenzen
 
-- Markdown: UTF-8 einschließlich BOM, höchstens 20 MiB. Dateien werden nie verändert.
-- Lokale PNG-, JPEG-, GIF- und WebP-Bilder: höchstens 16 MiB und 24 Megapixel je Bild.
-  Automatischer Zugriff bleibt im Dokumentverzeichnis einschließlich Unterordnern.
-- Remote-Bilder bleiben zunächst blockiert. „Remote-Bilder für dieses Dokument
-  laden“ gibt HTTP(S)-Bilder für die aktuelle Dokumentversion frei und weist auf
-  die Übertragung der IP-Adresse hin. Dateiwechsel und geänderte Revisionen setzen
-  die Freigabe zurück. Es gelten die lokalen Bildlimits sowie 64 Bilder/64 MiB
-  insgesamt, vier gleichzeitige Downloads und 15 Sekunden je Download.
-- SVG bleibt bewusst unimplementiert: lokale und entfernte SVG-Dateien sowie
-  eingebettetes SVG erscheinen nicht als Bild. Die Begründung und die Grenzen
-  der Remote-Freigabe stehen in der [Ressourcenentscheidung](docs/decisions/001-resources.md).
-- Links zu Markdown öffnen im selben Fenster. HTTP(S) und Mail öffnen nach einem
-  Klick in der Systemanwendung. Andere Schemata und Dateitypen werden abgewiesen.
-- Passive HTML-Auswahl; keine Dokument-Styles, Skripte, Formulare oder Frames.
-  Aufgabenlisten bleiben deaktiviert. Frontmatter steuert keine App-Funktionen.
+- Markdown: UTF-8 einschließlich BOM, höchstens 20 MiB. Dateien werden nie
+  verändert; Aufgabenlisten bleiben schreibgeschützt.
+- **Rohes HTML wird als Quelltext dargestellt, nicht interpretiert.** Der native
+  Renderer hat keinen HTML-Parser und keine Bereinigung; damit entfällt die
+  gesamte Klasse von Bereinigungsfehlern. Der Preis ist bewusst: HTML-lastige
+  Dokumente sehen anders aus als auf GitHub. 580 der 652 CommonMark-Beispiele
+  stimmen exakt mit der Spezifikation überein, die 72 mit rohem HTML weichen
+  absichtlich ab.
+- Lokale Bilder: höchstens 40 Megapixel, geprüft aus den Kopfdaten **vor** dem
+  Dekodieren. Automatischer Zugriff bleibt im Dokumentverzeichnis einschließlich
+  Unterordnern — nach Kanonisierung, damit ein Symlink nicht hinausführt.
+- Remote-Bilder laden in v1 nicht; der Platzhalter nennt die Quelle.
+- Links zu Markdown öffnen im selben Fenster, Fragmentlinks springen im
+  Dokument. `https:`, `http:` und `mailto:` öffnen nach einem Klick in der
+  Systemanwendung. Andere Schemata und Dateitypen werden abgewiesen; aus
+  Dokumentinhalt entsteht kein Shell-Aufruf.
+- Keine Telemetrie.
 
-[Visuelle und Zugänglichkeitsabnahme](docs/acceptance/REPORT.md) ·
-[Architektur und Rendering-Vertrag](docs/architecture.md) ·
-[Entscheidungen](docs/decisions/001-resources.md) ·
-[Benchmarkbericht](benchmarks/REPORT.md)
+[Spezifikation](SPEC.md) ·
+[Entwicklung](docs/development.md) ·
+[Prüfungen](docs/testing.md) ·
+[Entscheidungen](docs/decisions/) ·
+[Gestaltungsreferenz](docs/design/README.md)
