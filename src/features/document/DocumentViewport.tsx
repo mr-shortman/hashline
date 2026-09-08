@@ -211,14 +211,13 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         if (rendered.has(i) || cancelled) return;
         const start = performance.now();
         const section = doc.sections[i];
-        const { fragment } = sanitizeFragment(
-          { ...section, parseMs: 0 },
-          doc.file,
-          gateway,
-        );
-        const count = fragment.querySelectorAll(
-          'img[data-remote-source]',
-        ).length;
+        const {
+          fragment,
+          remoteImages: count,
+          hasImages,
+          tables,
+          pres,
+        } = sanitizeFragment({ ...section, parseMs: 0 }, doc.file, gateway);
         if (count) {
           setRemoteState((state) => ({ ...state, count: state.count + count }));
           if (
@@ -229,7 +228,7 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         }
         const sanitized = performance.now();
         sanitizeMs += sanitized - start;
-        fragment.querySelectorAll('table').forEach((table) => {
+        tables.forEach((table) => {
           const wrap = document.createElement('div');
           wrap.className = 'table-scroll';
           wrap.tabIndex = 0;
@@ -238,7 +237,7 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
           table.replaceWith(wrap);
           wrap.append(table);
         });
-        fragment.querySelectorAll('pre').forEach((pre) => {
+        pres.forEach((pre) => {
           const code = pre.querySelector('code');
           if (!code) return;
           const button = document.createElement('button');
@@ -251,7 +250,7 @@ export const DocumentViewport = memo(function DocumentViewport(props: Props) {
         });
         // Inspect the actual sanitized tree: HTML's legacy <image> spelling is
         // normalized to <img> too. Resource handles belong to this document.
-        shells[i].dataset.hasImages = String(!!fragment.querySelector('img'));
+        shells[i].dataset.hasImages = String(hasImages);
         shells[i].append(fragment);
         shells[i].dataset.populated = 'true';
         rendered.add(i);

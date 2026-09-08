@@ -56,11 +56,20 @@ export function unavailableImage(img: HTMLImageElement, message: string): void {
   label.textContent = `${img.alt || 'Bild'} — ${message}`;
 }
 
+export interface SanitizedFragment {
+  fragment: DocumentFragment;
+  blockedImages: number;
+  remoteImages: number;
+  hasImages: boolean;
+  tables: HTMLTableElement[];
+  pres: HTMLPreElement[];
+}
+
 export function sanitizeFragment(
   parsed: ParsedMarkdown,
   file: FileDocument,
   gateway: DocumentGateway,
-): { fragment: DocumentFragment; blockedImages: number } {
+): SanitizedFragment {
   const fragment = DOMPurify.sanitize(parsed.html, {
     RETURN_DOM_FRAGMENT: true,
     ALLOWED_TAGS: [
@@ -141,71 +150,106 @@ export function sanitizeFragment(
   });
   // Only parser-generated heading IDs survive; even passive HTML cannot claim app IDs.
   const remaining = new Map(parsed.headings.map((h) => [h.id, h.level]));
-  for (const element of fragment.querySelectorAll(
-    '[id], [class], input, [width], [height], [colspan], [rowspan]',
-  )) {
-    const id = element.getAttribute('id');
-    if (id) {
-      if (
-        remaining.get(id) === Number(element.tagName.slice(1)) &&
-        /^H[1-6]$/.test(element.tagName)
-      )
-        remaining.delete(id);
-      else element.removeAttribute('id');
-    }
-    const cls = element.getAttribute('class');
-    if (cls !== null) element.removeAttribute('class');
-    if (
-      element.tagName === 'CODE' &&
-      cls &&
-      /^language-[a-zA-Z0-9_+-]{1,40}$/.test(cls)
-    )
-      element.setAttribute('class', cls);
-    if (element.tagName === 'INPUT') {
-      if (element.getAttribute('type') !== 'checkbox') {
-        element.remove();
-        continue;
-      }
-      element.setAttribute('disabled', '');
-      element.setAttribute('tabindex', '-1');
-    }
-    for (const attr of ['width', 'height', 'colspan', 'rowspan']) {
-      const value = element.getAttribute(attr);
-      if (value && (!/^\d{1,4}$/.test(value) || Number(value) > 4096))
-        element.removeAttribute(attr);
-    }
-  }
-  for (const link of fragment.querySelectorAll('a')) {
-    const href = link.getAttribute('href') || '';
-    const kind = classifyUrl(href);
-    if (kind === 'blocked') link.removeAttribute('href');
-    else {
-      link.setAttribute('data-link', href);
-      link.setAttribute('href', '#');
-    }
-    if (kind === 'external')
-      link.setAttribute('title', `${href} · In Systemanwendung öffnen`);
-  }
   let blockedImages = 0;
-  for (const img of fragment.querySelectorAll('img')) {
-    const source = img.getAttribute('src') || '';
-    img.removeAttribute('src');
-    if (/^https?:/i.test(source) && classifyUrl(source) === 'external') {
-      img.dataset.remoteSource = source;
-      img.dataset.remoteAlt = img.alt;
+  let remoteImages = 0;
+  let hasImages = false;
+  const tables: HTMLTableElement[] = [];
+  const pres: HTMLPreElement[] = [];
+  const rejectedInputs: Element[] = [];
+  const unavailableImages: HTMLImageElement[] = [];
+  const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    const element = walker.currentNode as Element;
+    // Most parser elements have no attributes. Preserve the heading-ID and
+    // attribute policy here, before the fragment can enter the live document.
+    if (
+      element.tagName === 'INPUT' ||
+      (element.hasAttributes() &&
+        element.matches('[id], [class], [width], [height], [colspan], [rowspan]'))
+    ) {
+      const id = element.getAttribute('id');
+      if (id) {
+        if (
+          remaining.get(id) === Number(element.tagName.slice(1)) &&
+          /^H[1-6]$/.test(element.tagName)
+        )
+          remaining.delete(id);
+        else element.removeAttribute('id');
+      }
+      const cls = element.getAttribute('class');
+      if (cls !== null) element.removeAttribute('class');
+      if (
+        element.tagName === 'CODE' &&
+        cls &&
+        /^language-[a-zA-Z0-9_+-]{1,40}$/.test(cls)
+      )
+        element.setAttribute('class', cls);
+      if (element.tagName === 'INPUT') {
+        if (element.getAttribute('type') !== 'checkbox') {
+          rejectedInputs.push(element);
+          continue;
+        }
+        element.setAttribute('disabled', '');
+        element.setAttribute('tabindex', '-1');
+      }
+      for (const attr of ['width', 'height', 'colspan', 'rowspan']) {
+        const value = element.getAttribute(attr);
+        if (value && (!/^\d{1,4}$/.test(value) || Number(value) > 4096))
+          element.removeAttribute(attr);
+      }
     }
-    const url =
-      classifyUrl(source) === 'local' ? gateway.imageUrl(file, source) : null;
-    if (url && /^(hashline-image:\/\/localhost\/|blob:)/.test(url)) {
-      img.src = url;
-      img.loading = 'lazy';
-      img.decoding = 'async';
-    } else {
-      blockedImages++;
-      unavailableImage(img, 'Bildzugriff nicht freigegeben');
+    switch (element.tagName) {
+      case 'TABLE':
+        tables.push(element as HTMLTableElement);
+        break;
+      case 'PRE':
+        pres.push(element as HTMLPreElement);
+        break;
+      case 'A': {
+        const link = element as HTMLAnchorElement;
+        const href = link.getAttribute('href') || '';
+        const kind = classifyUrl(href);
+        if (kind === 'blocked') link.removeAttribute('href');
+        else {
+          link.setAttribute('data-link', href);
+          link.setAttribute('href', '#');
+        }
+        if (kind === 'external')
+          link.setAttribute('title', `${href} · In Systemanwendung öffnen`);
+        break;
+      }
+      case 'IMG': {
+        const img = element as HTMLImageElement;
+        hasImages = true;
+        const source = img.getAttribute('src') || '';
+        img.removeAttribute('src');
+        if (/^https?:/i.test(source) && classifyUrl(source) === 'external') {
+          remoteImages++;
+          img.dataset.remoteSource = source;
+          img.dataset.remoteAlt = img.alt;
+        }
+        const url =
+          classifyUrl(source) === 'local'
+            ? gateway.imageUrl(file, source)
+            : null;
+        if (url && /^(hashline-image:\/\/localhost\/|blob:)/.test(url)) {
+          img.src = url;
+          img.loading = 'lazy';
+          img.decoding = 'async';
+        } else {
+          blockedImages++;
+          unavailableImages.push(img);
+        }
+        break;
+      }
     }
   }
-  return { fragment, blockedImages };
+  // Tree edits are deferred until traversal ends: removing an input or inserting
+  // a placeholder must never skip siblings or feed app-owned markup into policy.
+  for (const input of rejectedInputs) input.remove();
+  for (const img of unavailableImages)
+    unavailableImage(img, 'Bildzugriff nicht freigegeben');
+  return { fragment, blockedImages, remoteImages, hasImages, tables, pres };
 }
 
 // String adapter for contract comparisons; the renderer inserts the fragment
