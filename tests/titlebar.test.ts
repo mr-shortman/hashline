@@ -1,8 +1,7 @@
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { PhysicalSize } from '@tauri-apps/api/dpi';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Titlebar } from '../src/ui/Titlebar';
+import { createTitlebar, type Titlebar } from '../src/ui/titlebar';
+import { el, svg } from '../src/ui/dom';
 import {
   windowPlatform,
   type DesktopWindow,
@@ -10,7 +9,7 @@ import {
 } from '../src/platform/window';
 
 let container: HTMLDivElement;
-let root: Root;
+let titlebar: Titlebar | undefined;
 let resized: () => void;
 let focusChanged: () => void;
 let maximized: boolean;
@@ -22,7 +21,6 @@ const stopFocus = vi.fn();
 const onError = vi.fn();
 
 beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
   maximized = false;
   fullscreen = false;
@@ -54,53 +52,43 @@ beforeEach(() => {
   };
   container = document.createElement('div');
   document.body.append(container);
-  root = createRoot(container);
 });
-afterEach(async () => {
-  await act(async () => root.unmount());
+afterEach(() => {
+  titlebar?.destroy();
+  titlebar = undefined;
   container.remove();
-  vi.unstubAllGlobals();
 });
+
+// The subscriptions resolve on microtasks; settle them before asserting.
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function render(
   platform: WindowPlatform = 'linux',
-  nativeWindow: DesktopWindow | undefined = native,
+  options: { preview?: boolean } = {},
 ) {
-  await act(async () => {
-    root.render(
-      createElement(Titlebar, {
-        nativeWindow,
-        platform,
-        onError,
-        children: [
-          createElement(
-            'button',
-            { key: 'open' },
-            createElement('svg', { 'data-tool-icon': true }),
-          ),
-          createElement(
-            'div',
-            { key: 'title', className: 'file-title' },
-            createElement('span', {}, 'reader.md'),
-          ),
-        ],
-      }),
-    );
+  titlebar = createTitlebar({
+    nativeWindow: options.preview ? undefined : native,
+    platform,
+    onError,
+    children: [
+      el('button', {}, svg('svg', { 'data-tool-icon': 'true' })),
+      el('div', { class: 'file-title' }, el('span', {}, 'reader.md')),
+    ],
   });
+  titlebar.mount(container);
+  await settle();
 }
 async function click(selector: string) {
-  await act(async () =>
-    container.querySelector<HTMLElement>(selector)!.click(),
-  );
+  container.querySelector<HTMLElement>(selector)!.click();
+  await settle();
 }
 async function mouseDown(selector: string, detail = 1, button = 0) {
-  await act(async () => {
-    container
-      .querySelector(selector)!
-      .dispatchEvent(
-        new MouseEvent('mousedown', { bubbles: true, detail, button }),
-      );
-  });
+  container
+    .querySelector(selector)!
+    .dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, detail, button }),
+    );
+  await settle();
 }
 
 describe('custom titlebar', () => {
@@ -117,8 +105,8 @@ describe('custom titlebar', () => {
     async (platform) => {
       await render(platform);
       expect(
-        [...container.querySelectorAll('.window-control')].map((el) =>
-          el.getAttribute('aria-label'),
+        [...container.querySelectorAll('.window-control')].map((node) =>
+          node.getAttribute('aria-label'),
         ),
       ).toEqual([
         'Fenster minimieren',
@@ -132,16 +120,21 @@ describe('custom titlebar', () => {
       expect(native.toggleMaximize).toHaveBeenCalledOnce();
       expect(native.close).toHaveBeenCalledOnce();
       maximized = true;
-      await act(async () => resized());
+      resized();
+      await settle();
       expect(
         container.querySelector('.window-maximize')?.getAttribute('aria-label'),
       ).toBe('Fenster wiederherstellen');
       expect(container.querySelector('.window-resize-handles')).toBeNull();
       focused = false;
-      await act(async () => focusChanged());
-      expect(container.querySelector('header')?.dataset.focused).toBe('false');
+      focusChanged();
+      await settle();
+      expect(
+        container.querySelector<HTMLElement>('header')?.dataset.focused,
+      ).toBe('false');
       maximized = false;
-      await act(async () => resized());
+      resized();
+      await settle();
       expect(container.querySelectorAll('.window-resize-handle')).toHaveLength(
         8,
       );
@@ -159,7 +152,8 @@ describe('custom titlebar', () => {
     await click('.window-maximize');
     expect(native.setFullscreen).toHaveBeenLastCalledWith(true);
     fullscreen = true;
-    await act(async () => resized());
+    resized();
+    await settle();
     expect(
       container.querySelector('.window-maximize')?.getAttribute('aria-label'),
     ).toBe('Vollbild verlassen');
@@ -194,7 +188,7 @@ describe('custom titlebar', () => {
     );
   });
 
-  it('cleans up event subscriptions, including late registrations after unmount', async () => {
+  it('cleans up event subscriptions, including late registrations after destroy', async () => {
     let resolveResize!: (stop: () => void) => void;
     vi.mocked(native.onResized).mockImplementationOnce(
       () =>
@@ -203,16 +197,15 @@ describe('custom titlebar', () => {
         }),
     );
     await render();
-    await act(async () => root.unmount());
-    await act(async () => resolveResize(stopResize));
+    titlebar!.destroy();
+    resolveResize(stopResize);
+    await settle();
     expect(stopResize).toHaveBeenCalledOnce();
     expect(stopFocus).toHaveBeenCalledOnce();
   });
 
   it('leaves the browser preview without window controls or resize handles', async () => {
-    await act(async () =>
-      root.render(createElement(Titlebar, { onError, children: 'Hashline' })),
-    );
+    await render('linux', { preview: true });
     expect(container.querySelector('.window-controls')).toBeNull();
     expect(container.querySelector('.window-resize-handles')).toBeNull();
     await mouseDown('header');

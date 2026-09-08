@@ -1,6 +1,4 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { App } from './app/App';
+import { createApp } from './app/app';
 import { DocumentController } from './features/document/controller';
 import { WorkerMarkdownService } from './core/markdown/service';
 import { createGateway, desktop } from './platform/tauri';
@@ -23,10 +21,11 @@ if (import.meta.env.DEV && desktop) {
     }
   });
 }
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App controller={controller} gateway={gateway} />
-  </React.StrictMode>,
-);
+const app = createApp(controller, gateway);
+document.getElementById('root')!.append(app.element);
 window.addEventListener('pagehide', () => controller.dispose(), { once: true });
-if (import.meta.hot) import.meta.hot.dispose(() => controller.dispose());
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    app.destroy();
+    controller.dispose();
+  });

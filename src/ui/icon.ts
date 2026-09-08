@@ -1,3 +1,5 @@
+import { svg } from './dom';
+
 type Name =
   | 'open'
   | 'search'
@@ -19,20 +21,20 @@ const paths: Record<Name, string> = {
   check: 'm5 12 4 4L19 6',
   file: 'M14 3H5v18h14V8l-5-5Zm0 0v6h5M8 13h8M8 17h6',
 };
-export function Icon({ name }: { name: Name }) {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={paths[name]} />
-    </svg>
+export function icon(name: Name): SVGElement {
+  return svg(
+    'svg',
+    {
+      width: '20',
+      height: '20',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.7',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true',
+    },
+    svg('path', { d: paths[name] }),
   );
 }
