@@ -1,0 +1,21 @@
+# Workspace root for the native stack (docs/decisions/009-native-renderer.md).
+#
+# `src-tauri` and the WASM shim are excluded rather than members: they still
+# build against the old lockfile and disappear once M0 is accepted
+# (SPEC.md, section 13). The probe under `benchmarks/` is a measurement tool,
+# not part of the product.
+[workspace]
+resolver = "2"
+members = ["crates/markdown", "crates/hashline"]
+exclude = ["src-tauri", "src-tauri/markdown-wasm", "benchmarks/pulldown-probe"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.98"
+version = "0.1.0"
+publish = false
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true

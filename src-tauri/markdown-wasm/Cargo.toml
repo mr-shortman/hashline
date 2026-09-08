@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-hashline-markdown = { path = "../markdown" }
+hashline-markdown = { path = "../../crates/markdown" }
 
 [profile.release]
 opt-level = "s"

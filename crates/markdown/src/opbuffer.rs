@@ -1,28 +1,62 @@
-//! The op buffer from docs/decisions/007-performance-path.md, section 4.
+//! The op buffer from docs/decisions/007-performance-path.md, section 4,
+//! adapted for the native renderer (SPEC.md, section 6).
 //!
-//! The layout is the one `src/core/markdown/opbuffer.ts` documents and decodes.
-//! Offsets and lengths are **UTF-16 code units** into the string the renderer
-//! obtains by decoding `strings` once per document — never byte offsets. The
-//! encoder carries that count forward while it appends, which is the whole
-//! reason the renderer can use `substring` without a translation table.
+//! Offsets and lengths are **UTF-8 byte offsets** into `strings` and `text`.
+//! They counted UTF-16 code units for as long as the consumer was JavaScript
+//! and wanted `substring` without a translation table; the Rust renderer slices
+//! `&str` by byte and that reason is gone.
 
 pub const OP_OPEN: u32 = 0;
 pub const OP_CLOSE: u32 = 1;
 pub const OP_TEXT: u32 = 2;
-pub const SECTION_FALLBACK: u32 = 1;
 
 /// Exactly the tag allowlist `opbuffer.ts` exports; a tag outside it has no id
 /// and is therefore not expressible in the buffer at all.
 pub const ALLOWED_TAGS: [&str; 39] = [
-    "p", "h1", "h2", "h3", "h4", "h5", "h6", "em", "strong", "del", "s", "code", "pre",
-    "blockquote", "ul", "ol", "li", "hr", "br", "a", "img", "table", "thead", "tbody", "tfoot",
-    "tr", "th", "td", "input", "sup", "sub", "kbd", "details", "summary", "div", "span", "dl", "dt",
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "em",
+    "strong",
+    "del",
+    "s",
+    "code",
+    "pre",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    "hr",
+    "br",
+    "a",
+    "img",
+    "table",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "input",
+    "sup",
+    "sub",
+    "kbd",
+    "details",
+    "summary",
+    "div",
+    "span",
+    "dl",
+    "dt",
     "dd",
 ];
 /// Exactly the attribute allowlist `opbuffer.ts` exports.
 pub const ALLOWED_ATTR: [&str; 16] = [
-    "id", "href", "src", "alt", "title", "class", "start", "type", "checked", "disabled", "colspan",
-    "rowspan", "align", "width", "height", "open",
+    "id", "href", "src", "alt", "title", "class", "start", "type", "checked", "disabled",
+    "colspan", "rowspan", "align", "width", "height", "open",
 ];
 
 pub const TAG_P: u32 = 0;
@@ -64,14 +98,6 @@ pub const ATTR_CHECKED: u32 = 8;
 pub const ATTR_DISABLED: u32 = 9;
 pub const ATTR_ALIGN: u32 = 12;
 
-fn utf16_len(value: &str) -> u32 {
-    if value.is_ascii() {
-        value.len() as u32
-    } else {
-        value.chars().map(|c| c.len_utf16() as u32).sum()
-    }
-}
-
 /// FNV-1a. Used only for section identity (see 008, section 5), never for
 /// integrity or security.
 #[derive(Clone, Copy)]
@@ -99,53 +125,64 @@ impl Fnv {
 // The blocks `indexText` treated as separate for search, unchanged: a match
 // must not run from the end of one block into the start of the next.
 const BLOCK_TAGS: [u32; 14] = [
-    TAG_P, TAG_LI, TAG_PRE, TAG_TD, TAG_TH, 1, 2, 3, 4, 5, 6, TAG_SUMMARY, TAG_DT, TAG_DD,
+    TAG_P,
+    TAG_LI,
+    TAG_PRE,
+    TAG_TD,
+    TAG_TH,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    TAG_SUMMARY,
+    TAG_DT,
+    TAG_DD,
 ];
 
 #[derive(Default)]
 pub struct Encoder {
     pub ops: Vec<u32>,
     pub attrs: Vec<u32>,
-    /// Attribute values, heading ids and texts, and the HTML of fallback
-    /// sections. Never document text.
+    /// Attribute values, heading ids and heading texts. Never document text.
     pub strings: String,
-    units: u32,
     /// The document's text in document order — what the search runs on.
     pub text: String,
-    text_units: u32,
     pub attr_count: u32,
+    /// Top-level flow elements: what the block plan virtualizes over
+    /// (SPEC.md, section 5). `BLOCK_WORDS` words each.
+    pub blocks: Vec<u32>,
     hash: Fnv,
     pending: String,
-    /// Serial of the block element enclosing the current position, and of the
-    /// one that produced the previous text run.
-    blocks: Vec<u32>,
+    /// One entry per open element, holding the serial of the block enclosing
+    /// it; its length is therefore the current element depth.
+    stack: Vec<u32>,
     block_serial: u32,
     last_block: Option<u32>,
+    /// Tag, first op and — once it has any — text start of the top-level
+    /// element being built.
+    open_block: Option<(u32, u32, Option<u32>)>,
 }
+
+/// Words per block: tag, opStart, opCount, textStart, textLen.
+pub const BLOCK_WORDS: usize = 5;
 
 impl Encoder {
     fn intern(&mut self, value: &str) -> u32 {
-        let offset = self.units;
+        let offset = self.strings.len() as u32;
         self.strings.push_str(value);
-        self.units += utf16_len(value);
         offset
     }
     fn current_block(&self) -> Option<u32> {
-        self.blocks.last().copied()
+        self.stack.last().copied()
     }
-    /// Length of the document text so far, in UTF-16 code units.
-    pub fn text_units(&self) -> u32 {
-        self.text_units
+    /// Length of the document text so far, in bytes.
+    pub fn text_len(&self) -> u32 {
+        self.text.len() as u32
     }
-    /// Separates two sections whose text must not run together, for sections
-    /// that contribute no operations at all.
-    pub fn separate(&mut self) {
-        self.text.push('\n');
-        self.text_units += 1;
-        self.last_block = None;
-    }
-    /// Text runs are merged the way an HTML parser merges them, so that
-    /// `isEqualNode` stays usable as a contract and fewer nodes are created.
+    /// Text runs are merged the way an HTML parser merges them, so that fewer
+    /// operations are produced than there are parser events.
     pub fn text(&mut self, value: &str) {
         self.pending.push_str(value);
     }
@@ -161,19 +198,28 @@ impl Encoder {
             // The separator belongs to no operation; it only keeps a match from
             // spanning a block boundary, exactly as `indexText` did.
             self.text.push('\n');
-            self.text_units += 1;
         }
         self.last_block = block;
-        let offset = self.text_units;
+        let offset = self.text.len() as u32;
+        // The block's text begins at its first run, never at the separator
+        // written above: that separator divides two blocks and belongs to
+        // neither, so a block's range is exactly its own text.
+        if let Some((_, _, start)) = self.open_block.as_mut() {
+            start.get_or_insert(offset);
+        }
         self.text.push_str(&pending);
-        let length = utf16_len(&pending);
-        self.text_units += length;
+        let length = pending.len() as u32;
         self.ops.extend_from_slice(&[OP_TEXT, offset, length, 0]);
         self.pending = pending;
         self.pending.clear();
     }
     pub fn open(&mut self, tag: u32) -> Open {
         self.flush_text();
+        // A top-level element starts a block of the plan. Text flushed above
+        // still belongs to the block before it.
+        if self.stack.is_empty() {
+            self.open_block = Some((tag, (self.ops.len() / 4) as u32, None));
+        }
         self.hash.write(b"\x00");
         self.hash.write_u32(tag);
         // Every open pushes the block in force inside it, so the enclosing
@@ -184,7 +230,7 @@ impl Encoder {
         } else {
             self.current_block()
         };
-        self.blocks.push(block.unwrap_or(0));
+        self.stack.push(block.unwrap_or(0));
         Open {
             tag,
             attr_start: self.attr_count,
@@ -196,8 +242,8 @@ impl Encoder {
         self.hash.write_u32(name);
         self.hash.write(value.as_bytes());
         let offset = self.intern(value);
-        let length = utf16_len(value);
-        self.attrs.extend_from_slice(&[name, offset, length]);
+        self.attrs
+            .extend_from_slice(&[name, offset, value.len() as u32]);
         self.attr_count += 1;
     }
     /// Emits the OPEN once its attributes are known.
@@ -209,8 +255,25 @@ impl Encoder {
     pub fn close(&mut self) {
         self.flush_text();
         self.hash.write(b"\x01");
-        self.blocks.pop();
+        self.stack.pop();
         self.ops.extend_from_slice(&[OP_CLOSE, 0, 0, 0]);
+        // Closing back to depth zero completes the block: its operations and
+        // its slice of the text blob are now both known.
+        if self.stack.is_empty() {
+            if let Some((tag, op_start, text_start)) = self.open_block.take() {
+                let op_count = (self.ops.len() / 4) as u32 - op_start;
+                // A block without text — a rule, an image on its own — is an
+                // empty range at the position it occupies.
+                let text_start = text_start.unwrap_or(self.text.len() as u32);
+                self.blocks.extend_from_slice(&[
+                    tag,
+                    op_start,
+                    op_count,
+                    text_start,
+                    self.text.len() as u32 - text_start,
+                ]);
+            }
+        }
     }
     pub fn end_section(&mut self) -> (usize, u64) {
         self.flush_text();
@@ -220,15 +283,7 @@ impl Encoder {
     }
     /// Offset and length of `value` after appending it; for ids and heading text.
     pub fn reference(&mut self, value: &str) -> (u32, u32) {
-        (self.intern(value), utf16_len(value))
-    }
-    pub fn hash_bytes(&mut self, bytes: &[u8]) {
-        self.hash.write(bytes);
-    }
-    pub fn take_hash(&mut self) -> u64 {
-        let hash = self.hash.value();
-        self.hash = Fnv::default();
-        hash
+        (self.intern(value), value.len() as u32)
     }
 }
 

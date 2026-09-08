@@ -15,3 +15,8 @@ pulldown-cmark = { version = "0.13.4", default-features = false, features = [
 ] }
 unicode-normalization = "0.1"
 unicode-general-category = "1"
+
+[dev-dependencies]
+html5ever = "0.39"
+markup5ever_rcdom = "0.39"
+serde_json = "1"

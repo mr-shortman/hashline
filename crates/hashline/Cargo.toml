@@ -1,0 +1,21 @@
+# The application. Everything toolkit-facing lives here; the parser stays clean
+# of GTK (SPEC.md, section 4).
+[package]
+name = "hashline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "A fast, quiet Markdown viewer for Linux"
+
+[dependencies]
+hashline-markdown = { path = "../markdown" }
+# v4_14 is the baseline: `GtkAccessible` needs 4.10 and the
+# `GtkAccessibleText` interface the document role reports through needs
+# 4.14 (SPEC.md, section 3). GTK 4.14 is from early 2024.
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+pango = "0.22"
+pangocairo = "0.22"
+
+[dev-dependencies]
+cairo-rs = { version = "0.22", features = ["png"] }

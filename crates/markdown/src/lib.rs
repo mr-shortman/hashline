@@ -2,14 +2,14 @@
 //!
 //! It reads Markdown once and emits the op buffer the renderer replays
 //! (docs/decisions/007-performance-path.md, section 4). No HTML string is
-//! produced on the fast path; only sections carrying raw HTML keep an HTML
-//! representation, because raw HTML is not expressible as operations and stays
-//! on the DOMPurify path in the frontend.
+//! produced at all: the native renderer has no HTML parser and no sanitizer, so
+//! raw HTML is shown as source text instead of being interpreted
+//! (SPEC.md, section 6). That removes DOMPurify and the whole class of
+//! sanitization bugs with it.
 //!
-//! The same code serves the desktop through IPC and the browser preview and the
-//! test suite through WebAssembly (docs/decisions/008-parser-reference.md).
+//! The crate stays free of toolkit and platform dependencies
+//! (docs/decisions/008-parser-reference.md).
 
-mod boundary;
 mod opbuffer;
 mod packet;
 mod slug;
@@ -20,7 +20,9 @@ use pulldown_cmark::{
 };
 use std::collections::HashMap;
 
-pub use opbuffer::{ALLOWED_ATTR, ALLOWED_TAGS};
+// The op vocabulary is the contract between parser and renderer
+// (SPEC.md, section 6). The native view decodes the buffer with these.
+pub use opbuffer::{ALLOWED_ATTR, ALLOWED_TAGS, BLOCK_WORDS, OP_CLOSE, OP_OPEN, OP_TEXT};
 pub use packet::{to_packet, Layout};
 pub use slug::slug_base;
 
@@ -37,26 +39,33 @@ pub fn options() -> Options {
 /// used, so section counts and the measurement series stay comparable.
 const SECTION_BUDGET: usize = 16_384;
 
-pub const SECTION_WORDS: usize = 9;
+/// Words per section: opStart, opCount, hashLow, hashHigh, textStart, textLen.
+pub const SECTION_WORDS: usize = 6;
 pub const HEADING_WORDS: usize = 6;
 
 #[derive(Default)]
 pub struct OpDocument {
     pub ops: Vec<u32>,
     pub attrs: Vec<u32>,
-    /// Attribute values, heading ids and texts, fallback HTML.
+    /// Attribute values, heading ids and heading texts.
     pub strings: String,
     /// The document's text in document order, with a separator between blocks.
     /// TEXT operations index into this, and the search runs on it directly
     /// (docs/decisions/007, P2.4).
     pub text: String,
-    /// 9 words per section: opStart, opCount, flags, hashLow, hashHigh,
-    /// htmlOffset, htmlLen, textStart, textLen. The HTML is present only for
-    /// fallback sections.
+    /// Top-level flow elements, `BLOCK_WORDS` words each: tag, opStart,
+    /// opCount, textStart, textLen. The block plan is built straight from this
+    /// (SPEC.md, section 5), and the per-block text range is what maps a search
+    /// hit and a selection position onto a block (SPEC.md, section 8).
+    pub blocks: Vec<u32>,
+    /// `SECTION_WORDS` words per section.
     pub sections: Vec<u32>,
     /// 6 words per heading: level, idOffset, idLen, sectionIndex, textOffset,
     /// textLen.
     pub headings: Vec<u32>,
+    /// Whether the document contained raw HTML shown as source text. The view
+    /// uses it for the single quiet notice SPEC.md, section 6 asks for.
+    pub raw_html: bool,
 }
 
 struct Heading {
@@ -80,6 +89,9 @@ struct Builder {
     in_head: bool,
     image: Option<(String, String, String)>,
     image_depth: usize,
+    /// Raw HTML of the block being collected, shown as source text on end.
+    html_block: Option<String>,
+    raw_html: bool,
 }
 
 fn tag_id(name: &str) -> u32 {
@@ -123,6 +135,8 @@ impl Builder {
             in_head: false,
             image: None,
             image_depth: 0,
+            html_block: None,
+            raw_html: false,
         }
     }
     fn open(&mut self, tag: u32) {
@@ -152,6 +166,28 @@ impl Builder {
             Some(image) => image.2.push_str(value),
             None => self.enc.text(value),
         }
+    }
+    /// Raw HTML is not expressible as operations and is not interpreted. It is
+    /// shown verbatim, monospace and set apart, exactly like a code block
+    /// (SPEC.md, section 6). The class is what lets the view mark it as source
+    /// rather than as the author's own code.
+    fn raw_block(&mut self, value: &str) {
+        let value = value.trim_end_matches('\n');
+        if value.is_empty() {
+            return;
+        }
+        self.raw_html = true;
+        self.open(TAG_PRE);
+        self.open_with(TAG_CODE, &[(ATTR_CLASS, "raw-html")]);
+        self.text(value);
+        self.enc.close();
+        self.enc.close();
+    }
+    fn raw_inline(&mut self, value: &str) {
+        self.raw_html = true;
+        self.open_with(TAG_CODE, &[(ATTR_CLASS, "raw-html")]);
+        self.text(value);
+        self.enc.close();
     }
 
     fn start(&mut self, tag: &Tag<'_>) {
@@ -258,7 +294,7 @@ impl Builder {
                 ));
                 self.image_depth += 1;
             }
-            Tag::HtmlBlock => {}
+            Tag::HtmlBlock => self.html_block = Some(String::new()),
             // Unreachable with `options()`; refusing beats guessing.
             _ => self.open(TAG_P),
         }
@@ -290,7 +326,11 @@ impl Builder {
                     self.void(TAG_IMG, &attributes);
                 }
             }
-            TagEnd::HtmlBlock => {}
+            TagEnd::HtmlBlock => {
+                if let Some(html) = self.html_block.take() {
+                    self.raw_block(&html);
+                }
+            }
             _ => self.enc.close(),
         }
     }
@@ -349,7 +389,12 @@ impl Builder {
                 self.enc.close();
                 self.enc.close();
             }
-            // Raw HTML never reaches here: such sections take the HTML path.
+            Event::Html(html) => match self.html_block.as_mut() {
+                Some(buffer) => buffer.push_str(html),
+                // Raw HTML outside a block wrapper still gets its own block.
+                None => self.raw_block(html),
+            },
+            Event::InlineHtml(html) => self.raw_inline(html),
             _ => {}
         }
     }
@@ -381,72 +426,34 @@ fn heading_text(events: &[Event<'_>]) -> String {
 
 /// Parses `source` into the op buffer the renderer replays.
 pub fn parse(source: &str) -> OpDocument {
-    // Raw HTML that leaves a container open cannot be split at all: a section
-    // boundary would change the tree the HTML parser builds. Deciding this needs
-    // one extra pass, which costs single-digit milliseconds per MiB.
-    let mut allow_split = true;
-    for event in Parser::new_ext(source, options()) {
-        if let Event::Html(html) | Event::InlineHtml(html) = event {
-            if !boundary::is_closed_html(&html) {
-                allow_split = false;
-                break;
-            }
-        }
-    }
-
     let mut builder = Builder::new();
     let mut events: Vec<Event<'_>> = Vec::new();
     let mut depth = 0usize;
     let mut size = 0usize;
-    let mut raw = false;
     let mut heading_start: Option<usize> = None;
 
-    let flush = |builder: &mut Builder, events: &mut Vec<Event<'_>>, raw: &mut bool| {
+    // Raw HTML no longer constrains where a section may end: nothing downstream
+    // parses HTML, so no boundary can change a tree. The pre-pass that decided
+    // this — a second walk over the whole document — is gone with it.
+    let flush = |builder: &mut Builder, events: &mut Vec<Event<'_>>| {
         if events.is_empty() {
             return;
         }
         let op_start = (builder.enc.ops.len() / 4) as u32;
-        let text_start = builder.enc.text_units();
-        if *raw {
-            let mut html = String::new();
-            pulldown_cmark::html::push_html(&mut html, events.drain(..));
-            builder.enc.hash_bytes(html.as_bytes());
-            let hash = builder.enc.take_hash();
-            let (offset, length) = builder.enc.reference(&html);
-            // A section the renderer sanitizes contributes no operations, so it
-            // contributes no searchable text either; the separator keeps the
-            // neighbouring sections' text from running together.
-            builder.enc.separate();
-            builder.sections.extend_from_slice(&[
-                op_start,
-                0,
-                SECTION_FALLBACK,
-                hash as u32,
-                (hash >> 32) as u32,
-                offset,
-                length,
-                text_start,
-                builder.enc.text_units() - text_start,
-            ]);
-        } else {
-            for event in events.iter() {
-                builder.event(event);
-            }
-            events.clear();
-            let (ops_end, hash) = builder.enc.end_section();
-            builder.sections.extend_from_slice(&[
-                op_start,
-                ops_end as u32 - op_start,
-                0,
-                hash as u32,
-                (hash >> 32) as u32,
-                0,
-                0,
-                text_start,
-                builder.enc.text_units() - text_start,
-            ]);
+        let text_start = builder.enc.text_len();
+        for event in events.iter() {
+            builder.event(event);
         }
-        *raw = false;
+        events.clear();
+        let (ops_end, hash) = builder.enc.end_section();
+        builder.sections.extend_from_slice(&[
+            op_start,
+            ops_end as u32 - op_start,
+            hash as u32,
+            (hash >> 32) as u32,
+            text_start,
+            builder.enc.text_len() - text_start,
+        ]);
     };
 
     for event in Parser::new_ext(source, options()) {
@@ -475,16 +482,15 @@ pub fn parse(source: &str) -> OpDocument {
                 }
             }
             Event::End(_) => depth -= 1,
-            Event::Html(_) | Event::InlineHtml(_) => raw = true,
             _ => {}
         }
         events.push(event);
-        if depth == 0 && size >= SECTION_BUDGET && allow_split {
-            flush(&mut builder, &mut events, &mut raw);
+        if depth == 0 && size >= SECTION_BUDGET {
+            flush(&mut builder, &mut events);
             size = 0;
         }
     }
-    flush(&mut builder, &mut events, &mut raw);
+    flush(&mut builder, &mut events);
 
     let mut document = OpDocument {
         sections: std::mem::take(&mut builder.sections),
@@ -503,6 +509,8 @@ pub fn parse(source: &str) -> OpDocument {
             text_len,
         ]);
     }
+    document.raw_html = builder.raw_html;
+    document.blocks = std::mem::take(&mut builder.enc.blocks);
     document.ops = std::mem::take(&mut builder.enc.ops);
     document.attrs = std::mem::take(&mut builder.enc.attrs);
     document.strings = std::mem::take(&mut builder.enc.strings);
