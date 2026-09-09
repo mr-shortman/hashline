@@ -172,14 +172,13 @@ ist kein Budget.
 Auswahlkriterium des Auftrags: grafische Viewer mit ähnlichem Umfang. Terminal-
 Programme und Editoren mit Vorschau fallen damit heraus.
 
-### Aufgenommen
+### Aufgenommen: vier Konkurrenten
 
 | Viewer | Technik | Warum |
 | --- | --- | --- |
 | **ViewMD** | C, md4c, GTK | Die aktuelle Latte. Installiert, mehrfach gemessen, in 009 als Maßstab gesetzt. |
 | **mdview** (beleon) | C++, md4c, litehtml, Cairo/Pango | Der architektonisch nächste Verwandte: dieselbe Textmaschinerie, ohne WebView. Eigenangabe 267–426 ms und 34–67 MB RSS. |
 | **md-viewer** (aydiler) | Rust, egui | Der einzige Kandidat mit demselben Anspruch: Tabs, Live-Reload, Viewport-Virtualisierung, Eigenangabe 60 fps bei über 100 000 Zeilen. Der eigentliche Wettbewerber. |
-| **MDVIEW MTX** (step-) | GTK3 | Gleiche Toolkit-Familie, eine Generation älter. Zeigt, was GTK selbst kostet. |
 | **Okular** | Qt, Discount-Backend | Kein Peer, sondern Referenz: das Programm, das auf vielen Rechnern ohnehin installiert ist. Als Obergrenze ausgewiesen, nicht als Ziel. |
 
 ### Nicht aufgenommen
@@ -194,7 +193,7 @@ Programme und Editoren mit Vorschau fallen damit heraus.
 
 ### Das praktische Problem
 
-**Installiert ist nur ViewMD.** Die übrigen vier müssen beschafft oder gebaut
+**Installiert ist nur ViewMD.** Die übrigen drei müssen beschafft oder gebaut
 werden. Ohne einen reproduzierbaren Beschaffungsschritt gibt es keinen
 Vergleichslauf, und ohne festgehaltene Version ist ein Vergleich in drei Monaten
 wertlos. Die Suite braucht deshalb `benchmarks/competitors.toml` mit Quelle,
@@ -223,7 +222,8 @@ laufen könnte.
 | `stages` | ✓ | – | `examples/measure` | 5 s |
 | `startup` | ✓ | ✓ | `startup-wayland.py` | 5 min |
 | `content` | ✓ | ✓ | **neu**, Mutter-ScreenCast | 3 min |
-| `memory` | ✓ | ✓ | `memory.py` | 10 min |
+| `memory` | ✓ | ✓ | `memory.py`, kurzes Fenster | 10 min |
+| `idle` | ✓ | ✓ | `memory.py`, 30-s-Fenster, n = 5 | 4 min |
 | `scroll` | ✓ | ✓ | `scroll-native.py` + `compositor.py` | 5 min |
 | `interaction` | ✓ | – | **neu** | 3 min |
 | `tabs` | ✓ | ✓ wo unterstützt | **neu** | 2 min |
@@ -232,16 +232,24 @@ laufen könnte.
 
 ### 5.2 Laufzeiten
 
+Gemessene Kosten je Lauf auf der Entwicklungsmaschine, kleine Fixture:
+`stages` 1 s, `startup` 4 s, `content` 6 s, `memory` 13 s, `scroll` 21 s,
+`idle` 38 s. Daraus die Laufzeiten für drei Fixtures und n = 30 (`idle` n = 5):
+
 | Aufruf | Dauer |
 | --- | ---: |
-| `bench` vollständig | ~33 min |
+| `bench --only content,memory,idle,scroll`, ein Renderer | ~1,25 h |
+| dieselbe Auswahl, `cairo` und `vulkan` | ~2,5 h |
 | `bench --quick` (n=5, eine Fixture) | ~3 min |
-| `bench --only startup` | ~5 min |
 | `bench --only stages` | 5 s |
-| `compare` vollständig, 6 Programme | ~2,5 h |
-| `compare --quick` | ~15 min |
-| `compare --only startup` | ~9 min |
+| `compare` dieselbe Auswahl, 5 Programme | ~6 h |
+| `compare` dieselbe Auswahl, n = 10 | ~2 h |
+| `compare --quick` | ~12 min |
 | `compare --only memory --viewers viewmd` | ~3 min |
+
+Das 30-Sekunden-Fenster für die Leerlauf-CPU ist der Grund, warum `memory` und
+`idle` getrennt sind. In einer Reihe mit n = 30 wären es 93 Minuten reines
+Warten für einen einzigen Zielwert, den ein einziges Fenster belegt.
 
 Der vollständige Vergleich ist zu lang für den Alltag — deshalb ist die
 Teilausführung keine Bequemlichkeit, sondern die Voraussetzung dafür, dass die
@@ -279,13 +287,34 @@ Diese Punkte blockieren die Suite und sind vor ihrem Bau zu erledigen:
    Projekts wiederholen.** Der Generator muss nach Rust, oder die Fixtures ins
    Repository. Ohne das ist jede Zielzahl unbelegbar. Das ist die einzige
    Voraussetzung, die alle anderen blockiert.
+
+   **Erledigt.** Der Generator ist als `benchmarks/generate.rs` nach Rust
+   portiert; `rustc` übersetzt ihn ohne Cargo und ohne Fremdkiste. Eingecheckt
+   ist `benchmarks/fixtures/metadata.json` mit Größe und SHA-256 aller 114
+   historischen Dateien, und `benchmarks/fixtures.py` prüft jede erzeugte Datei
+   dagegen, bevor sie eine vorhandene ersetzt. Die Inhalte der bisherigen Reihen
+   sind damit byteweise erhalten. Die Werkzeugkette prüft das bei jedem Lauf
+   mit.
 2. **Der Inhaltsnachweis fehlt** als Werkzeug, obwohl SPEC Abschnitt 9 ihn
    verlangt. Ohne ihn ist keine `cairo`-Startzeit als „erste lesbare
    Darstellung" verwendbar, siehe Abschnitt 1.
+
+   **Erledigt.** `benchmarks/content.py` nimmt den Monitor über
+   `org.gnome.Mutter.ScreenCast` auf und weist den Dokumenttext im Einzelbild
+   per OCR nach; die Startmessung meldet nur noch `readableUpperMs`, eine
+   Obergrenze mit Nachweis, und ohne Nachweis kein Ergebnis. Der Nachweis trägt
+   auch `reload`, `interaction` und `tabs`. Gemessen wurde er auf allen fünf
+   Programmen des Vergleichs.
 3. **Die Renderer-Entscheidung steht aus.** `cairo` gegen Vulkan entscheidet über
    rund 53 MiB Speicher und mehr als 100 ms Startzeit, und die Frametimes von
    `cairo` kennt niemand. Bis das gemessen ist, sind die Zielwerte aus
    Abschnitt 3 nicht abnehmbar.
+
+   **Entschieden für `cairo`**, siehe [015](015-renderer-choice.md): Start und
+   Speicher trennen beide deutlich — 515 gegen 939 ms bis zum lesbaren Text,
+   43,0 gegen 156,5 MiB PSS —, die Scrollqualität spricht mit 93,2 gegen 98,3 %
+   für Vulkan. Der Abstand beim Speicher wiegt schwerer. Die Reihe mit n = 30
+   bei 60 und 120 Hz steht noch aus; sie bestätigt die Wahl oder kehrt sie um.
 
 Zwei Punkte der ursprünglichen Liste sind inzwischen erledigt: `memory.py` und
 `startup-wayland.py` sind committet, und `benchmarks/REFERENCE.md` ist mit den
