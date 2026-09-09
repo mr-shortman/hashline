@@ -17,6 +17,13 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import tempfile
+import shutil
+import signal
+import re
+from memory import PrivateBus, ISOLATION
+from content import Capture, EXPECTED
+from presentation import analyze
 
 from gi.repository import Gio, GLib
 
@@ -107,6 +114,7 @@ def main():
     parser.add_argument('--reverse-after', type=float, default=2.0,
                         help='seconds before the scroll direction flips')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--content-proof', action='store_true')
     parser.add_argument('--schema-dir', type=Path, default=Path('target/schemas'))
     args = parser.parse_args()
     if args.output.exists():
@@ -125,8 +133,9 @@ def main():
     environment = {
         **os.environ,
         'HASHLINE_MONITOR': args.connector,
-        'GSETTINGS_SCHEMA_DIR': str(args.schema_dir.resolve()),
     }
+    if args.schema_dir.exists():
+        environment['GSETTINGS_SCHEMA_DIR'] = str(args.schema_dir.resolve())
     record = {
         'binary': args.binary,
         'fixture': args.fixture,
@@ -139,8 +148,23 @@ def main():
                   'monotonic boundaries bound an interior window in an external '
                   'compositor trace. Nothing in the application is instrumented.',
     }
-    application = subprocess.Popen([args.binary, args.fixture], env=environment,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    bus = PrivateBus()
+    home = tempfile.mkdtemp(prefix='hashline-scroll-')
+    environment.update(ISOLATION)
+    environment['DBUS_SESSION_BUS_ADDRESS'] = bus.address
+    for name in ('CONFIG', 'DATA', 'CACHE', 'STATE'):
+        directory = Path(home) / name.lower()
+        directory.mkdir()
+        environment[f'XDG_{name}_HOME'] = str(directory)
+    pointer_setup = Pointer(args.connector)
+    pointer_setup.to(width / 2, height / 2)
+    pointer_setup.close()
+    capture = Capture(args.connector) if args.content_proof else None
+    protocol = args.output.with_suffix('.wayland.log').open('w+')
+    environment.update(WAYLAND_DEBUG='1', HASHLINE_BENCH_METADATA='1')
+    launched = time.monotonic_ns()
+    application = subprocess.Popen([args.binary, args.fixture], env=environment, start_new_session=True,
+                                   stdout=subprocess.DEVNULL, stderr=protocol)
     pointer = None
     try:
         # The window has to exist and have settled before the interior window
@@ -148,9 +172,16 @@ def main():
         time.sleep(args.settle)
         if application.poll() is not None:
             record['error'] = 'application exited before scrolling (handed off?)'
-            record['stderr'] = application.stderr.read().decode(errors='replace')[-2000:]
+            protocol.seek(0)
+            record['stderr'] = protocol.read()[-2000:]
             args.output.write_text(json.dumps(record, indent=2) + '\n')
             return 1
+        if capture:
+            capture.close()
+            record['contentProof'] = capture.proof(launched, EXPECTED[Path(args.fixture).stem], args.output.parent / 'content')
+            if not record['contentProof']['contentVerified']:
+                raise RuntimeError('No document text before scrolling')
+            time.sleep(1)
         pointer = Pointer(args.connector)
         # Where the window sits cannot be read back: Wayland tells a client
         # nothing about its own position, and screenshots are not available on
@@ -239,11 +270,30 @@ def main():
     finally:
         if pointer is not None:
             pointer.close()
-        application.terminate()
+        try:
+            os.killpg(application.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
         try:
             application.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            application.kill()
+            os.killpg(application.pid, signal.SIGKILL)
+            application.wait()
+        if capture:
+            capture.close()
+        protocol.seek(0)
+        trace = protocol.read()
+        protocol.close()
+        metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', trace)
+        record['rendererObserved'] = metadata[1] if metadata else 'unknown'
+        record['backendObserved'] = metadata[2] if metadata else 'unknown'
+        try:
+            record['applicationPresentation'] = analyze(trace, record.get('raw', []), args.refresh_hz)
+            record['applicationPresentation']['contentVerified'] = bool(record.get('contentProof', {}).get('contentVerified'))
+        except ValueError as error:
+            record['applicationPresentation'] = {'applicationFramesVerified': False, 'reason': str(error)}
+        bus.stop()
+        shutil.rmtree(home, ignore_errors=True)
         args.output.write_text(json.dumps(record, indent=2) + '\n')
     return 0 if record.get('complete') else 1
 

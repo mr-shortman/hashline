@@ -1,0 +1,79 @@
+# Source locks reviewed 2026-09-09. Local builds never install desktop defaults.
+# Declared capabilities are hypotheses; only successful observations are results.
+[viewers.viewmd]
+name = "ViewMD"
+role = "peer"
+source = "https://github.com/rabfulton/ViewMD.git"
+revision = "effa68576210604a5d0e9725f013397f1d05f7e5"
+version = "0.1.3"
+directory = "viewmd"
+build = [["make"]]
+binary = "viewmd"
+system_binary = "/usr/bin/viewmd"
+package = "viewmd"
+package_version = "0.1.3"
+args = []
+renderer = "GTK3/Cairo (declared)"
+backend = "Wayland"
+reload = false
+tabs = false
+dependencies = ["make", "pkg-config", "libgtk-3-dev"]
+
+[viewers.mdview]
+name = "mdview (beleon)"
+role = "peer"
+source = "https://codefloe.com/beleon/mdview.git"
+revision = "91ad2c0f189dd6a22f3b3ee9939d419a85ce9226"
+version = "1.1.1"
+directory = "mdview-source"
+build = [["cmake", "-B", "build", "-DCMAKE_BUILD_TYPE=Release"], ["cmake", "--build", "build", "-j4"]]
+binary = "build/mdview"
+args = ["--foreground"]
+renderer = "Cairo/wl_shm (declared)"
+backend = "Wayland"
+reload = true
+tabs = false
+dependencies = ["cmake", "libwayland-dev", "wayland-protocols", "libxkbcommon-dev", "libcairo2-dev", "libpango1.0-dev", "libgdk-pixbuf-2.0-dev"]
+
+[viewers.md-viewer]
+name = "md-viewer (aydiler)"
+role = "peer"
+source = "https://github.com/aydiler/md-viewer.git"
+revision = "d5e3229c18c48f31dce94257bbeb4d4a52c6cc45"
+version = "0.2.0"
+directory = "md-viewer"
+build = [["cargo", "build", "--release", "--locked", "-j4"]]
+binary = "target/release/md-viewer"
+args = ["--foreground"]
+renderer = "egui/glow OpenGL (declared)"
+backend = "Wayland"
+reload = true
+tabs = true
+tab_keys = [65507, 65289]
+dependencies = ["cargo", "pkg-config", "libxkbcommon-dev", "libssl-dev", "libfontconfig-dev"]
+
+[viewers.okular]
+name = "Okular"
+role = "reference"
+source = "https://invent.kde.org/graphics/okular"
+version = "25.12.3"
+package = "okular"
+package_version = "4:25.12.3-0ubuntu1"
+extra_packages = ["okular-extra-backends=4:25.12.3-0ubuntu1"]
+system_binary = "/usr/bin/okular"
+binary = "usr/bin/okular"
+directory = "okular"
+args = ["--unique"]
+renderer = "Qt raster (declared)"
+backend = "Wayland"
+reload = true
+tabs = false
+dependencies = ["okular-extra-backends (Markdown/Discount backend)"]
+
+# Measurement tools are pinned like the viewers. The content proof reads pixels
+# with this exact OCR build; a different one would change what counts as legible.
+[tools.ocr]
+name = "Tesseract OCR"
+directory = "ocr"
+packages = ["tesseract-ocr=5.5.0-1build1", "tesseract-ocr-eng=1:4.1.0-2build1"]
+binary = "usr/bin/tesseract"

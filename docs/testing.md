@@ -61,11 +61,96 @@ cargo run --release -p hashline --example render -- SPEC.md /tmp/spec-dark.png 9
 
 ## Performance
 
-Die Fixtures liegen deterministisch unter `benchmarks/generated/` und bleiben
-unverändert, damit Reihen über den Stackwechsel hinweg vergleichbar sind
-(SPEC.md, Abschnitt 9). `benchmarks/generate.mjs` hat sie erzeugt und ist
-historisch: es braucht die entfernte Node-Toolchain und wird nicht mehr
-ausgeführt — neu zu generieren würde die Messreihe entwerten.
+### Fixtures
+
+Die Fixtures liegen unter `benchmarks/generated/` und stehen in `.gitignore`.
+Eingecheckt ist stattdessen `benchmarks/fixtures/metadata.json`: Name, Größe und
+SHA-256 jeder einzelnen Datei der bisherigen Reihen. `benchmarks/fixtures.py`
+erzeugt die Dateien mit `benchmarks/generate.rs` — einer einzelnen Datei, die
+`rustc` ohne Cargo, ohne Fremdkiste und ohne npm übersetzt — und vergleicht
+anschließend jedes Byte mit dem Manifest. Erzeugt wird zuerst daneben; eine
+Abweichung bricht ab, bevor eine vorhandene Fixture ersetzt wird. Damit bleiben
+alte und neue Messreihen vergleichbar (SPEC.md, Abschnitt 9), und ein frischer
+Klon kommt ohne die entfernte Node-Toolchain zu denselben Dokumenten. Der alte
+Erzeuger `generate.mjs` ist entfernt; er brauchte `marked` und `jsdom` aus npm.
+
+```sh
+python3 benchmarks/fixtures.py           # erzeugen und prüfen
+python3 benchmarks/fixtures.py --check   # nur prüfen
+```
+
+`generate.rs` bindet die PNG-Bilder der Bildfixtures über die Systembibliothek
+`zlib` ein; ein frischer Klon braucht dafür `zlib1g-dev`. `run.py` erzeugt
+fehlende Fixtures selbst, bevor es misst.
+
+### Ein Lauf für alles: `bench` und `compare`
+
+`benchmarks/run.py` fasst die Werkzeuge unten zu einer Messreihe zusammen.
+`bench` misst nur Hashline, `compare` zusätzlich die Programme aus
+`benchmarks/competitors.toml`. Beide teilen Messlogik, Budgets und Berichtsform;
+sie unterscheiden sich allein in der Auswahl.
+
+```sh
+python3 benchmarks/run.py bench --quick
+python3 benchmarks/run.py bench --only startup,memory --fixtures small,large
+python3 benchmarks/run.py compare --provision --out benchmarks/results/<lauf>
+```
+
+- `--only` wählt Gruppen: `stages`, `startup`, `content`, `memory`, `idle`,
+  `scroll`, `interaction`, `tabs`, `reload`, `stability`. `startup` meldet den ersten vom
+  Compositor ausgegebenen Frame aus den Wayland-Marken und braucht keine
+  Bildschirmaufnahme; `content` meldet den ersten Frame **mit Dokumenttext**.
+  Nur `content` trägt das Ziel „Start bis lesbarer Text" aus
+  [014](decisions/014-competitive-targets.md).
+- `--fixtures`, `--viewers` und `--renderers` wählen Dokumente, Programme und
+  GSK-Renderer. `--quick` bedeutet n=5 auf `small` und ist ausdrücklich **nicht**
+  abnahmefähig.
+- `memory` misst den Speicher in einem kurzen Fenster (`--sample-seconds`,
+  voreingestellt 5 s); der PSS-Median steht nach einer Sekunde fest. `idle` misst
+  die Leerlauf-CPU in dem 30-Sekunden-Fenster, das der Zielwert nennt
+  (`--idle-seconds`), und läuft dafür nur fünfmal (`--idle-repetitions`). Beide
+  Fenster dreißigmal zu wiederholen wäre über anderthalb Stunden reines Warten
+  für einen einzigen Zielwert.
+- `--plan` schreibt die geplante Matrix, ohne ein Fenster zu öffnen.
+- `--provision` beschafft Konkurrenzprogramme und Messwerkzeuge auf ihren
+  festgeschriebenen Ständen nach `benchmarks/.provision/`; ins System wird nichts
+  installiert.
+- `--refresh-hz` gilt für den **gesamten** Lauf und prüft nur die bereits
+  eingestellte Rate. 60 gegen 120 Hz sind zwei Läufe, keine Umschaltung im Lauf.
+
+Die Programme werden abwechselnd gemessen, ein Aufwärmdurchgang zählt nicht mit.
+Jeder Lauf schreibt fortlaufend `report.json` — Fixture-Hashes, Programmversion
+und -prüfsumme, angeforderter und beobachteter Renderer, Backend, Rohartefakte,
+Budgetdefinitionen — und daneben `report.md`. Läufe unter 30 Wiederholungen sind
+als nicht abnahmefähig ausgewiesen; fehlende, nicht unterstützte und
+diagnostische Ergebnisse bestehen nie ein Budget. Die Grenze von 30
+Wiederholungen gilt für Zeitreihen; `idle` belegt seinen Zielwert durch die
+Länge des Fensters und braucht fünf. Gruppen ohne Zielwert — `stages` und
+`startup` — müssen vollständig sein, tragen aber keine Abnahme; ein Lauf, der
+nur aus ihnen besteht, ist nie eine. Okular steht als eigene
+Referenz in einem eigenen Abschnitt des Berichts, nicht unter den Konkurrenten.
+
+### Inhaltsnachweis
+
+Ein Fenster erscheint, bevor es Text zeigt; eine Startzeit ohne Inhaltsnachweis
+misst deshalb möglicherweise ein leeres Fenster. `benchmarks/content.py` nimmt
+den Monitor über `org.gnome.Mutter.ScreenCast` und PipeWire auf und sucht in den
+Einzelbildern per OCR nach Textstellen, die nur im geöffneten Dokument
+vorkommen. `readableUpperMs` ist die Empfangszeit des ersten solchen Bildes:
+eine konservative Obergrenze einschließlich Aufnahme- und Erkennungsweg, kein
+Scanout-Zeitstempel. Vor dem Start wartet das Werkzeug, bis der Text **nicht**
+mehr auf dem Bildschirm steht — das Fenster der vorigen Messung kann noch
+gezeichnet sein —, und bricht ab, wenn er nicht verschwindet. Enthält danach ein
+Bild vor dem Reiz den gesuchten Text, ist der Lauf ungültig statt schnell. Die
+Erkennung läuft vor dem Start und nach dem Beenden der Anwendung, nie
+währenddessen, und kann die Messung deshalb nicht ausbremsen.
+
+Die OCR ist auf einen genauen Paketstand festgelegt und wird nicht ins System
+installiert:
+
+```sh
+python3 benchmarks/provision.py --tools
+```
 
 Der eigene Anteil an der Öffnungszeit — Parsen, Blockplan, erstes Setzen —
 getrennt instrumentiert, ohne Fenster:
@@ -124,10 +209,10 @@ lesbar sein; fehlende Werte dürfen nicht als Nullverbrauch gelten.
 
 ### Scroll-Frametimes
 
-> **Achtung:** `compositor.py` stellt zur Messung vorübergehend die
-> Bildwiederholrate des primären Monitors um und setzt sie danach zurück. Bei
-> einem Wechsel auf 120 Hz kann der Bildschirm mehrfach kurz schwarz werden.
-> Nicht während anderer Arbeit ausführen.
+`compositor.py` liest die bestehende Bildwiederholrate ausschließlich aus und
+ändert keine Monitorkonfiguration. `--refresh-hz` ist optional und prüft nur,
+ob die angegebene Rate bereits aktiv ist; eine Abweichung bricht den Lauf ab.
+Automatische 60/120-Hz-Wechsel sind auf Wunsch des Nutzers ausgeschlossen.
 
 Der Reiz ist echte Zeigereingabe über `org.gnome.Mutter.RemoteDesktop`; in der
 Anwendung ist nichts instrumentiert. `scroll-native.py` sucht das Fenster,
@@ -138,7 +223,7 @@ liegt und Ruhe statt Scrollen gemessen wird.
 
 ```sh
 python3 benchmarks/compositor.py ./target/release/hashline \
-    benchmarks/generated/large.md --refresh-hz 60 --seconds 12 \
+    benchmarks/generated/large.md --seconds 12 \
     --output-prefix benchmarks/results/<lauf>/scroll-60
 sysprof-cat --no-callgraph --no-counters benchmarks/results/<lauf>/scroll-60.syscap \
     > benchmarks/results/<lauf>/scroll-60.dump

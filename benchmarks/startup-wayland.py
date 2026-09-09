@@ -103,13 +103,13 @@ def run(command: list[str], bus: str, hold: float, quiet_ms: float) -> dict:
     # before the first frame, and the client blocks writing it instead of
     # drawing. That silently moves the very moment being measured.
     with tempfile.TemporaryFile("w+", errors="replace") as sink:
+        started = realtime_ms()
         with subprocess.Popen(
             command,
             stdout=subprocess.DEVNULL,
             stderr=sink,
             env=environment,
         ) as process:
-            started = realtime_ms()
             time.sleep(hold)
             process.send_signal(signal.SIGTERM)
             try:

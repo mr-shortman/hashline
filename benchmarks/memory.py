@@ -35,6 +35,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
+import re
 import statistics
 import subprocess
 import sys
@@ -112,6 +114,7 @@ def measure(binary, fixture, bus, renderer, settle, seconds, home):
     environ = dict(os.environ)
     environ.update(ISOLATION)
     environ['DBUS_SESSION_BUS_ADDRESS'] = bus.address
+    environ['HASHLINE_BENCH_METADATA'] = '1'
     # A run must not read or write the desktop's own preferences, and must not
     # inherit a reading position from an earlier one.
     for name, directory in (('XDG_CONFIG_HOME', 'config'), ('XDG_DATA_HOME', 'data'),
@@ -125,8 +128,13 @@ def measure(binary, fixture, bus, renderer, settle, seconds, home):
         environ.pop('GSK_RENDERER', None)
 
     command = [str(binary)] + ([str(fixture)] if fixture else [])
-    application = subprocess.Popen(command, env=environ,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log = tempfile.TemporaryFile(mode='w+')
+    try:
+        application = subprocess.Popen(command, env=environ, start_new_session=True,
+                                       stdout=subprocess.DEVNULL, stderr=log)
+    except BaseException:
+        log.close()
+        raise
     row = {
         'fixture': str(fixture) if fixture else None,
         'bytes': Path(fixture).stat().st_size if fixture else None,
@@ -146,11 +154,20 @@ def measure(binary, fixture, bus, renderer, settle, seconds, home):
         row['isolated'] = not set(row['pids']) & set(row['busActivatedPids'])
         row['alive'] = application.poll() is None
     finally:
-        application.terminate()
+        try:
+            os.killpg(application.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
         try:
             application.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            application.kill()
+            os.killpg(application.pid, signal.SIGKILL)
+            application.wait()
+        log.seek(0)
+        metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', log.read())
+        row['rendererObserved'] = metadata[1] if metadata else 'unknown'
+        row['backendObserved'] = metadata[2] if metadata else 'unknown'
+        log.close()
     return row
 
 

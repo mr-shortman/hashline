@@ -168,6 +168,20 @@ impl Ui {
             .default_width(width)
             .default_height(height)
             .build();
+        // Optional benchmark provenance: a requested GSK renderer can fall back.
+        // Report the actual native renderer once it exists, never infer it from
+        // GSK_RENDERER. Normal launches do not install this handler.
+        if std::env::var_os("HASHLINE_BENCH_METADATA").is_some() {
+            window.connect_map(|window| {
+                if let Some(renderer) = window.renderer() {
+                    eprintln!(
+                        "HASHLINE_BENCH renderer={} backend={}",
+                        renderer.type_().name(),
+                        gtk::prelude::WidgetExt::display(window).type_().name()
+                    );
+                }
+            });
+        }
         if maximized {
             window.maximize();
         }

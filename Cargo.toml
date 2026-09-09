@@ -4,6 +4,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/markdown", "crates/hashline"]
+exclude = ["benchmarks/.provision/md-viewer"]
 
 [workspace.package]
 edition = "2021"

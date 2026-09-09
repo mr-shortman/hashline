@@ -1,10 +1,7 @@
-"""Capture GNOME Shell's Sysprof stream during real 60/120 Hz scroll runs.
+"""Capture GNOME Shell's Sysprof stream at the existing display mode.
 
-The stimulus comes from `scroll-native.py`, which drives the native reader with
-real Mutter input. Both run on the desktop session bus: the earlier separate
-test bus existed to isolate a WebDriver, and the native application has no
-script bridge to isolate. A requested display-mode change is temporary and
-restored in finally.
+DisplayConfig is read-only. This tool never switches or restores monitor modes.
+--refresh-hz, when provided, asserts the existing rate; a mismatch is an error.
 """
 import argparse
 import json
@@ -20,7 +17,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary')
     parser.add_argument('fixture')
-    parser.add_argument('--refresh-hz', type=float, required=True)
+    parser.add_argument('--refresh-hz', type=float, help='Assert current Hz without changing it')
+    parser.add_argument('--connector', help='Monitor connector; defaults to primary')
+    parser.add_argument('--content-proof', action='store_true')
+    parser.add_argument('--iterations', type=int, default=3)
     parser.add_argument('--seconds', type=float, default=12.0)
     parser.add_argument('--output-prefix', type=Path, required=True)
     args = parser.parse_args()
@@ -39,29 +39,22 @@ def main():
     def mode_map(state):
         return {spec[0]: next(mode[0] for mode in modes if mode[-1].get('is-current'))
                 for spec, modes, _ in state[1] if any(m[-1].get('is-current') for m in modes)}
-    def apply(state, modes):
-        logical = [(x, y, scale, transform, primary,
-                    [(spec[0], modes[spec[0]], {}) for spec in monitors])
-                   for x, y, scale, transform, primary, monitors, _ in state[2]]
-        properties = {'layout-mode': GLib.Variant('u', state[3]['layout-mode'])} if 'layout-mode' in state[3] else {}
-        display('ApplyMonitorsConfig', GLib.Variant('(uua(iiduba(ssa{sv}))a{sv})', (state[0], 1, logical, properties)))
     before = display('GetCurrentState')
     original = mode_map(before)
-    primary = next(row for row in before[2] if row[4])[5][0][0]
+    primary = args.connector or next(row for row in before[2] if row[4])[5][0][0]
+    if primary not in original:
+        parser.error('Requested connector has no current mode')
     available = next(modes for spec, modes, _ in before[1] if spec[0] == primary)
-    candidates = [mode for mode in available if abs(mode[3] - args.refresh_hz) < 1 and mode[1:3] == next(m[1:3] for m in available if m[0] == original[primary])]
-    if not candidates:
-        parser.error('Requested refresh rate is unavailable at the current resolution')
-    chosen = min(candidates, key=lambda mode: abs(mode[3] - args.refresh_hz))
+    chosen = next(mode for mode in available if mode[0] == original[primary])
+    if args.refresh_hz is not None and abs(chosen[3] - args.refresh_hz) >= 1:
+        parser.error(f'Current refresh is {chosen[3]:.3f} Hz; requested {args.refresh_hz}. No display change performed.')
     output = {'primaryConnector': primary, 'requestedRefreshHz': args.refresh_hz,
-              'selectedMode': chosen[0], 'before': before, 'complete': False,
-              'method': 'GNOME Shell org.gnome.Sysprof3.Profiler; temporary primary-monitor mode with finally restoration. Trace includes the compositor; app frame attribution must be verified during analysis.'}
-    changed = chosen[0] != original[primary]
+              'observedRefreshHz': chosen[3], 'selectedMode': chosen[0],
+              'before': before, 'complete': False, 'displayConfigurationChanged': False,
+              'method': 'GNOME Shell Sysprof capture at the existing monitor mode; DisplayConfig read-only.'}
     started = False
     fd = None
     try:
-        if changed:
-            apply(before, {**original, primary: chosen[0]})
         output['during'] = display('GetCurrentState')
         fd = os.open(capture_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         fds = Gio.UnixFDList.new()
@@ -72,7 +65,8 @@ def main():
         started = True
         result = subprocess.run([sys.executable, 'benchmarks/scroll-native.py', args.binary,
             args.fixture, '--connector', primary, '--refresh-hz', str(chosen[3]),
-            '--seconds', str(args.seconds), '--output', str(scroll_file)])
+            '--seconds', str(args.seconds), '--iterations', str(args.iterations), '--output', str(scroll_file),
+            *(['--content-proof'] if args.content_proof else [])])
         output['scrollExitCode'] = result.returncode
         output['complete'] = result.returncode == 0
     except Exception as error:
@@ -88,19 +82,14 @@ def main():
         if fd is not None:
             os.close(fd)
         try:
-            if changed:
-                current = display('GetCurrentState')
-                modes = mode_map(current)
-                # Restore only our own refresh change, respecting unrelated user changes.
-                if modes.get(primary) == chosen[0]:
-                    apply(current, {**modes, primary: original[primary]})
             output['after'] = display('GetCurrentState')
-            output['restored'] = mode_map(output['after']).get(primary) == original[primary]
+            output['modeUnchanged'] = mode_map(output['after']).get(primary) == original[primary]
         except Exception as error:
-            output['restoreError'] = str(error)
-            output['restored'] = False
+            output['displayReadError'] = str(error)
+            output['modeUnchanged'] = None
         state_file.write_text(json.dumps(output, indent=2) + '\n')
+    return 0 if output['complete'] else 1
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
