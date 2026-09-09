@@ -1207,17 +1207,34 @@ fn table(
     let columns = rows.iter().map(|row| row.len()).max().unwrap_or(0);
 
     // Natural width of each column, then a fair share of what is available.
+    //
+    // A width is measured once per distinct piece of cell text rather than once
+    // per cell. A table's cells repeat — the 100×101 fixture holds two distinct
+    // strings in ten thousand cells — and one Pango layout per cell was most of
+    // the 53 ms this block used to cost against a 16 ms budget
+    // (docs/decisions/014-competitive-targets.md, section 3.3).
     let mut natural = vec![0.0f64; columns];
+    let mut measured: std::collections::HashMap<(bool, &str), f64> =
+        std::collections::HashMap::new();
     for row in &rows {
         for (index, cell) in row.iter().enumerate() {
-            let want = measure_width(
-                context,
-                if cell.header { &bold } else { &font },
-                &cell.compose.text,
-            );
+            let key = (cell.header, cell.compose.text.as_str());
+            let want = match measured.get(&key) {
+                Some(&width) => width,
+                None => {
+                    let width = measure_width(
+                        context,
+                        if cell.header { &bold } else { &font },
+                        &cell.compose.text,
+                    );
+                    measured.insert(key, width);
+                    width
+                }
+            };
             natural[index] = natural[index].max(want + 2.0 * pad_x);
         }
     }
+    drop(measured);
     let total: f64 = natural.iter().sum();
     let available = width - border * (columns as f64 + 1.0);
     let widths: Vec<f64> = if total <= available && total > 0.0 {
@@ -1241,6 +1258,14 @@ fn table(
         let mut x = border;
         for (index, cell) in row.into_iter().enumerate() {
             let column = widths.get(index).copied().unwrap_or(0.0);
+            // A table wider than the reading column is cut off at its right
+            // edge (docs/limitations.md), so the cells past that edge are never
+            // drawn. Setting them anyway is what made a hundred-column table
+            // cost a hundred columns instead of the ten that show.
+            if x > width {
+                x += column + border;
+                continue;
+            }
             let inner = (column - 2.0 * pad_x).max(20.0);
             let mut piece = cell.compose.finish(
                 context,

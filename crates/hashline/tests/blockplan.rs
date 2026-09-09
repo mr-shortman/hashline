@@ -267,7 +267,7 @@ fn text_without_a_single_space_is_still_cut_up() {
         "{} blocks for 200 000 characters",
         plan.len()
     );
-    assert!((0..plan.len()).all(|index| plan.block(index).text_len <= 4096));
+    assert!((0..plan.len()).all(|index| plan.block(index).text_len <= 2048));
 }
 
 #[test]

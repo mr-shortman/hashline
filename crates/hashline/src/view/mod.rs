@@ -3,6 +3,7 @@
 mod accessibility;
 mod document;
 mod images;
+pub(crate) mod mainthread;
 mod selection;
 
 pub use document::DocumentView;

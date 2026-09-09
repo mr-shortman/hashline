@@ -1,0 +1,1462 @@
+{
+  "environment": {
+    "binary": "/home/big-linus/gitpp/markdown-view/target/release/hashline",
+    "binarySha256": "a6d9fdca8a48a01cbb1dd21e8d34d182c5ffe1480a5a68729d9d1f93c44d379a",
+    "kernel": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "distribution": {
+      "NAME": "Ubuntu",
+      "ID": "ubuntu",
+      "PRETTY_NAME": "Ubuntu 26.04 LTS",
+      "VERSION_ID": "26.04",
+      "VERSION": "26.04 LTS (Resolute Raccoon)",
+      "VERSION_CODENAME": "resolute",
+      "ID_LIKE": "debian",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "UBUNTU_CODENAME": "resolute",
+      "LOGO": "ubuntu-logo"
+    },
+    "sessionType": "wayland",
+    "gdkBackend": null,
+    "loadAverage": [
+      0.2080078125,
+      0.84716796875,
+      1.021484375
+    ],
+    "competingHashlineProcesses": {
+      "command": [
+        "pgrep",
+        "-a",
+        "-x",
+        "hashline"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "desktopUnattendedVerified": false,
+    "cpu": {
+      "command": [
+        "lscpu"
+      ],
+      "exitCode": 0,
+      "stdout": "Architektur:                             x86_64\nCPU Operationsmodus:                     32-bit, 64-bit\nAdressgr\u00f6\u00dfen:                            48 bits physical, 48 bits virtual\nByte-Reihenfolge:                        Little Endian\nCPU(s):                                  24\nListe der Online-CPU(s):                 0-23\nAnbieterkennung:                         AuthenticAMD\nModellname:                              AMD Ryzen 9 9900X 12-Core Processor\nProzessorfamilie:                        26\nModell:                                  68\nThread(s) pro Kern:                      2\nKern(e) pro Sockel:                      12\nSockel:                                  1\nStepping:                                0\n\u00dcbertaktung:                             aktiviert\nSkalierung der CPU(s):                   38%\nMaximale Taktfrequenz der CPU:           5662,0161\nMinimale Taktfrequenz der CPU:           613,9540\nBogoMIPS:                                8799,76\nMarkierungen:                            fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualisierung:                         AMD-V\nL1d Cache:                               576 KiB (12 Instanzen)\nL1i Cache:                               384 KiB (12 Instanzen)\nL2 Cache:                                12 MiB (12 Instanzen)\nL3 Cache:                                64 MiB (2 Instanzen)\nNUMA-Knoten:                             1\nNUMA-Knoten0 CPU(s):                     0-23\nSchwachstelle Gather data sampling:      Not affected\nSchwachstelle Ghostwrite:                Not affected\nSchwachstelle Indirect target selection: Not affected\nSchwachstelle Itlb multihit:             Not affected\nSchwachstelle L1tf:                      Not affected\nSchwachstelle Mds:                       Not affected\nSchwachstelle Meltdown:                  Not affected\nSchwachstelle Mmio stale data:           Not affected\nSchwachstelle Old microcode:             Not affected\nSchwachstelle Reg file data sampling:    Not affected\nSchwachstelle Retbleed:                  Not affected\nSchwachstelle Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nSchwachstelle Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nSchwachstelle Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nSchwachstelle Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nSchwachstelle Srbds:                     Not affected\nSchwachstelle Tsa:                       Not affected\nSchwachstelle Tsx async abort:           Not affected\nSchwachstelle Vmscape:                   Mitigation; IBPB on VMEXIT",
+      "stderr": ""
+    },
+    "memory": "MemTotal:       31967208 kB\nMemFree:         6565444 kB\nMemAvailable:   24847756 kB\nBuffers:          793148 kB\nCached:         17974056 kB\nSwapCached:            0 kB\nActive:         10791196 kB\nInactive:       12174132 kB\nActive(anon):    5374348 kB\nInactive(anon):        0 kB\nActive(file):    5416848 kB\nInactive(file): 12174132 kB\nUnevictable:          32 kB\nMlocked:              32 kB\nSwapTotal:       8388604 kB\nSwapFree:        8388604 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              6636 kB\nWriteback:             0 kB\nAnonPages:       4198628 kB\nMapped:          1995380 kB\nShmem:           1176572 kB\nKReclaimable:    1157540 kB\nSlab:            1305108 kB\nSReclaimable:     865148 kB\nSUnreclaim:       439960 kB\nKernelStack:       30816 kB\nPageTables:        80384 kB\nSecPageTables:      5848 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    24372208 kB\nCommitted_AS:   29456112 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      122816 kB\nVmallocChunk:          0 kB\nPercpu:            38880 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    802816 kB\nFilePmdMapped:      2048 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     1468244 kB\nDirectMap2M:    18089984 kB\nDirectMap1G:    13631488 kB\n",
+    "graphics": {
+      "command": [
+        "lspci",
+        "-nn"
+      ],
+      "exitCode": 0,
+      "stdout": "00:00.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Root Complex [1022:14d8]\n00:00.2 IOMMU [0806]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge IOMMU [1022:14d9]\n00:01.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:01.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:02.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.2 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:03.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:04.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:08.3 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:14.0 SMBus [0c05]: Advanced Micro Devices, Inc. [AMD] FCH SMBus Controller [1022:790b] (rev 71)\n00:14.3 ISA bridge [0601]: Advanced Micro Devices, Inc. [AMD] FCH LPC Bridge [1022:790e] (rev 51)\n00:18.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 0 [1022:14e0]\n00:18.1 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 1 [1022:14e1]\n00:18.2 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 2 [1022:14e2]\n00:18.3 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 3 [1022:14e3]\n00:18.4 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 4 [1022:14e4]\n00:18.5 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 5 [1022:14e5]\n00:18.6 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 6 [1022:14e6]\n00:18.7 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 7 [1022:14e7]\n01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA106 [GeForce RTX 3060 Lite Hash Rate] [10de:2504] (rev a1)\n01:00.1 Audio device [0403]: NVIDIA Corporation GA106 High Definition Audio Controller [10de:228e] (rev a1)\n02:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Upstream Port [1022:43f4] (rev 01)\n03:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:08.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:09.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0a.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0b.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0c.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0d.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n07:00.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller [10ec:8125] (rev 05)\n09:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset USB 3.2 Controller [1022:43f7] (rev 01)\n0a:00.0 SATA controller [0106]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset SATA Controller [1022:43f6] (rev 01)\n0b:00.0 Non-Volatile memory controller [0108]: Samsung Electronics Co Ltd NVMe SSD Controller SM981/PM981/PM983 [144d:a808]\n0c:00.0 Non-Essential Instrumentation [1300]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge PCIe Dummy Function [1022:14de] (rev c2)\n0c:00.2 Encryption controller [1080]: Advanced Micro Devices, Inc. [AMD] Family 19h PSP/CCP [1022:1649]\n0c:00.3 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b6]\n0c:00.4 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b7]\n0c:00.6 Audio device [0403]: Advanced Micro Devices, Inc. [AMD] Ryzen HD Audio Controller [1022:15e3]\n0d:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 2.0 xHCI [1022:15b8]",
+      "stderr": ""
+    },
+    "storage": {
+      "command": [
+        "lsblk",
+        "-d",
+        "-o",
+        "NAME,MODEL,ROTA,SIZE"
+      ],
+      "exitCode": 0,
+      "stdout": "NAME    MODEL                     ROTA    SIZE\nloop0                                0   55,5M\nloop1                                0  519,4M\nloop2                                0      4K\nloop3                                0  521,1M\nloop4                                0   63,8M\nloop5                                0     74M\nloop6                                0     74M\nloop7                                0   66,8M\nloop8                                0   49,1M\nloop9                                0   66,8M\nloop10                               0   47,9M\nloop11                               0   19,6M\nloop12                               0     20M\nloop13                               0  266,9M\nloop14                               0  265,4M\nloop15                               0  257,7M\nloop16                               0  260,3M\nloop17                               0   16,5M\nloop18                               0  164,8M\nloop19                               0  349,7M\nloop20                               0  531,5M\nloop21                               0  606,1M\nloop22                               0  614,5M\nloop23                               0   91,7M\nloop24                               0   72,8M\nloop25                               0    395M\nloop26                               0    402M\nloop27                               0 1009,1M\nloop28                               0   18,8M\nloop29                               0   18,8M\nloop30                               0   73,8M\nloop31                               0   15,7M\nloop32                               0   11,8M\nloop33                               0   50,1M\nloop34                               0   50,3M\nloop35                               0    828K\nloop36                               0    828K\nloop37                               0  219,9M\nloop38                               0  221,1M\nloop39                               0  321,1M\nsda     Samsung SSD 870 QVO 1TB      0  931,5G\nnvme0n1 Samsung SSD 970 EVO 500GB    0  465,8G",
+      "stderr": ""
+    },
+    "webkit": {
+      "command": [
+        "dpkg-query",
+        "-W",
+        "libwebkit2gtk-4.1-0"
+      ],
+      "exitCode": 0,
+      "stdout": "libwebkit2gtk-4.1-0:amd64\t2.52.6-0ubuntu0.26.04.1",
+      "stderr": ""
+    },
+    "displays": {
+      "command": [
+        "gdbus",
+        "call",
+        "--session",
+        "--dest",
+        "org.gnome.Mutter.DisplayConfig",
+        "--object-path",
+        "/org/gnome/Mutter/DisplayConfig",
+        "--method",
+        "org.gnome.Mutter.DisplayConfig.GetCurrentState"
+      ],
+      "exitCode": 0,
+      "stdout": "(uint32 2, [(('DP-1', 'SNY', 'SONY TV', '0x01010101'), [('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@29.972', 1920, 1080, 29.971717834472656, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@23.977', 1920, 1080, 23.977373123168945, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1600x900@60.000', 1600, 900, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@29.972', 1280, 720, 29.971717834472656, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@23.976', 1280, 720, 23.975757598876953, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'Sony SONY TV'>, 'min-refresh-rate': <48>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>}), (('DP-3', 'GBT', 'G27FC', '0x0000110e'), [('1920x1080@165.003', 1920, 1080, 165.00346374511719, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@143.992', 1920, 1080, 143.99191284179688, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@119.982', 1920, 1080, 119.982177734375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@99.930', 1920, 1080, 99.930412292480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1440x900@59.887', 1440, 900, 59.887443542480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1440x576@50.000', 1440, 576, 50.0, 1.0, [1.0, 1.3333333730697632], {}), ('1440x480@59.940', 1440, 480, 59.940059661865234, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x1024@75.025', 1280, 1024, 75.024673461914062, 1.0, [1.0, 1.3333333730697632], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x960@60.000', 1280, 960, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@75.029', 1024, 768, 75.028579711914062, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@70.069', 1024, 768, 70.069358825683594, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@75.000', 800, 600, 75.0, 1.0, [1.0], {}), ('800x600@72.188', 800, 600, 72.187568664550781, 1.0, [1.0], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('800x600@56.250', 800, 600, 56.25, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'GIGA-BYTE TECHNOLOGY CO., LTD. 27\"'>, 'min-refresh-rate': <48>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>}), (('HDMI-1', 'ACI', 'VS248', 'J7LMQS050673'), [('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.988', 1920, 1080, 59.987873077392578, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1600x1200@60.000', 1600, 1200, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368, 2.0], {}), ('1440x900@59.887', 1440, 900, 59.887443542480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1366x768@59.790', 1366, 768, 59.789539337158203, 1.0, [1.0], {}), ('1280x1024@75.025', 1280, 1024, 75.024673461914062, 1.0, [1.0, 1.3333333730697632], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x960@60.000', 1280, 960, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@75.029', 1024, 768, 75.028579711914062, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@70.069', 1024, 768, 70.069358825683594, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@75.000', 800, 600, 75.0, 1.0, [1.0], {}), ('800x600@72.188', 800, 600, 72.187568664550781, 1.0, [1.0], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('800x600@56.250', 800, 600, 56.25, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'Ancor Communications Inc 24\"'>, 'min-refresh-rate': <50>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>})], [(985, 0, 1.0, uint32 0, false, [('DP-1', 'SNY', 'SONY TV', '0x01010101')], @a{sv} {}), (1920, 1080, 1.0, 0, false, [('HDMI-1', 'ACI', 'VS248', 'J7LMQS050673')], {}), (0, 1080, 1.0, 0, true, [('DP-3', 'GBT', 'G27FC', '0x0000110e')], {})], {'layout-mode': <uint32 1>, 'supports-changing-layout-mode': <true>})",
+      "stderr": ""
+    },
+    "installedPackage": {
+      "command": [
+        "dpkg-query",
+        "-W",
+        "hashline"
+      ],
+      "exitCode": 0,
+      "stdout": "hashline\t0.1.0-1",
+      "stderr": ""
+    },
+    "referenceVerified": false
+  },
+  "method": "One release process per fixture on a private session bus started beside it, not around it; recursive process-group PSS/CPU over /proc after settling. Portals, gvfs and dconf are kept off that bus and are therefore neither started by the run nor counted in it. No application instrumentation.",
+  "isolation": {
+    "GTK_USE_PORTAL": "0",
+    "GIO_USE_VFS": "local",
+    "GSETTINGS_BACKEND": "memory",
+    "NO_AT_BRIDGE": "1"
+  },
+  "otherInstancesAtStart": [],
+  "settleSeconds": 4.0,
+  "sampleSeconds": 4.0,
+  "rows": [
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006536338998557767,
+          "pids": [
+            227505
+          ],
+          "processIdentities": [
+            [
+              227505,
+              4218073
+            ]
+          ],
+          "pssKiB": 33684,
+          "cpuTicks": 19,
+          "cpuTicksByPid": {
+            "227505": 19
+          }
+        },
+        {
+          "seconds": 1.0130509810005606,
+          "pids": [
+            227505
+          ],
+          "processIdentities": [
+            [
+              227505,
+              4218073
+            ]
+          ],
+          "pssKiB": 33684,
+          "cpuTicks": 19,
+          "cpuTicksByPid": {
+            "227505": 19
+          }
+        },
+        {
+          "seconds": 2.0197178419984994,
+          "pids": [
+            227505
+          ],
+          "processIdentities": [
+            [
+              227505,
+              4218073
+            ]
+          ],
+          "pssKiB": 33684,
+          "cpuTicks": 19,
+          "cpuTicksByPid": {
+            "227505": 19
+          }
+        },
+        {
+          "seconds": 3.0262411839976266,
+          "pids": [
+            227505
+          ],
+          "processIdentities": [
+            [
+              227505,
+              4218073
+            ]
+          ],
+          "pssKiB": 33684,
+          "cpuTicks": 19,
+          "cpuTicksByPid": {
+            "227505": 19
+          }
+        },
+        {
+          "seconds": 4.032772033999208,
+          "pids": [
+            227505
+          ],
+          "processIdentities": [
+            [
+              227505,
+              4218073
+            ]
+          ],
+          "pssKiB": 33684,
+          "cpuTicks": 19,
+          "cpuTicksByPid": {
+            "227505": 19
+          }
+        }
+      ],
+      "pssKibMedian": 33684,
+      "pssKibMax": 33684,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.026235695000651,
+      "pids": [
+        227505
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006279791003180435,
+          "pids": [
+            227628
+          ],
+          "processIdentities": [
+            [
+              227628,
+              4218877
+            ]
+          ],
+          "pssKiB": 41677,
+          "cpuTicks": 25,
+          "cpuTicksByPid": {
+            "227628": 25
+          }
+        },
+        {
+          "seconds": 1.0126848170002631,
+          "pids": [
+            227628
+          ],
+          "processIdentities": [
+            [
+              227628,
+              4218877
+            ]
+          ],
+          "pssKiB": 41677,
+          "cpuTicks": 25,
+          "cpuTicksByPid": {
+            "227628": 25
+          }
+        },
+        {
+          "seconds": 2.018993601999682,
+          "pids": [
+            227628
+          ],
+          "processIdentities": [
+            [
+              227628,
+              4218877
+            ]
+          ],
+          "pssKiB": 41677,
+          "cpuTicks": 25,
+          "cpuTicksByPid": {
+            "227628": 25
+          }
+        },
+        {
+          "seconds": 3.025387915000465,
+          "pids": [
+            227628
+          ],
+          "processIdentities": [
+            [
+              227628,
+              4218877
+            ]
+          ],
+          "pssKiB": 41677,
+          "cpuTicks": 25,
+          "cpuTicksByPid": {
+            "227628": 25
+          }
+        },
+        {
+          "seconds": 4.03171472699978,
+          "pids": [
+            227628
+          ],
+          "processIdentities": [
+            [
+              227628,
+              4218877
+            ]
+          ],
+          "pssKiB": 41677,
+          "cpuTicks": 25,
+          "cpuTicksByPid": {
+            "227628": 25
+          }
+        }
+      ],
+      "pssKibMedian": 41677,
+      "pssKibMax": 41677,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.0254349359966,
+      "pids": [
+        227628
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.0066680969976005144,
+          "pids": [
+            227652
+          ],
+          "processIdentities": [
+            [
+              227652,
+              4219682
+            ]
+          ],
+          "pssKiB": 43237,
+          "cpuTicks": 23,
+          "cpuTicksByPid": {
+            "227652": 23
+          }
+        },
+        {
+          "seconds": 1.013190437999583,
+          "pids": [
+            227652
+          ],
+          "processIdentities": [
+            [
+              227652,
+              4219682
+            ]
+          ],
+          "pssKiB": 43237,
+          "cpuTicks": 23,
+          "cpuTicksByPid": {
+            "227652": 23
+          }
+        },
+        {
+          "seconds": 2.0195451409999805,
+          "pids": [
+            227652
+          ],
+          "processIdentities": [
+            [
+              227652,
+              4219682
+            ]
+          ],
+          "pssKiB": 43237,
+          "cpuTicks": 23,
+          "cpuTicksByPid": {
+            "227652": 23
+          }
+        },
+        {
+          "seconds": 3.025922422999429,
+          "pids": [
+            227652
+          ],
+          "processIdentities": [
+            [
+              227652,
+              4219682
+            ]
+          ],
+          "pssKiB": 43237,
+          "cpuTicks": 23,
+          "cpuTicksByPid": {
+            "227652": 23
+          }
+        },
+        {
+          "seconds": 4.032339457000489,
+          "pids": [
+            227652
+          ],
+          "processIdentities": [
+            [
+              227652,
+              4219682
+            ]
+          ],
+          "pssKiB": 43237,
+          "cpuTicks": 23,
+          "cpuTicksByPid": {
+            "227652": 23
+          }
+        }
+      ],
+      "pssKibMedian": 43237,
+      "pssKibMax": 43237,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.025671360002889,
+      "pids": [
+        227652
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006446239000069909,
+          "pids": [
+            227682
+          ],
+          "processIdentities": [
+            [
+              227682,
+              4220486
+            ]
+          ],
+          "pssKiB": 59524,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227682": 34
+          }
+        },
+        {
+          "seconds": 1.0127202020012191,
+          "pids": [
+            227682
+          ],
+          "processIdentities": [
+            [
+              227682,
+              4220486
+            ]
+          ],
+          "pssKiB": 59524,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227682": 34
+          }
+        },
+        {
+          "seconds": 2.0190223270001297,
+          "pids": [
+            227682
+          ],
+          "processIdentities": [
+            [
+              227682,
+              4220486
+            ]
+          ],
+          "pssKiB": 59524,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227682": 34
+          }
+        },
+        {
+          "seconds": 3.025656486999651,
+          "pids": [
+            227682
+          ],
+          "processIdentities": [
+            [
+              227682,
+              4220486
+            ]
+          ],
+          "pssKiB": 59524,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227682": 34
+          }
+        },
+        {
+          "seconds": 4.032127260001289,
+          "pids": [
+            227682
+          ],
+          "processIdentities": [
+            [
+              227682,
+              4220486
+            ]
+          ],
+          "pssKiB": 59524,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227682": 34
+          }
+        }
+      ],
+      "pssKibMedian": 59524,
+      "pssKibMax": 59524,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.025681021001219,
+      "pids": [
+        227682
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 0
+    },
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006126673000835581,
+          "pids": [
+            227706
+          ],
+          "processIdentities": [
+            [
+              227706,
+              4221291
+            ]
+          ],
+          "pssKiB": 33683,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227706": 18
+          }
+        },
+        {
+          "seconds": 1.012592394999956,
+          "pids": [
+            227706
+          ],
+          "processIdentities": [
+            [
+              227706,
+              4221291
+            ]
+          ],
+          "pssKiB": 33683,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227706": 18
+          }
+        },
+        {
+          "seconds": 2.0188004610026837,
+          "pids": [
+            227706
+          ],
+          "processIdentities": [
+            [
+              227706,
+              4221291
+            ]
+          ],
+          "pssKiB": 33683,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227706": 18
+          }
+        },
+        {
+          "seconds": 3.025314463000541,
+          "pids": [
+            227706
+          ],
+          "processIdentities": [
+            [
+              227706,
+              4221291
+            ]
+          ],
+          "pssKiB": 33683,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227706": 18
+          }
+        },
+        {
+          "seconds": 4.031627868000214,
+          "pids": [
+            227706
+          ],
+          "processIdentities": [
+            [
+              227706,
+              4221291
+            ]
+          ],
+          "pssKiB": 33683,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227706": 18
+          }
+        }
+      ],
+      "pssKibMedian": 33683,
+      "pssKibMax": 33683,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.025501194999379,
+      "pids": [
+        227706
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006064713998057414,
+          "pids": [
+            227729
+          ],
+          "processIdentities": [
+            [
+              227729,
+              4222095
+            ]
+          ],
+          "pssKiB": 41737,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227729": 34
+          }
+        },
+        {
+          "seconds": 1.0123090279994358,
+          "pids": [
+            227729
+          ],
+          "processIdentities": [
+            [
+              227729,
+              4222095
+            ]
+          ],
+          "pssKiB": 41737,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227729": 34
+          }
+        },
+        {
+          "seconds": 2.0185983419978584,
+          "pids": [
+            227729
+          ],
+          "processIdentities": [
+            [
+              227729,
+              4222095
+            ]
+          ],
+          "pssKiB": 41737,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227729": 34
+          }
+        },
+        {
+          "seconds": 3.024887747000321,
+          "pids": [
+            227729
+          ],
+          "processIdentities": [
+            [
+              227729,
+              4222095
+            ]
+          ],
+          "pssKiB": 41737,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227729": 34
+          }
+        },
+        {
+          "seconds": 4.031110340998566,
+          "pids": [
+            227729
+          ],
+          "processIdentities": [
+            [
+              227729,
+              4222095
+            ]
+          ],
+          "pssKiB": 41737,
+          "cpuTicks": 34,
+          "cpuTicksByPid": {
+            "227729": 34
+          }
+        }
+      ],
+      "pssKibMedian": 41737,
+      "pssKibMax": 41737,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.025045627000509,
+      "pids": [
+        227729
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.0062180029999581166,
+          "pids": [
+            227773
+          ],
+          "processIdentities": [
+            [
+              227773,
+              4222899
+            ]
+          ],
+          "pssKiB": 43284,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227773": 26
+          }
+        },
+        {
+          "seconds": 1.0124641389993485,
+          "pids": [
+            227773
+          ],
+          "processIdentities": [
+            [
+              227773,
+              4222899
+            ]
+          ],
+          "pssKiB": 43284,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227773": 26
+          }
+        },
+        {
+          "seconds": 2.0191167699995276,
+          "pids": [
+            227773
+          ],
+          "processIdentities": [
+            [
+              227773,
+              4222899
+            ]
+          ],
+          "pssKiB": 43284,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227773": 26
+          }
+        },
+        {
+          "seconds": 3.0256476899994595,
+          "pids": [
+            227773
+          ],
+          "processIdentities": [
+            [
+              227773,
+              4222899
+            ]
+          ],
+          "pssKiB": 43284,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227773": 26
+          }
+        },
+        {
+          "seconds": 4.032230131997494,
+          "pids": [
+            227773
+          ],
+          "processIdentities": [
+            [
+              227773,
+              4222899
+            ]
+          ],
+          "pssKiB": 43284,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227773": 26
+          }
+        }
+      ],
+      "pssKibMedian": 43284,
+      "pssKibMax": 43284,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.026012128997536,
+      "pids": [
+        227773
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006352921001962386,
+          "pids": [
+            227805
+          ],
+          "processIdentities": [
+            [
+              227805,
+              4223704
+            ]
+          ],
+          "pssKiB": 59646,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227805": 31
+          }
+        },
+        {
+          "seconds": 1.0127663960010977,
+          "pids": [
+            227805
+          ],
+          "processIdentities": [
+            [
+              227805,
+              4223704
+            ]
+          ],
+          "pssKiB": 59646,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227805": 31
+          }
+        },
+        {
+          "seconds": 2.0192847290018108,
+          "pids": [
+            227805
+          ],
+          "processIdentities": [
+            [
+              227805,
+              4223704
+            ]
+          ],
+          "pssKiB": 59646,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227805": 31
+          }
+        },
+        {
+          "seconds": 3.0257384720025584,
+          "pids": [
+            227805
+          ],
+          "processIdentities": [
+            [
+              227805,
+              4223704
+            ]
+          ],
+          "pssKiB": 59646,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227805": 31
+          }
+        },
+        {
+          "seconds": 4.032551610001974,
+          "pids": [
+            227805
+          ],
+          "processIdentities": [
+            [
+              227805,
+              4223704
+            ]
+          ],
+          "pssKiB": 59646,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227805": 31
+          }
+        }
+      ],
+      "pssKibMedian": 59646,
+      "pssKibMax": 59646,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.026198689000012,
+      "pids": [
+        227805
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 1
+    },
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline"
+      ],
+      "samples": [
+        {
+          "seconds": 0.00616620300206705,
+          "pids": [
+            227830
+          ],
+          "processIdentities": [
+            [
+              227830,
+              4224508
+            ]
+          ],
+          "pssKiB": 34050,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227830": 18
+          }
+        },
+        {
+          "seconds": 1.012400889001583,
+          "pids": [
+            227830
+          ],
+          "processIdentities": [
+            [
+              227830,
+              4224508
+            ]
+          ],
+          "pssKiB": 34050,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227830": 18
+          }
+        },
+        {
+          "seconds": 2.018831223002053,
+          "pids": [
+            227830
+          ],
+          "processIdentities": [
+            [
+              227830,
+              4224508
+            ]
+          ],
+          "pssKiB": 34050,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227830": 18
+          }
+        },
+        {
+          "seconds": 3.0251273159992706,
+          "pids": [
+            227830
+          ],
+          "processIdentities": [
+            [
+              227830,
+              4224508
+            ]
+          ],
+          "pssKiB": 34050,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227830": 18
+          }
+        },
+        {
+          "seconds": 4.031570350001857,
+          "pids": [
+            227830
+          ],
+          "processIdentities": [
+            [
+              227830,
+              4224508
+            ]
+          ],
+          "pssKiB": 34050,
+          "cpuTicks": 18,
+          "cpuTicksByPid": {
+            "227830": 18
+          }
+        }
+      ],
+      "pssKibMedian": 34050,
+      "pssKibMax": 34050,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.02540414699979,
+      "pids": [
+        227830
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.00645760000043083,
+          "pids": [
+            227863
+          ],
+          "processIdentities": [
+            [
+              227863,
+              4225313
+            ]
+          ],
+          "pssKiB": 41866,
+          "cpuTicks": 22,
+          "cpuTicksByPid": {
+            "227863": 22
+          }
+        },
+        {
+          "seconds": 1.0126866370010248,
+          "pids": [
+            227863
+          ],
+          "processIdentities": [
+            [
+              227863,
+              4225313
+            ]
+          ],
+          "pssKiB": 41866,
+          "cpuTicks": 22,
+          "cpuTicksByPid": {
+            "227863": 22
+          }
+        },
+        {
+          "seconds": 2.0188992240000516,
+          "pids": [
+            227863
+          ],
+          "processIdentities": [
+            [
+              227863,
+              4225313
+            ]
+          ],
+          "pssKiB": 41866,
+          "cpuTicks": 22,
+          "cpuTicksByPid": {
+            "227863": 22
+          }
+        },
+        {
+          "seconds": 3.0251470590010285,
+          "pids": [
+            227863
+          ],
+          "processIdentities": [
+            [
+              227863,
+              4225313
+            ]
+          ],
+          "pssKiB": 41866,
+          "cpuTicks": 22,
+          "cpuTicksByPid": {
+            "227863": 22
+          }
+        },
+        {
+          "seconds": 4.031432077001227,
+          "pids": [
+            227863
+          ],
+          "processIdentities": [
+            [
+              227863,
+              4225313
+            ]
+          ],
+          "pssKiB": 41866,
+          "cpuTicks": 22,
+          "cpuTicksByPid": {
+            "227863": 22
+          }
+        }
+      ],
+      "pssKibMedian": 41866,
+      "pssKibMax": 41866,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.0249744770007965,
+      "pids": [
+        227863
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006203613000252517,
+          "pids": [
+            227905
+          ],
+          "processIdentities": [
+            [
+              227905,
+              4226117
+            ]
+          ],
+          "pssKiB": 43277,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227905": 26
+          }
+        },
+        {
+          "seconds": 1.0124951060024614,
+          "pids": [
+            227905
+          ],
+          "processIdentities": [
+            [
+              227905,
+              4226117
+            ]
+          ],
+          "pssKiB": 43277,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227905": 26
+          }
+        },
+        {
+          "seconds": 2.0186887820018455,
+          "pids": [
+            227905
+          ],
+          "processIdentities": [
+            [
+              227905,
+              4226117
+            ]
+          ],
+          "pssKiB": 43277,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227905": 26
+          }
+        },
+        {
+          "seconds": 3.024870818000636,
+          "pids": [
+            227905
+          ],
+          "processIdentities": [
+            [
+              227905,
+              4226117
+            ]
+          ],
+          "pssKiB": 43277,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227905": 26
+          }
+        },
+        {
+          "seconds": 4.031198651002342,
+          "pids": [
+            227905
+          ],
+          "processIdentities": [
+            [
+              227905,
+              4226117
+            ]
+          ],
+          "pssKiB": 43277,
+          "cpuTicks": 26,
+          "cpuTicksByPid": {
+            "227905": 26
+          }
+        }
+      ],
+      "pssKibMedian": 43277,
+      "pssKibMax": 43277,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.024995038002089,
+      "pids": [
+        227905
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "cairo",
+      "command": [
+        "target/release/hashline",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006427480002457742,
+          "pids": [
+            227930
+          ],
+          "processIdentities": [
+            [
+              227930,
+              4226921
+            ]
+          ],
+          "pssKiB": 59805,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227930": 31
+          }
+        },
+        {
+          "seconds": 1.0131248380021134,
+          "pids": [
+            227930
+          ],
+          "processIdentities": [
+            [
+              227930,
+              4226921
+            ]
+          ],
+          "pssKiB": 59805,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227930": 31
+          }
+        },
+        {
+          "seconds": 2.019429753003351,
+          "pids": [
+            227930
+          ],
+          "processIdentities": [
+            [
+              227930,
+              4226921
+            ]
+          ],
+          "pssKiB": 59805,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227930": 31
+          }
+        },
+        {
+          "seconds": 3.025713455001096,
+          "pids": [
+            227930
+          ],
+          "processIdentities": [
+            [
+              227930,
+              4226921
+            ]
+          ],
+          "pssKiB": 59805,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227930": 31
+          }
+        },
+        {
+          "seconds": 4.031964727000741,
+          "pids": [
+            227930
+          ],
+          "processIdentities": [
+            [
+              227930,
+              4226921
+            ]
+          ],
+          "pssKiB": 59805,
+          "cpuTicks": 31,
+          "cpuTicksByPid": {
+            "227930": 31
+          }
+        }
+      ],
+      "pssKibMedian": 59805,
+      "pssKibMax": 59805,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 4.025537246998283,
+      "pids": [
+        227930
+      ],
+      "busActivatedPids": [
+        227504,
+        227590
+      ],
+      "isolated": true,
+      "alive": true,
+      "rendererObserved": "GskCairoRenderer",
+      "backendObserved": "GdkWaylandDisplay",
+      "pass": 2
+    }
+  ],
+  "completed": true,
+  "busAddress": "unix:path=/tmp/dbus-RL0OR3JDyN,guid=c9be6ea389d389e5f522a25f6aa1a490"
+}

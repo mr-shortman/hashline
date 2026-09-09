@@ -32,10 +32,37 @@ mkdir -p /tmp/hashline-test-schemas
 glib-compile-schemas --strict --targetdir=/tmp/hashline-test-schemas data
 ```
 
-Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft Fensterwiederverwendung, Dateiwechsel, Menüaktionen, Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen und die Textschnittstelle. Zum isolierten Betrieb kann `gtk4-broadwayd :9` in einem separaten Terminal laufen:
+Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft
+Fensterwiederverwendung, Tabs samt Ctrl+W und Ctrl+Tab, Menüaktionen,
+Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen, die Textschnittstelle
+und den Leseanker über einen Neuladevorgang. Zum isolierten Betrieb kann
+`gtk4-broadwayd :9` in einem separaten Terminal laufen:
 
 ```sh
-dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline native_ui -- --ignored --test-threads=1
+dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline -- --ignored --exact app::tests::native_ui
+```
+
+Der zweite Fenstertest misst die **längste zusammenhängende Hauptthread-Aufgabe**
+und ist damit der Nachweis für das 16-ms-Budget aus SPEC Abschnitt 9. Er öffnet
+`large.md`, `wide-table.md`, `long-line.md`, `large-code.md`, `many-blocks.md`
+und `deep-list.md`, fährt jede Datei zwanzig Schritte hinunter und zehn wieder
+hinauf und liest ab, was die längste Aufgabe gekostet hat. Er braucht die
+erzeugten Fixtures (`python3 benchmarks/fixtures.py`):
+
+```sh
+env GSETTINGS_BACKEND=memory GSK_RENDERER=cairo cargo test --release -p hashline -- --ignored --exact app::tests::main_thread_work_stays_inside_the_frame_budget --nocapture
+```
+
+**Jeder dieser beiden Tests braucht einen eigenen Prozess.** GTK lässt sich pro
+Prozess nur einmal initialisieren, und `cargo test` gibt jedem Test einen
+eigenen Thread; zwei Fenstertests in einem Lauf scheitern deshalb am zweiten.
+Deswegen steht oben je ein `--exact`.
+
+Dasselbe Maß meldet das laufende Programm mit `HASHLINE_BENCH_MAIN_THREAD=1`
+nach `stderr`, jede Zeile ein neues Maximum:
+
+```text
+HASHLINE_BENCH mainThreadMaxMs=11.02 task=measure-visible
 ```
 
 Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterstützt diesen GTK-Backendpfad nicht. Der folgende Test verwendet temporäre Dokumente, prüft Dokumentrolle, Unicode-Textoffsets, den zweiten Prozessaufruf mit demselben Fenster und den sichtbaren Mehrdatei-Hinweis und beendet seine Anwendung anschließend. Benötigt werden `python3-gi` und `gir1.2-atspi-2.0`:
@@ -46,6 +73,21 @@ dbus-run-session -- env GDK_BACKEND=x11 GTK_A11Y=atspi GSETTINGS_SCHEMA_DIR=/tmp
 
 Diese Tests sind Entwicklungsprüfungen. Vollständige Orca-Bedienung, visueller
 Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen.
+
+## Live-Vorschau
+
+Der Vertrag des Beobachters läuft ohne Fenster: jeder Test macht sich einen
+eigenen Hauptkontext und treibt ihn selbst.
+
+```sh
+GSETTINGS_BACKEND=memory cargo test --release -p hashline --test reload
+```
+
+Geprüft werden Speichern über Rename, Löschen und Wiederanlegen, eine halb
+geschriebene Datei, eine Folge von zwanzig Schreibvorgängen, eine Datei ohne
+inhaltliche Änderung, das Lesen der offenen Datei — das ist kein Änderungsgrund,
+sonst weckt sich der Prozess selbst — und die Zeit vom Schreiben bis zur
+angeforderten Neuladung.
 
 ## Aussehen ohne Fenster
 

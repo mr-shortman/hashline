@@ -178,18 +178,20 @@ impl Block {
 /// own. The limits come from measuring what setting costs, and each keeps one
 /// part well inside the 16 ms budget of SPEC.md, section 9:
 ///
-/// * Text wraps, so its limit is a byte count, and 4 KiB is already more than
-///   one screen of the reading column. Setting that much costs about 1 ms of
-///   ordinary prose and 8 ms of text without a single space — the pathological
-///   case, where Pango's search for a break makes the cost grow with the
-///   square of the length.
+/// * Text wraps, so its limit is a byte count, and 2 KiB is about one screen
+///   of the reading column. Setting that much costs well under a millisecond
+///   of ordinary prose and about 2 ms of text without a single space — the
+///   pathological case, where Pango's search for a break makes the cost grow
+///   with the square of the length. It was 4 KiB until two such parts on one
+///   screen came to 16.3 ms against a 16 ms budget; halving the part quarters
+///   that, because the cost is quadratic.
 /// * Code does not wrap, so its cost is driven by its line count, which grows
 ///   quadratically as well; 256 lines cost about 1 ms. The byte limit beside it
 ///   catches the block whose few lines are each very long.
 ///
 /// Lists and tables are not cut: their parts are items and rows rather than
 /// stretches of text, which the plan cannot address (docs/limitations.md).
-const TEXT_PART_BYTES: usize = 4096;
+const TEXT_PART_BYTES: usize = 2048;
 const CODE_PART_LINES: u32 = 256;
 const CODE_PART_BYTES: usize = 32 * 1024;
 
@@ -366,6 +368,19 @@ impl BlockPlan {
         }
         let first = self.block_at(top - height);
         let last = self.block_at(top + height * 2.0);
+        first..(last + 1).min(self.blocks.len())
+    }
+
+    /// The blocks actually on screen, without the buffer around them. These are
+    /// the ones a frame cannot do without; the buffer can wait for an idle
+    /// moment, which is what keeps a jump inside the 16 ms budget
+    /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    pub fn onscreen_range(&self, top: f64, height: f64) -> std::ops::Range<usize> {
+        if self.blocks.is_empty() {
+            return 0..0;
+        }
+        let first = self.block_at(top);
+        let last = self.block_at(top + height);
         first..(last + 1).min(self.blocks.len())
     }
 

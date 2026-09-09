@@ -61,6 +61,8 @@ pub(crate) struct State {
     /// Set while the widget itself is moving the adjustment, so that the
     /// resulting notification is not mistaken for the user scrolling.
     adjusting: bool,
+    /// Whether a pass over the buffer around the viewport is already pending.
+    buffering: bool,
 }
 
 /// The handler a clicked link is passed to.
@@ -69,6 +71,10 @@ type LinkHandler = Rc<dyn Fn(&str)>;
 /// How many set blocks to keep. A block that is evicted keeps its measured
 /// height in the plan, so eviction costs re-setting, never a jump.
 const CACHE_LIMIT: usize = 240;
+
+/// How long one idle pass over the viewport's buffer may take. Well inside the
+/// 16 ms a frame has, so a frame that lands on top of one still fits.
+const BUFFER_SLICE: f64 = 6.0;
 
 /// How many code blocks keep their syntax colours. Twice the layout cache,
 /// because a span is 12 bytes where a set block is a Pango layout: scrolling
@@ -104,6 +110,7 @@ impl State {
             coloured: std::collections::VecDeque::new(),
             on_link: None,
             adjusting: false,
+            buffering: false,
         }
     }
     fn body_px(&self) -> f64 {
@@ -252,13 +259,15 @@ mod imp {
 
         fn size_allocate(&self, width: i32, height: i32, _baseline: i32) {
             let widget = self.obj();
-            widget.reflow_for(width as f64);
-            widget.update_adjustment(width as f64, height as f64);
-            widget.notify_navigation();
+            crate::view::mainthread::timed("size-allocate", || {
+                widget.reflow_for(width as f64);
+                widget.update_adjustment(width as f64, height as f64);
+                widget.notify_navigation();
+            });
         }
 
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
-            self.obj().draw(snapshot);
+            crate::view::mainthread::timed("snapshot", || self.obj().draw(snapshot));
         }
     }
 
@@ -351,7 +360,11 @@ impl DocumentView {
     /// copied out can be released before it is shared: the block table is
     /// exactly what `BlockPlan` holds, and keeping both costs 2.8 MiB on the
     /// 10 MiB fixture (docs/decisions/014-competitive-targets.md, section 3.2).
-    pub fn set_document(&self, mut document: OpDocument) {
+    pub fn set_document(&self, document: OpDocument) {
+        super::mainthread::timed("set-document", || self.take_document(document));
+    }
+
+    fn take_document(&self, mut document: OpDocument) {
         let old_len = self.imp().state.borrow().accessible_len();
         if old_len > 0 {
             self.update_contents(gtk::AccessibleTextContentChange::Remove, 0, old_len);
@@ -538,15 +551,67 @@ impl DocumentView {
     /// A block above the viewport whose measurement differs from its estimate
     /// moves everything below it; the scroll offset moves with it so the text
     /// on screen stands still.
+    /// Sets what this frame needs, and leaves the rest for an idle moment.
+    ///
+    /// The plan lays out a screen of buffer above and below the viewport so
+    /// that the next scroll step has nothing to do. Setting all three screens
+    /// in the frame that jumped there cost 22 ms on the 10 MiB fixture against
+    /// a 16 ms budget, so only the screen that is actually shown is set here
+    /// (docs/decisions/014-competitive-targets.md, section 3.3).
     fn measure_visible(&self, height: f64) {
+        let top = self.scroll_top();
+        let onscreen = {
+            let state = self.imp().state.borrow();
+            state.plan.onscreen_range(top, height)
+        };
+        super::mainthread::timed("measure-visible", || self.lay_out(onscreen, height, None));
+        self.schedule_buffer(height);
+    }
+
+    /// Fills the buffer around the viewport in idle slices, so that no single
+    /// piece of it is long enough to hold up a frame. The range is worked out
+    /// when the slice runs, not when it was asked for: by then the reader may
+    /// be somewhere else, and the buffer that matters is the one around where
+    /// they are now.
+    fn schedule_buffer(&self, height: f64) {
+        if self.imp().state.borrow().buffering {
+            return;
+        }
+        self.imp().state.borrow_mut().buffering = true;
+        glib::idle_add_local_once(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move || {
+                view.imp().state.borrow_mut().buffering = false;
+                let range = {
+                    let state = view.imp().state.borrow();
+                    state.plan.visible_range(view.scroll_top(), height)
+                };
+                let done = super::mainthread::timed("buffer", || {
+                    view.lay_out(range, height, Some(BUFFER_SLICE))
+                });
+                if !done {
+                    view.schedule_buffer(height);
+                }
+            }
+        ));
+    }
+
+    /// Sets every block of `range` that is not set yet, stopping after `budget`
+    /// if one is given. Returns whether it finished the range.
+    fn lay_out(&self, range: std::ops::Range<usize>, height: f64, budget: Option<f64>) -> bool {
+        let started = std::time::Instant::now();
         let top = self.scroll_top();
         let context = self.pango_context();
         let mut shift = 0.0;
-        let range = {
-            let state = self.imp().state.borrow();
-            state.plan.visible_range(top, height)
-        };
+        let mut finished = true;
         for index in range {
+            if let Some(budget) = budget {
+                if started.elapsed().as_secs_f64() * 1000.0 >= budget {
+                    finished = false;
+                    break;
+                }
+            }
             let (needs, block, width) = {
                 let state = self.imp().state.borrow();
                 if index >= state.plan.len() {
@@ -590,7 +655,9 @@ impl DocumentView {
                 adjustment.set_value(adjustment.value() + shift);
                 state.adjusting = false;
             }
+            self.queue_draw();
         }
+        finished
     }
 
     /// Applies the colours a code block already has, or asks for them.

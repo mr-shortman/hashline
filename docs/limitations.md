@@ -4,45 +4,50 @@ Der native Reader und die Linux-Paketierung sind implementiert. Der Stand ist
 noch keine v1-Freigabe nach SPEC.md. Diese Liste fasst offene Befunde aus
 [011](decisions/011-m0-foundation.md),
 [012](decisions/012-rendering-and-navigation.md) und dem
-[nativen Benchmarkbericht](../benchmarks/results/native-current/REPORT.md)
-zusammen; historische Aussagen dort sind keine erneute Messung dieses Pakets.
-Was [013](decisions/013-oversized-blocks.md) daran geändert hat, ist unten
-jeweils vermerkt.
+[nativen Benchmarkbericht](../benchmarks/results/native-2026-09-09/REPORT.md)
+zusammen; historische Aussagen im
+[älteren Bericht](../benchmarks/results/native-current/REPORT.md) sind keine
+erneute Messung dieses Pakets.
 
-- **Breite Tabellen** blockieren den Hauptthread weiterhin: 53 ms für
-  `wide-table.md` gegen ein 16-ms-Budget. Große Codeblöcke und sehr lange
-  Zeilen zerfallen seit 013 in Teilblöcke und tun das nicht mehr — aus 67
-  Sekunden werden 1,6 ms und aus 172 ms werden 8 ms. Eine Tabelle zerfällt
-  nicht, weil ihre Teile Zeilen sind und der Plan über Textbereiche adressiert.
-- **Ein Absatz über 4 KiB wird geschnitten**, und die letzte Zeile jedes Teils
+- **Ein Absatz über 2 KiB wird geschnitten**, und die letzte Zeile jedes Teils
   endet dort, wo der Teil endet, statt an der Spalte. Sichtbar nur bei
   Absätzen, die höher als ein Schirm sind.
+- **Überbreite Tabellen setzen nur die Spalten, die auf den Schirm passen.**
+  Die abgeschnittenen Zellen werden nicht gesetzt und sind deshalb auch nicht
+  anklickbar; ihr Text bleibt im Dokument, wird also mitkopiert und mitgesucht.
+  Sobald es waagerechtes Scrollen gibt, muss das zurück.
 - **Die Höhenschätzung von Fließtext liegt rund 32 % zu niedrig**, weil sie
   mehr Zeichen in eine Zeile rechnet, als eine Zeile mit ausgefranstem rechtem
   Rand fasst. Die Bildlaufleiste ist dadurch zu kurz, nie zu lang, und
   korrigiert sich beim Lesen. Für Codeblöcke ist die Schätzung seit 013 auf
   0,2 % genau.
-- Das Inhaltsverzeichnis erzeugt alle Überschriftenzeilen. Bei 10 MiB
-  überschreitet der gemessene Speicherverbrauch das vorgesehene Budget;
-  auch die Scroll- und Klein-Datei-Speicherziele sind noch nicht belegt.
-- **Der Standard-GSK-Renderer kostet den größten Einzelposten des
-  Speicherbodens.** Im leeren Fenster stehen rund 100 MiB gegen 74 MiB mit
-  `GSK_RENDERER=gl` und 33 MiB mit `GSK_RENDERER=cairo`. Umgestellt ist
-  nichts: die Frametimes der anderen Renderer sind unbekannt, und der
-  Frameanteil beim Scrollen ist selbst ein verfehltes Budget.
-- Die Suche wartet bereits 120 ms auf weitere Eingabe; das 100-ms-Ziel für
-  mittlere Dateien ist damit noch nicht erfüllbar. Aufweitendes Unicode-Folding
-  (`ß`/`ss`, `ﬁ`/`fi`) fehlt.
+- **Der Speicher der kleinen Datei liegt bei 40,8 MiB gegen ein Ziel von
+  40 MiB.** 1,5 MiB davon sind die CJK-Schrift, die `small.md` mit „Grüße
+  日本語“ in jedem Abschnitt anfordert; ersetzt man dieses eine Wort, sind es
+  38,9 MiB. Der Rest des Abstands ist nicht lokalisiert.
+- **Der Frameanteil beim Scrollen ist unter `cairo` nicht gemessen.** Die
+  einzige Stichprobe aus [015](decisions/015-renderer-choice.md) nennt 93,2 %
+  gegen 98,3 % unter Vulkan, beides unter einem Ziel von 99 %. Die Reihe mit
+  n = 30 bei 60 und 120 Hz steht aus und braucht eine ruhige Sitzung.
+- Aufweitendes Unicode-Folding (`ß`/`ss`, `ﬁ`/`fi`) fehlt in der Suche.
 - Überbreite Tabellen und Codeblöcke sind beschnitten; internes horizontales
   Scrollen fehlt. Fußnoten und Definitionslisten haben keine eigene Gestaltung.
 - Bilder im Fließtext zeigen Alternativtext. Remote-Bilder laden nicht;
   rohes HTML einschließlich `details`/`summary` bleibt Quelltext.
 - Die Entscheidung für einen sandboxenden Bilddecoder ist offen. Der jetzige
   Decoder verwendet gdk-pixbuf mit Verzeichnis- und Pixelgrenzen.
+- **Alle Budgets, deren Nachweis ein Einzelbild des Monitors ist, fehlen
+  weiterhin**: Start bis lesbarer Text, Öffnen in laufender Instanz, Suche und
+  Menü öffnen, Tabwechsel. Der Nachweis verlangt eine unbeaufsichtigte Sitzung,
+  in der das Fenster des Betrachters allein auf dem Schirm steht; auf einer
+  Arbeitssitzung misst er das, was sonst noch offen ist.
 - Vollständiger visueller Vergleich, Orca-Bedienung und alle regulären
   Performancebudgets mit n=30 auf der vorgesehenen Referenzhardware sind
   noch nicht abgenommen. Bisherige Messungen stammen von Ubuntu 26.04;
   sie ersetzen keine Bestätigung der geforderten integrierten Grafik.
+- Tabs stellen sich nach einem Neustart nicht wieder her, lassen sich nicht
+  gruppieren und nicht zwischen Fenstern ziehen; einen Dateibaum gibt es
+  nicht ([017](decisions/017-tabs.md)).
 
 Der [M3-Bericht](acceptance/M3.md) unterscheidet Paketprüfungen von diesen
 noch offenen Freigabekriterien.

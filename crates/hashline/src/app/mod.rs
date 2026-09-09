@@ -25,7 +25,15 @@ pub const APP_ID: &str = "de.kalendium.Hashline";
 const SOURCE_LIMIT: u64 = 20 * 1024 * 1024;
 
 /// How long typing settles before a search runs (SPEC.md, section 8).
-const SEARCH_DEBOUNCE_MS: u64 = 120;
+///
+/// The budget is the whole distance from the last keystroke to the marks on
+/// screen: 100 ms for a medium document, 120 ms for a large one
+/// (docs/decisions/014-competitive-targets.md, section 3.3). Scanning the
+/// 10 MiB fixture takes 5 ms, so nearly all of that budget is this wait, and
+/// 120 ms of it left nothing. Sixty milliseconds still collects a fast typist's
+/// keystrokes into one scan, and a scan that does happen per keystroke costs
+/// less than a frame.
+const SEARCH_DEBOUNCE_MS: u64 = 60;
 
 /// Above this window width the outline gets its own column instead of
 /// floating over the text (SPEC.md, section 3).
@@ -220,6 +228,10 @@ impl Ui {
         // Search: a bar over the document, with the hit count beside the field
         // and the usual next/previous (SPEC.md, section 3).
         let search_entry = gtk::SearchEntry::new();
+        // GtkSearchEntry delays its own change notification by 150 ms, which
+        // would come on top of the wait below and put every search over budget
+        // before the first byte is compared. The waiting is done in one place.
+        search_entry.set_search_delay(0);
         search_entry.set_hexpand(true);
         search_entry.set_placeholder_text(Some("Im Dokument suchen"));
         let search_count = gtk::Label::new(None);
@@ -320,6 +332,9 @@ impl Ui {
             .icon_name("open-menu-symbolic")
             .tooltip_text("Menü")
             .menu_model(&menu)
+            // The window's primary menu, so F10 opens it as every GNOME
+            // application's does.
+            .primary(true)
             .build();
         header.pack_end(&menu_button);
         header.pack_end(&search_button);
@@ -1578,8 +1593,89 @@ mod tests {
         pump();
     }
 
+    /// Reads a benchmark fixture, if the generated ones are there. They are
+    /// not in the repository (`benchmarks/fixtures.py` rebuilds them), so a
+    /// check that needs one says so rather than passing on nothing.
+    fn fixture(name: &str) -> Option<PathBuf> {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmarks/generated")
+            .join(name);
+        path.is_file().then_some(path)
+    }
+
+    /// No single piece of main-thread work over 16 ms, on the fixtures that
+    /// used to produce one (SPEC.md, section 9, and
+    /// docs/decisions/014-competitive-targets.md, section 3.3).
+    ///
+    /// Scrolling is done by moving the adjustment, which is what a scroll event
+    /// does, so this measures the reader's own work rather than the input
+    /// stack's. What it cannot see is a task in code no step here reaches; the
+    /// same instrumentation reports from a running program under
+    /// `HASHLINE_BENCH_MAIN_THREAD`.
     #[test]
-    #[ignore = "requires a GTK display; run with gtk4-broadwayd and GDK_BACKEND=broadway"]
+    #[ignore = "needs a GTK display, benchmarks/generated, and a process of its \
+                own: GTK may only be initialized once per process"]
+    fn main_thread_work_stays_inside_the_frame_budget() {
+        gtk::init().expect("GTK display");
+        let application = gtk::Application::builder()
+            .application_id("de.kalendium.Hashline.Budget")
+            .flags(gio::ApplicationFlags::NON_UNIQUE | gio::ApplicationFlags::HANDLES_OPEN)
+            .build();
+        application.register(gio::Cancellable::NONE).unwrap();
+        let ui = Ui::build(&application);
+        ui.window.present();
+        pump();
+
+        let mut worst: Vec<(String, f64)> = Vec::new();
+        for name in [
+            "large.md",
+            "wide-table.md",
+            "long-line.md",
+            "large-code.md",
+            "many-blocks.md",
+            "deep-list.md",
+        ] {
+            let Some(path) = fixture(name) else {
+                panic!("{name} is missing; run: python3 benchmarks/fixtures.py");
+            };
+            ui.open(&path);
+            for _ in 0..40 {
+                pump();
+                if ui.tab().is_some_and(|tab| tab.path.borrow().is_some()) {
+                    break;
+                }
+            }
+            let tab = ui.tab().expect("a tab for the fixture");
+            crate::view::mainthread::forget();
+            // Through the document in twenty steps, and back up in ten, so
+            // that both a fresh layout and a return to evicted blocks are
+            // included.
+            let adjustment = tab.view.vadjustment().expect("a scrollable view");
+            let upper = adjustment.upper() - adjustment.page_size();
+            for step in 0..30 {
+                let fraction = if step < 20 {
+                    step as f64 / 19.0
+                } else {
+                    1.0 - (step - 20) as f64 / 9.0
+                };
+                adjustment.set_value(upper * fraction);
+                pump();
+            }
+            worst.push((name.to_string(), crate::view::mainthread::longest()));
+            ui.close_tab(&tab);
+            pump();
+        }
+        ui.window.close();
+        for (name, longest) in &worst {
+            println!("{name}: longest main-thread task {longest:.2} ms");
+        }
+        let over: Vec<&(String, f64)> = worst.iter().filter(|(_, ms)| *ms > 16.0).collect();
+        assert!(over.is_empty(), "over the 16 ms budget: {over:?}");
+    }
+
+    #[test]
+    #[ignore = "needs a GTK display and a process of its own: GTK may only be \
+                initialized once per process"]
     fn native_ui() {
         gtk::init().expect("GTK display");
         let application = gtk::Application::builder()

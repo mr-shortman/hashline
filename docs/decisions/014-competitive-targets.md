@@ -1,6 +1,7 @@
 # 014 — Wettbewerbsziel, erweiterter Umfang und zweiteilige Messsuite
 
-Status: Vorschlag, noch nicht beschlossen. Stand: 9. September 2026.
+Status: Umfang beschlossen und umgesetzt, Zielwerte teils belegt. Stand:
+9. September 2026; siehe [Abschnitt 8](#8-stand-der-umsetzung).
 Bezug: [SPEC.md](../../SPEC.md) Abschnitte 2, 9 und 12,
 [009-native-renderer.md](009-native-renderer.md),
 [013-oversized-blocks.md](013-oversized-blocks.md),
@@ -145,8 +146,9 @@ Die 1,3× bei 100 KiB sind bewusst bescheiden. Ein größerer Abstand ist gegen 
 
 Der Speicherzuwachs verschärft sich von SPEC Abschnitt 9 (Vierfaches) auf das
 **Zweifache** der Dateigröße. Das ist die Zeile, die das Alleinstellungsmerkmal
-trägt, und sie ist heute mit 402 MiB bei 10 MiB weit verfehlt — das
-Inhaltsverzeichnis allein kostet 153 MiB.
+trägt, und sie war beim Schreiben dieses Dokuments mit 402 MiB bei 10 MiB weit
+verfehlt — das Inhaltsverzeichnis allein kostete 153 MiB. Sie ist inzwischen
+eingehalten; der Stand steht in [Abschnitt 8](#8-stand-der-umsetzung).
 
 ### 3.3 Laufzeitverhalten
 
@@ -320,6 +322,44 @@ Zwei Punkte der ursprünglichen Liste sind inzwischen erledigt: `memory.py` und
 `startup-wayland.py` sind committet, und `benchmarks/REFERENCE.md` ist mit den
 übrigen WebView-Unterlagen aus dem Baum entfernt — die laufenden Messbefehle
 stehen in [Prüfungen](../testing.md).
+
+## 8. Stand der Umsetzung
+
+Stand: 9. September 2026, nach den Arbeiten an Speicher, Tabs, Live-Reload und
+Hauptthread. Gemessen auf der Entwicklungsmaschine, Release-Build,
+`GSK_RENDERER=cairo`, ein Prozess je Messung. **Keine dieser Zahlen ist eine
+Abnahme:** die Reihen haben n < 30 und die Sitzung war nicht ruhiggestellt.
+
+| Ziel | Wert | |
+| --- | ---: | --- |
+| PSS, 100 KiB ≤ 40 MiB | 40,7–40,9 MiB | knapp verfehlt |
+| PSS, 1 MiB ≤ 70 MiB | 42,2–42,3 MiB | erfüllt |
+| PSS, 10 MiB ≤ 150 MiB | 58,1–58,4 MiB | erfüllt |
+| Zuwachs ≤ 2 × Dateigröße (20 MiB) | 17,4–17,5 MiB | erfüllt |
+| Zusatz je inaktivem Tab ≤ 3 × Dateigröße | 1,9 MiB bei 1 MiB | erfüllt |
+| 10 Tabs à 1 MiB ≤ 110 MiB | 59,9 MiB | erfüllt |
+| Leerlauf-CPU < 0,3 % über 30 s | 0,000–0,033 % | erfüllt |
+| Hauptthread ≤ 16 ms, Sonderfälle eingeschlossen | 11,0 ms (`large.md`) | erfüllt |
+| Installierte Größe ≤ 20 MiB | 3,72 MiB Binary | erfüllt |
+| Live-Reload: Leseanker bleibt erhalten | geprüft | erfüllt |
+
+Der Abstand bei 100 KiB ist zu 1,5 MiB die CJK-Schrift, die `small.md` selbst
+anfordert; ohne dieses eine Wort sind es 38,9 MiB
+([limitations.md](../limitations.md)).
+
+Nicht gemessen sind alle Ziele, deren Nachweis ein Einzelbild des Monitors ist:
+Start bis lesbarer Text, Öffnen in laufender Instanz, Suche und Menü öffnen,
+Tabwechsel und der Frameanteil beim Scrollen. Die Werkzeuge dafür stehen —
+`benchmarks/run.py bench --only content,interaction,tabs,reload,scroll` misst
+sie — aber sie brauchen eine unbeaufsichtigte Sitzung, in der das Fenster des
+Betrachters allein auf dem Schirm steht. Auf einer Arbeitssitzung liest die
+Texterkennung das, was sonst noch offen ist.
+
+Zwei Zahlen, die keine Bildschirmaufnahme brauchen und den Rahmen abstecken:
+das Setzen des ersten Schirms kostet bei 10 MiB 0,4 ms und der Blockplan
+1,3 ms, und ein Suchlauf über die 7,9 MiB Text der Datei 5–6 ms. Was die
+Budgets für Start, Öffnen und Suche im Wesentlichen enthält, ist damit weder
+das Parsen noch das Suchen, sondern das Warten des Fensters.
 
 ## 7. Was diese Entscheidung nicht tut
 

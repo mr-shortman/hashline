@@ -180,6 +180,118 @@ sys.exit(1)
         raise RuntimeError('Cannot verify benchmark window focus via AT-SPI; no keys sent')
 
 
+def interaction(command, fixture, renderer, options, artifact):
+    """Four stimuli in one launch, each timed to the frame that shows its effect.
+
+    They share a launch because each needs a settled window and a private bus,
+    and four launches would be four times the waiting for numbers that are all
+    about the same running program: opening the search bar, opening the menu,
+    a search that has to jump, and handing a second file to the instance that
+    is already running.
+
+    The longest main-thread task is the fifth reading, and the only one that
+    cannot come from outside: a compositor sees late frames, not what made them
+    late. The reader reports its own under HASHLINE_BENCH_MAIN_THREAD.
+    """
+    # A needle that occurs once, at the end, and whose prefixes match nothing:
+    # the search must actually have to move the document to satisfy it.
+    needle = 'Kaninchenbau'
+    pointer = module('scroll-native').Pointer(options.connector)
+    application = None
+    capture = Capture(options.connector)
+    readings, evidence = {}, {}
+    trace = artifact / 'wayland.log'
+    try:
+        width, height = module('scroll-native').monitor_geometry(options.connector)
+        pointer.to(width / 2, height / 2)
+        with tempfile.TemporaryDirectory(prefix='hashline-interaction-') as temp, \
+                isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
+            document = Path(temp) / fixture.name
+            document.write_text(fixture.read_text() + f'\n\nSuchziel {needle} Ende.\n')
+            second = Path(temp) / ('zweites-' + fixture.name)
+            second.write_text('Zweites Dokument beginnt hier.\n\n' + fixture.read_text())
+            for image in fixture.parent.glob('*.png'):
+                (Path(temp) / image.name).symlink_to(image)
+            env = dict(os.environ, HASHLINE_BENCH_METADATA='1', HASHLINE_BENCH_MAIN_THREAD='1')
+            env.pop('NO_AT_BRIDGE', None)
+            env['GTK_A11Y'] = 'atspi'
+            application = subprocess.Popen([*command, str(document)], env=env,
+                stdout=subprocess.DEVNULL, stderr=sink, start_new_session=True)
+            time.sleep(options.settle)
+            if application.poll() is not None:
+                raise RuntimeError('Viewer exited before the first stimulus')
+            require_focus(application.pid)
+
+            def stimulus(name, expected, act):
+                with capture.lock:
+                    capture.frames = capture.frames[-1:]
+                started = act()
+                time.sleep(options.hold)
+                proof = capture.proof(started, expected, artifact / name)
+                evidence[name] = proof
+                readings[name] = proof.get('readableUpperMs')
+
+            def open_search():
+                started = time.monotonic_ns()
+                keyboard(pointer, [65507, ord('f')])
+                return started
+            stimulus('searchOpenUpperMs', ['Im Dokument suchen'], open_search)
+
+            def run_search():
+                for char in needle[:-1]:
+                    keyboard(pointer, [ord(char)])
+                    time.sleep(.05)
+                with capture.lock:
+                    capture.frames = capture.frames[-1:]
+                started = time.monotonic_ns()
+                keyboard(pointer, [ord(needle[-1])])
+                return started
+            stimulus('searchLargeMs', [f'Suchziel {needle} Ende'], run_search)
+            keyboard(pointer, [65307]); time.sleep(.4)
+
+            def open_menu():
+                started = time.monotonic_ns()
+                keyboard(pointer, [65471])  # F10 opens the primary menu.
+                return started
+            stimulus('menuOpenMs', ['Neu laden'], open_menu)
+            keyboard(pointer, [65307]); time.sleep(.4)
+
+            def hand_over():
+                started = time.monotonic_ns()
+                subprocess.run([*command, str(second)], env=env, timeout=60,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return started
+            stimulus('openExistingMs', ['Zweites Dokument beginnt hier'], hand_over)
+
+            exited = application.poll()
+            stop(application); application = None
+            sink.seek(0)
+            log = sink.read()
+        capture.close()
+        longest = re.findall(r'HASHLINE_BENCH mainThreadMaxMs=([\d.]+) task=(\S+)', log)
+        metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', log)
+        metrics = {name: value for name, value in readings.items() if value is not None}
+        if longest:
+            metrics['mainThreadMaxMs'] = float(longest[-1][0])
+        missing = [name for name, value in readings.items() if value is None]
+        if not longest:
+            missing.append('mainThreadMaxMs')
+        return {'status': 'ok' if not missing and exited is None else 'missing',
+                'reason': ('No frame showed: ' + ', '.join(missing)) if missing else
+                          (f'Viewer exited before termination: {exited}' if exited is not None else None),
+                'longestTask': longest[-1][1] if longest else None,
+                'mainThreadTasks': [{'ms': float(ms), 'task': task} for ms, task in longest],
+                'evidence': {name: {k: v for k, v in proof.items() if k != 'frames'}
+                             for name, proof in evidence.items()},
+                'rendererObserved': metadata[1] if metadata else 'unknown',
+                'backendObserved': metadata[2] if metadata else 'unknown',
+                'metrics': metrics}
+    finally:
+        stop(application)
+        capture.close()
+        pointer.close()
+
+
 def tab_memory(command, fixture, renderer, options, artifact):
     """PSS with one, two and ten copies of a fixture open at once.
 
@@ -295,8 +407,10 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
             result['stimulus'] = ('Atomic rename of a temporary copy: a paragraph added above '
                                   'everything and the paragraph at the reading position changed')
             return result
-    if group in ('interaction', 'tabs'):
-        if group == 'tabs' and not spec.get('tabs'):
+    if group == 'interaction':
+        return interaction(command, fixture, renderer, options, artifact)
+    if group == 'tabs':
+        if not spec.get('tabs'):
             return {'status': 'unsupported', 'reason': 'Viewer has no tabs', 'metrics': {}}
         # Accessibility registry must live on the same isolated bus as the app;
         # real keyboard events still use the desktop Mutter connection.
@@ -304,10 +418,6 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
         try:
             def action(application, capture, document):
                 require_focus(application.pid)
-                started = time.monotonic_ns()
-                if group == 'interaction':
-                    keyboard(pointer, [65507, ord('f')])
-                    return started, ['Im Dokument suchen']
                 # Open another document through the viewer's real file chooser.
                 # Ctrl+Tab then must restore original *document body*, not tab title.
                 keyboard(pointer, [65507, ord('o')]); time.sleep(.5)
@@ -325,9 +435,8 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
                 keyboard(pointer, spec.get('tab_keys', [65507, 65289]))
                 return started, EXPECTED[document.stem]
             result = readable(command, fixture, renderer, options, artifact, action)
-            key = 'searchOpenUpperMs' if group == 'interaction' else 'tabSwitchUpperMs'
-            result['metrics'] = {key: result.get('readableUpperMs')}
-            if group == 'tabs':
+            result['metrics'] = {'tabSwitchUpperMs': result.get('readableUpperMs')}
+            if result.get('contentVerified'):
                 # What a tab that is not showing costs, and what ten of them
                 # cost together (decision 014, section 3.2). Every tab needs
                 # its own path: a viewer may bring an open file forward
