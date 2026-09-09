@@ -98,6 +98,10 @@ impl Metrics {
     }
 }
 
+/// One entry of the plan. The 10 MiB fixture has 144 651 of them, so every
+/// field is sized for what it can actually hold: a height is a pixel count and
+/// does not need double precision, and the source limit of 20 MiB divided by
+/// the smallest part bounds the part count well below `u16::MAX`.
 #[derive(Clone, Copy, Debug)]
 pub struct Block {
     pub kind: BlockKind,
@@ -110,15 +114,19 @@ pub struct Block {
     pub lines: u32,
     /// Which part of its source block this is, and how many parts that block
     /// was cut into. A block small enough to set in one piece is part 0 of 1.
-    pub part: u32,
-    pub parts: u32,
+    pub part: u16,
+    pub parts: u16,
     /// Height including the space above and below the block.
-    pub height: f64,
+    pub height: f32,
     /// False while `height` is still an estimate.
     pub measured: bool,
 }
 
 impl Block {
+    /// The height, widened for arithmetic against document coordinates.
+    pub fn height(&self) -> f64 {
+        self.height as f64
+    }
     /// True for the first part of a cut-up block, and for every block that was
     /// not cut up. The space above a block, the top of a code panel and its
     /// copy control all belong to this part alone.
@@ -250,7 +258,8 @@ impl BlockPlan {
                 BlockKind::Rule | BlockKind::List | BlockKind::Table => cuts.push((0, len, 0)),
                 _ => text_cuts(text, &mut cuts),
             }
-            let parts = cuts.len() as u32;
+            debug_assert!(cuts.len() <= u16::MAX as usize, "part count must fit u16");
+            let parts = cuts.len() as u16;
             for (part, &(from, to, lines)) in cuts.iter().enumerate() {
                 let mut block = Block {
                     kind,
@@ -259,16 +268,16 @@ impl BlockPlan {
                     text_start: start + from,
                     text_len: to - from,
                     lines,
-                    part: part as u32,
+                    part: part as u16,
                     parts,
                     height: 0.0,
                     measured: false,
                 };
-                block.height = estimate(&block, metrics, width);
+                block.height = estimate(&block, metrics, width) as f32;
                 blocks.push(block);
             }
         }
-        let offsets = Offsets::new(blocks.iter().map(|block| block.height));
+        let offsets = Offsets::new(blocks.iter().map(|block| block.height as f64));
         BlockPlan {
             blocks,
             offsets,
@@ -329,11 +338,11 @@ impl BlockPlan {
     /// is what keeps the visible text still — the single most common defect of
     /// virtualized lists, and an acceptance failure here (SPEC.md, section 5).
     pub fn set_measured(&mut self, index: usize, height: f64) -> f64 {
-        let previous = self.blocks[index].height;
+        let previous = self.blocks[index].height as f64;
         let delta = height - previous;
         if delta != 0.0 {
-            self.blocks[index].height = height;
-            self.offsets.add(index, delta);
+            self.blocks[index].height = height as f32;
+            self.offsets.add(index, height as f32 as f64 - previous);
         }
         self.blocks[index].measured = true;
         delta
@@ -347,9 +356,9 @@ impl BlockPlan {
         self.width = width;
         for block in self.blocks.iter_mut() {
             block.measured = false;
-            block.height = estimate(block, metrics, width);
+            block.height = estimate(block, metrics, width) as f32;
         }
-        self.offsets = Offsets::new(self.blocks.iter().map(|block| block.height));
+        self.offsets = Offsets::new(self.blocks.iter().map(|block| block.height as f64));
     }
 
     /// The plan indices that make up one block of the document. A block that

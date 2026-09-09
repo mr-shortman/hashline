@@ -51,7 +51,7 @@ fn positions_are_consistent_with_the_heights_held() {
             "block {index} sits at {} not {expected}",
             plan.y_of(index)
         );
-        expected += plan.block(index).height;
+        expected += plan.block(index).height();
     }
     assert!((plan.total_height() - (expected + document::PAD_BOTTOM)).abs() < 1e-9);
 }
@@ -64,12 +64,12 @@ fn a_measurement_above_the_reading_position_moves_everything_below_by_its_delta(
     let mut plan = plan(SOURCE);
     let reading = 4;
     let before = plan.y_of(reading);
-    let estimate = plan.block(1).height;
+    let estimate = plan.block(1).height();
     let delta = plan.set_measured(1, estimate + 23.0);
     assert!((delta - 23.0).abs() < 1e-9);
     assert!((plan.y_of(reading) - (before + delta)).abs() < 1e-9);
     // Blocks above the change do not move.
-    assert!((plan.y_of(1) - (document::PAD_TOP + plan.block(0).height)).abs() < 1e-9);
+    assert!((plan.y_of(1) - (document::PAD_TOP + plan.block(0).height())).abs() < 1e-9);
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn a_measurement_below_the_reading_position_leaves_it_where_it_was() {
     let mut plan = plan(SOURCE);
     let reading = 1;
     let before = plan.y_of(reading);
-    plan.set_measured(5, plan.block(5).height + 40.0);
+    plan.set_measured(5, plan.block(5).height() + 40.0);
     assert_eq!(plan.y_of(reading), before);
 }
 
@@ -296,7 +296,7 @@ fn only_the_outer_parts_carry_the_space_around_a_block() {
     for index in parts.start + 1..parts.end - 1 {
         let block = plan.block(index);
         assert!(
-            (block.height - block.lines as f64 * line).abs() < 1.0,
+            (block.height() - block.lines as f64 * line).abs() < 1.0,
             "part {index} is {} high for {} lines",
             block.height,
             block.lines

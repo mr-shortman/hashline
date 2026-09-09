@@ -37,8 +37,11 @@ pub(crate) struct State {
     palette: Palette,
     zoom: i32,
     selection: Option<Selection>,
-    outline: Outline,
-    accessible: super::accessibility::Text,
+    outline: Rc<Outline>,
+    /// Character offsets for AT-SPI, built the first time a screen reader asks
+    /// for them. Nothing else needs them, and on the 10 MiB fixture building
+    /// them costs half a megabyte and a pass over the whole text.
+    accessible: Option<super::accessibility::Text>,
     images: Rc<ImageCache>,
     /// Search hits over the whole document, in document order, and which of
     /// them is the current one.
@@ -92,8 +95,8 @@ impl State {
             palette: LIGHT,
             zoom: 100,
             selection: None,
-            outline: Outline::default(),
-            accessible: super::accessibility::Text::default(),
+            outline: Rc::new(Outline::default()),
+            accessible: None,
             images: Rc::new(ImageCache::default()),
             hits: Vec::new(),
             current_hit: None,
@@ -105,6 +108,26 @@ impl State {
     }
     fn body_px(&self) -> f64 {
         tokens::BODY_PX * self.zoom as f64 / 100.0
+    }
+    /// The accessible text and the two things every query on it needs, built
+    /// on first use. They come out together because they all borrow the state.
+    fn accessible(&mut self) -> (&super::accessibility::Text, &BlockPlan, &str) {
+        if self.accessible.is_none() {
+            self.accessible = Some(super::accessibility::Text::build(
+                &self.plan,
+                &self.document.text,
+            ));
+        }
+        (
+            self.accessible.as_ref().expect("just built"),
+            &self.plan,
+            &self.document.text,
+        )
+    }
+    /// How long the accessible text is, without building it: a client that has
+    /// never asked is not listening for a change either.
+    fn accessible_len(&self) -> u32 {
+        self.accessible.as_ref().map_or(0, |text| text.len)
     }
     fn remember(&mut self, index: usize, set: BlockLayout) {
         if self.cache.insert(index, set).is_none() {
@@ -243,66 +266,44 @@ mod imp {
 
     impl AccessibleTextImpl for DocumentView {
         fn contents(&self, start: u32, end: u32) -> Option<glib::Bytes> {
-            Some(glib::Bytes::from_owned(
-                self.state
-                    .borrow()
-                    .accessible
-                    .slice(start, end)
-                    .into_bytes(),
-            ))
+            let mut state = self.state.borrow_mut();
+            let (accessible, plan, source) = state.accessible();
+            let text = accessible.slice(plan, source, start, end);
+            Some(glib::Bytes::from_owned(text.into_bytes()))
         }
         fn contents_at(
             &self,
             offset: u32,
             granularity: gtk::AccessibleTextGranularity,
         ) -> Option<(u32, u32, glib::Bytes)> {
-            if granularity == gtk::AccessibleTextGranularity::Line {
-                if let Some((start, end)) = self.obj().accessible_line(offset) {
-                    return Some((
-                        start,
-                        end,
-                        glib::Bytes::from_owned(
-                            self.state
-                                .borrow()
-                                .accessible
-                                .slice(start, end)
-                                .into_bytes(),
-                        ),
-                    ));
-                }
-            }
-            let state = self.state.borrow();
-            let (start, end) =
-                super::super::accessibility::span(&state.accessible.content, offset, granularity);
-            Some((
-                start,
-                end,
-                glib::Bytes::from_owned(state.accessible.slice(start, end).into_bytes()),
-            ))
+            let line = (granularity == gtk::AccessibleTextGranularity::Line)
+                .then(|| self.obj().accessible_line(offset))
+                .flatten();
+            let mut state = self.state.borrow_mut();
+            let (accessible, plan, source) = state.accessible();
+            let (start, end) = line.unwrap_or_else(|| {
+                super::super::accessibility::span_at(accessible, plan, source, offset, granularity)
+            });
+            let text = accessible.slice(plan, source, start, end);
+            Some((start, end, glib::Bytes::from_owned(text.into_bytes())))
         }
         fn caret_position(&self) -> u32 {
-            let state = self.state.borrow();
-            state
-                .selection
-                .map(|s| {
-                    state
-                        .accessible
-                        .offset(s.cursor, &state.plan, &state.document.text)
-                })
-                .unwrap_or(0)
+            let mut state = self.state.borrow_mut();
+            let Some(cursor) = state.selection.map(|s| s.cursor) else {
+                return 0;
+            };
+            let (accessible, plan, source) = state.accessible();
+            accessible.offset(cursor, plan, source)
         }
         fn selection(&self) -> Vec<gtk::AccessibleTextRange> {
-            let state = self.state.borrow();
+            let mut state = self.state.borrow_mut();
             let Some(selection) = state.selection.filter(|s| !s.is_empty()) else {
                 return vec![];
             };
             let (start, end) = selection.range();
-            let start = state
-                .accessible
-                .offset(start, &state.plan, &state.document.text);
-            let end = state
-                .accessible
-                .offset(end, &state.plan, &state.document.text);
+            let (accessible, plan, source) = state.accessible();
+            let start = accessible.offset(start, plan, source);
+            let end = accessible.offset(end, plan, source);
             vec![gtk::AccessibleTextRange::new(
                 start as usize,
                 (end - start) as usize,
@@ -345,14 +346,41 @@ impl DocumentView {
     }
 
     /// Shows a parsed document, from the top.
-    pub fn set_document(&self, document: Rc<OpDocument>) {
-        let old_len = self.imp().state.borrow().accessible.len;
+    ///
+    /// The document is taken by value so that the parts of it the plan has
+    /// copied out can be released before it is shared: the block table is
+    /// exactly what `BlockPlan` holds, and keeping both costs 2.8 MiB on the
+    /// 10 MiB fixture (docs/decisions/014-competitive-targets.md, section 3.2).
+    pub fn set_document(&self, mut document: OpDocument) {
+        let old_len = self.imp().state.borrow().accessible_len();
         if old_len > 0 {
             self.update_contents(gtk::AccessibleTextContentChange::Remove, 0, old_len);
         }
+        let width = self.view_width().max(1.0);
+        let column = self.column_width(width);
+        let char_width = self.char_width();
+        let body_px = self.imp().state.borrow().body_px();
+        let plan = BlockPlan::new(
+            &document,
+            Metrics {
+                char_width,
+                body_px,
+            },
+            column,
+        );
+        let entries = Outline::entries_of(&document, &plan);
+        // Both tables have been copied out now: the plan holds the blocks and
+        // the outline holds the headings it needs.
+        document.blocks = Vec::new();
+        document.headings = Vec::new();
+        let document = Rc::new(document);
+        let outline = Rc::new(Outline::new(document.clone(), entries));
         {
             let mut state = self.imp().state.borrow_mut();
+            state.accessible = None;
             state.document = document;
+            state.plan = plan;
+            state.outline = outline;
             state.cache.clear();
             state.recent.clear();
             state.selection = None;
@@ -361,14 +389,12 @@ impl DocumentView {
             state.highlights.clear();
             state.coloured.clear();
         }
-        let width = self.view_width().max(1.0);
-        self.reflow_for(width);
-        {
-            let mut state = self.imp().state.borrow_mut();
-            state.outline = Outline::build(&state.document, &state.plan);
-            state.accessible = super::accessibility::Text::build(&state.plan, &state.document.text);
-        }
-        let len = self.imp().state.borrow().accessible.len;
+        // Rebuilt only for a client that had already asked for the old text.
+        let len = if old_len > 0 {
+            self.imp().state.borrow_mut().accessible().0.len
+        } else {
+            0
+        };
         if len > 0 {
             self.update_contents(gtk::AccessibleTextContentChange::Insert, 0, len);
         }
@@ -440,6 +466,10 @@ impl DocumentView {
         (metrics.approximate_char_width() as f64 / pango::SCALE as f64).max(1.0)
     }
 
+    /// Estimates every block again for a new width, zoom or font. The cuts a
+    /// block was made of do not depend on either, so the plan is re-estimated
+    /// in place rather than rebuilt — which is also what lets the document's
+    /// own block table be released once the plan exists.
     fn reflow_for(&self, width: f64) {
         let column = self.column_width(width);
         let char_width = self.char_width();
@@ -452,8 +482,7 @@ impl DocumentView {
             char_width,
             body_px,
         };
-        let document = state.document.clone();
-        state.plan = BlockPlan::new(&document, metrics, column);
+        state.plan.reflow(metrics, column);
         state.cache.clear();
         state.recent.clear();
     }
@@ -522,7 +551,7 @@ impl DocumentView {
             }
             let measured = set.height();
             let mut state = self.imp().state.borrow_mut();
-            let was_above = state.plan.y_of(index) + block.height <= top;
+            let was_above = state.plan.y_of(index) + block.height as f64 <= top;
             let delta = state.plan.set_measured(index, measured);
             if was_above {
                 shift += delta;
@@ -823,10 +852,12 @@ impl DocumentView {
 
     /// Set only the requested block for offscreen screen-reader queries.
     fn accessible_line(&self, offset: u32) -> Option<(u32, u32)> {
-        let state = self.imp().state.borrow();
-        let position = state
-            .accessible
-            .position(offset, &state.plan, &state.document.text)?;
+        let mut state = self.imp().state.borrow_mut();
+        let position = {
+            let (accessible, plan, source) = state.accessible();
+            accessible.position(offset, plan, source)?
+        };
+        let state = &*state;
         let block = state.plan.block(position.block);
         let temporary;
         let set = if let Some(set) = state.cache.get(&position.block) {
@@ -862,7 +893,7 @@ impl DocumentView {
                             .map
                             .to_document(byte)?
                             .saturating_sub(block.text_start);
-                        Some(state.accessible.offset(
+                        Some(state.accessible.as_ref()?.offset(
                             Position::new(position.block, byte),
                             &state.plan,
                             &state.document.text,
@@ -1043,7 +1074,7 @@ impl DocumentView {
             .active_for_block(state.plan.block_at(self.scroll_top() + tokens::PAD_TOP))
     }
 
-    pub fn outline(&self) -> Outline {
+    pub fn outline(&self) -> Rc<Outline> {
         self.imp().state.borrow().outline.clone()
     }
 
@@ -1085,8 +1116,7 @@ impl DocumentView {
         let heading = state
             .outline
             .active_for_block(block)
-            .and_then(|index| state.outline.entries().get(index))
-            .map(|entry| entry.id.clone());
+            .map(|index| state.outline.id(index).to_string());
         // Measured from the anchor itself, so the same line stays at the same
         // height even when the blocks above it changed size.
         let from = match (&heading, &state.outline) {
@@ -1417,9 +1447,7 @@ fn font_families() -> (String, String) {
 #[cfg(test)]
 impl DocumentView {
     pub(crate) fn verify_accessibility_and_selection(&self) {
-        self.set_document(Rc::new(hashline_markdown::parse(
-            "# Grüße 🌍\n\nÄpfel und Öl.\n",
-        )));
+        self.set_document(hashline_markdown::parse("# Grüße 🌍\n\nÄpfel und Öl.\n"));
         assert_eq!(self.accessible_role(), gtk::AccessibleRole::Document);
         assert!(self.is::<gtk::AccessibleText>());
         assert_eq!(
@@ -1449,10 +1477,9 @@ impl DocumentView {
             }
         }
         assert_eq!(self.selected_text(), selection);
-        let original = self.imp().state.borrow().document.clone();
         let body = "Grüße aus Berlin und Äpfel mit Öl. ".repeat(20);
-        self.set_document(Rc::new(hashline_markdown::parse(&body)));
-        let len = self.imp().state.borrow().accessible.len;
+        self.set_document(hashline_markdown::parse(&body));
+        let len = self.imp().state.borrow_mut().accessible().0.len;
         let mut offset = 0;
         let mut lines = 0;
         while offset < len {
@@ -1469,7 +1496,7 @@ impl DocumentView {
             lines > 1,
             "screen-reader queries must follow visual wrapping"
         );
-        self.set_document(original);
+        self.set_document(hashline_markdown::parse("# Grüße 🌍\n\nÄpfel und Öl.\n"));
     }
 }
 

@@ -6,9 +6,58 @@
 //! and wanted `substring` without a translation table; the Rust renderer slices
 //! `&str` by byte and that reason is gone.
 
-pub const OP_OPEN: u32 = 0;
-pub const OP_CLOSE: u32 = 1;
-pub const OP_TEXT: u32 = 2;
+//! ## The encoding
+//!
+//! Operations are a byte stream, not an array of four-word records. The record
+//! form cost 16 bytes per operation and 24 MiB on the 10 MiB fixture — more
+//! than the whole memory growth decision 014 allows for that document
+//! (docs/decisions/014-competitive-targets.md, section 3.2). A close is one
+//! byte here, an open one or two, a text run three to five.
+//!
+//! ```text
+//! 0x00..=0x3E  OPEN, tag id in the byte itself
+//! 0x40..=0x7E  OPEN with attributes: tag id in the low six bits, then a
+//!              varint count and, per attribute, varint name, string offset
+//!              and length
+//! 0x80         CLOSE
+//! 0x81         TEXT: varint text offset, varint length. The first run of a
+//!              block carries an absolute offset, every later one the distance
+//!              from the run before it, so a block can be decoded on its own.
+//! ```
+//!
+//! Every number is LEB128. `opStart` and `opCount` of a block are therefore a
+//! byte offset and a byte length, not an operation index and a count.
+
+/// Attributes follow this open. The tag id occupies the low six bits, which is
+/// why `ALLOWED_TAGS` may not grow past 63 entries.
+pub const OP_ATTRS: u8 = 0x40;
+pub const OP_TAG_MASK: u8 = 0x3F;
+pub const OP_CLOSE: u8 = 0x80;
+pub const OP_TEXT: u8 = 0x81;
+
+/// Appends an unsigned LEB128 number.
+pub fn write_varint(out: &mut Vec<u8>, mut value: u32) {
+    while value >= 0x80 {
+        out.push((value as u8) | 0x80);
+        value >>= 7;
+    }
+    out.push(value as u8);
+}
+
+/// Reads an unsigned LEB128 number, advancing the cursor.
+pub fn read_varint(bytes: &[u8], cursor: &mut usize) -> u32 {
+    let (mut value, mut shift) = (0u32, 0u32);
+    while *cursor < bytes.len() {
+        let byte = bytes[*cursor];
+        *cursor += 1;
+        value |= ((byte & 0x7F) as u32) << shift;
+        if byte < 0x80 {
+            break;
+        }
+        shift += 7;
+    }
+    value
+}
 
 /// Exactly the tag allowlist `opbuffer.ts` exports; a tag outside it has no id
 /// and is therefore not expressible in the buffer at all.
@@ -143,13 +192,11 @@ const BLOCK_TAGS: [u32; 14] = [
 
 #[derive(Default)]
 pub struct Encoder {
-    pub ops: Vec<u32>,
-    pub attrs: Vec<u32>,
+    pub ops: Vec<u8>,
     /// Attribute values, heading ids and heading texts. Never document text.
     pub strings: String,
     /// The document's text in document order — what the search runs on.
     pub text: String,
-    pub attr_count: u32,
     /// Top-level flow elements: what the block plan virtualizes over
     /// (SPEC.md, section 5). `BLOCK_WORDS` words each.
     pub blocks: Vec<u32>,
@@ -163,9 +210,16 @@ pub struct Encoder {
     /// Tag, first op and — once it has any — text start of the top-level
     /// element being built.
     open_block: Option<(u32, u32, Option<u32>)>,
+    /// Attributes of the element being opened. One buffer serves every
+    /// element, because an open is never nested inside another open.
+    attributes: Vec<(u32, u32, u32)>,
+    /// Whether the block being built has emitted a text run yet, and where the
+    /// last one started: together they make a run's offset a small delta.
+    text_seen: bool,
+    text_cursor: u32,
 }
 
-/// Words per block: tag, opStart, opCount, textStart, textLen.
+/// Words per block: tag, opStart (byte), opCount (bytes), textStart, textLen.
 pub const BLOCK_WORDS: usize = 5;
 
 impl Encoder {
@@ -209,7 +263,19 @@ impl Encoder {
         }
         self.text.push_str(&pending);
         let length = pending.len() as u32;
-        self.ops.extend_from_slice(&[OP_TEXT, offset, length, 0]);
+        self.ops.push(OP_TEXT);
+        // The first run of a block is absolute so the block decodes alone.
+        write_varint(
+            &mut self.ops,
+            if self.text_seen {
+                offset - self.text_cursor
+            } else {
+                offset
+            },
+        );
+        write_varint(&mut self.ops, length);
+        self.text_seen = true;
+        self.text_cursor = offset;
         self.pending = pending;
         self.pending.clear();
     }
@@ -218,7 +284,8 @@ impl Encoder {
         // A top-level element starts a block of the plan. Text flushed above
         // still belongs to the block before it.
         if self.stack.is_empty() {
-            self.open_block = Some((tag, (self.ops.len() / 4) as u32, None));
+            self.open_block = Some((tag, self.ops.len() as u32, None));
+            self.text_seen = false;
         }
         self.hash.write(b"\x00");
         self.hash.write_u32(tag);
@@ -231,37 +298,46 @@ impl Encoder {
             self.current_block()
         };
         self.stack.push(block.unwrap_or(0));
-        Open {
-            tag,
-            attr_start: self.attr_count,
-        }
+        self.attributes.clear();
+        Open { tag }
     }
-    pub fn attribute(&mut self, open: &Open, name: u32, value: &str) {
-        debug_assert!(open.attr_start <= self.attr_count);
+    pub fn attribute(&mut self, _open: &Open, name: u32, value: &str) {
         self.hash.write(b"\x03");
         self.hash.write_u32(name);
         self.hash.write(value.as_bytes());
         let offset = self.intern(value);
-        self.attrs
-            .extend_from_slice(&[name, offset, value.len() as u32]);
-        self.attr_count += 1;
+        self.attributes.push((name, offset, value.len() as u32));
     }
     /// Emits the OPEN once its attributes are known.
     pub fn opened(&mut self, open: Open) {
-        let count = self.attr_count - open.attr_start;
-        self.ops
-            .extend_from_slice(&[OP_OPEN, open.tag, open.attr_start, count]);
+        debug_assert!(open.tag <= OP_TAG_MASK as u32, "tag id must fit six bits");
+        if self.attributes.is_empty() {
+            self.ops.push(open.tag as u8);
+            return;
+        }
+        self.ops.push(open.tag as u8 | OP_ATTRS);
+        // Taken out and put back so the buffer keeps its capacity across
+        // elements while the operations are written.
+        let attributes = std::mem::take(&mut self.attributes);
+        write_varint(&mut self.ops, attributes.len() as u32);
+        for &(name, offset, length) in &attributes {
+            write_varint(&mut self.ops, name);
+            write_varint(&mut self.ops, offset);
+            write_varint(&mut self.ops, length);
+        }
+        self.attributes = attributes;
+        self.attributes.clear();
     }
     pub fn close(&mut self) {
         self.flush_text();
         self.hash.write(b"\x01");
         self.stack.pop();
-        self.ops.extend_from_slice(&[OP_CLOSE, 0, 0, 0]);
+        self.ops.push(OP_CLOSE);
         // Closing back to depth zero completes the block: its operations and
         // its slice of the text blob are now both known.
         if self.stack.is_empty() {
             if let Some((tag, op_start, text_start)) = self.open_block.take() {
-                let op_count = (self.ops.len() / 4) as u32 - op_start;
+                let op_count = self.ops.len() as u32 - op_start;
                 // A block without text — a rule, an image on its own — is an
                 // empty range at the position it occupies.
                 let text_start = text_start.unwrap_or(self.text.len() as u32);
@@ -279,7 +355,7 @@ impl Encoder {
         self.flush_text();
         let hash = self.hash.value();
         self.hash = Fnv::default();
-        (self.ops.len() / 4, hash)
+        (self.ops.len(), hash)
     }
     /// Offset and length of `value` after appending it; for ids and heading text.
     pub fn reference(&mut self, value: &str) -> (u32, u32) {
@@ -290,5 +366,4 @@ impl Encoder {
 /// An element whose attributes are still being collected.
 pub struct Open {
     tag: u32,
-    attr_start: u32,
 }

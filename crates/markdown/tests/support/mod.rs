@@ -12,11 +12,9 @@
 // the part it needs.
 #![allow(dead_code)]
 
-use hashline_markdown::{OpDocument, ALLOWED_ATTR, ALLOWED_TAGS};
-
-pub const OP_OPEN: u32 = hashline_markdown::OP_OPEN;
-pub const OP_CLOSE: u32 = hashline_markdown::OP_CLOSE;
-pub const OP_TEXT: u32 = hashline_markdown::OP_TEXT;
+use hashline_markdown::{
+    read_varint, OpDocument, ALLOWED_ATTR, ALLOWED_TAGS, OP_ATTRS, OP_CLOSE, OP_TAG_MASK, OP_TEXT,
+};
 
 /// Words per section and per heading, as `OpDocument` documents them.
 pub const SECTION_WORDS: usize = hashline_markdown::SECTION_WORDS;
@@ -113,15 +111,15 @@ impl Doc {
     }
 
     /// Every TEXT operation in document order, as `(offset, length)`.
+    ///
+    /// Text offsets are relative to the run before them inside a block, so the
+    /// whole stream is walked rather than scanned for text bytes.
     pub fn text_runs(&self) -> Vec<(u32, u32)> {
         let mut runs = Vec::new();
-        let mut cursor = 0usize;
-        while cursor < self.document.ops.len() {
-            let op = &self.document.ops[cursor..cursor + 4];
-            if op[0] == OP_TEXT {
-                runs.push((op[1], op[2]));
-            }
-            cursor += 4;
+        for index in 0..self.block_count() {
+            let words = self.block(index);
+            let (start, end) = (words[1] as usize, (words[1] + words[2]) as usize);
+            runs.extend(text_runs_in(&self.document.ops[start..end]));
         }
         runs
     }
@@ -137,48 +135,99 @@ impl Doc {
 
     fn replay_section(&self, index: usize, out: &mut String) {
         let words = self.section(index);
-        let start = words[0] as usize * 4;
-        let end = start + words[1] as usize * 4;
+        let start = words[0] as usize;
+        let end = start + words[1] as usize;
         let ops = &self.document.ops[start..end];
         let mut open: Vec<&str> = Vec::new();
         let mut cursor = 0usize;
+        // A section may hold several blocks, and a text offset is absolute
+        // only for the first run of each. The replay therefore restarts its
+        // delta whenever a top-level element opens.
+        let mut depth = 0usize;
+        let mut text_seen = false;
+        let mut text_cursor = 0u32;
         while cursor < ops.len() {
-            let op = &ops[cursor..cursor + 4];
-            cursor += 4;
-            match op[0] {
-                OP_OPEN => {
-                    let tag = ALLOWED_TAGS[op[1] as usize];
-                    out.push('<');
-                    out.push_str(tag);
-                    for i in 0..op[3] as usize {
-                        let attr = (op[2] as usize + i) * 3;
-                        let name = ALLOWED_ATTR[self.document.attrs[attr] as usize];
-                        let value = self
-                            .strings
-                            .slice(self.document.attrs[attr + 1], self.document.attrs[attr + 2]);
-                        out.push(' ');
-                        out.push_str(name);
-                        out.push_str("=\"");
-                        out.push_str(&escape_attribute(&value));
-                        out.push('"');
-                    }
-                    out.push('>');
-                    open.push(tag);
-                }
+            let byte = ops[cursor];
+            cursor += 1;
+            match byte {
                 OP_CLOSE => {
                     let tag = open.pop().expect("close without open");
+                    depth -= 1;
                     if !VOID.contains(&tag) {
                         out.push_str("</");
                         out.push_str(tag);
                         out.push('>');
                     }
                 }
-                OP_TEXT => out.push_str(&escape_text(&self.text.slice(op[1], op[2]))),
-                other => panic!("unknown operation {other}"),
+                OP_TEXT => {
+                    let value = read_varint(ops, &mut cursor);
+                    let length = read_varint(ops, &mut cursor);
+                    let offset = if text_seen {
+                        text_cursor + value
+                    } else {
+                        value
+                    };
+                    text_seen = true;
+                    text_cursor = offset;
+                    out.push_str(&escape_text(&self.text.slice(offset, length)));
+                }
+                byte => {
+                    if depth == 0 {
+                        text_seen = false;
+                    }
+                    depth += 1;
+                    let tag = ALLOWED_TAGS[(byte & OP_TAG_MASK) as usize];
+                    out.push('<');
+                    out.push_str(tag);
+                    if byte & OP_ATTRS != 0 {
+                        let count = read_varint(ops, &mut cursor);
+                        for _ in 0..count {
+                            let name = ALLOWED_ATTR[read_varint(ops, &mut cursor) as usize];
+                            let at = read_varint(ops, &mut cursor);
+                            let length = read_varint(ops, &mut cursor);
+                            out.push(' ');
+                            out.push_str(name);
+                            out.push_str("=\"");
+                            out.push_str(&escape_attribute(&self.strings.slice(at, length)));
+                            out.push('"');
+                        }
+                    }
+                    out.push('>');
+                    open.push(tag);
+                }
             }
         }
         assert!(open.is_empty(), "section {index} left elements open");
     }
+}
+
+/// Every text run of one block's operations, as absolute `(offset, length)`.
+pub fn text_runs_in(ops: &[u8]) -> Vec<(u32, u32)> {
+    let mut runs = Vec::new();
+    let (mut cursor, mut seen, mut previous) = (0usize, false, 0u32);
+    while cursor < ops.len() {
+        let byte = ops[cursor];
+        cursor += 1;
+        match byte {
+            OP_CLOSE => {}
+            OP_TEXT => {
+                let value = read_varint(ops, &mut cursor);
+                let length = read_varint(ops, &mut cursor);
+                let offset = if seen { previous + value } else { value };
+                seen = true;
+                previous = offset;
+                runs.push((offset, length));
+            }
+            byte if byte & OP_ATTRS != 0 => {
+                let count = read_varint(ops, &mut cursor);
+                for _ in 0..count * 3 {
+                    read_varint(ops, &mut cursor);
+                }
+            }
+            _ => {}
+        }
+    }
+    runs
 }
 
 fn escape_text(value: &str) -> String {

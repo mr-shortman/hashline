@@ -31,7 +31,7 @@ fn every_operation_belongs_to_exactly_one_block() {
         assert!(block[2] > 0, "block {index} is empty");
         next_op = block[1] + block[2];
     }
-    assert_eq!(next_op as usize * 4, doc.document.ops.len());
+    assert_eq!(next_op as usize, doc.document.ops.len());
 }
 
 #[test]
@@ -57,17 +57,12 @@ fn a_blocks_text_range_contains_the_text_its_operations_reference() {
         let block = doc.block(index);
         let (op_start, op_count) = (block[1] as usize, block[2] as usize);
         let (start, length) = (block[3], block[4]);
-        let ops = &doc.document.ops[op_start * 4..(op_start + op_count) * 4];
-        let mut cursor = 0;
-        while cursor < ops.len() {
-            if ops[cursor] == support::OP_TEXT {
-                let (offset, run) = (ops[cursor + 1], ops[cursor + 2]);
-                assert!(
-                    offset >= start && offset + run <= start + length,
-                    "block {index}: text run {offset}+{run} escapes {start}+{length}"
-                );
-            }
-            cursor += 4;
+        for (offset, run) in support::text_runs_in(&doc.document.ops[op_start..op_start + op_count])
+        {
+            assert!(
+                offset >= start && offset + run <= start + length,
+                "block {index}: text run {offset}+{run} escapes {start}+{length}"
+            );
         }
     }
 }

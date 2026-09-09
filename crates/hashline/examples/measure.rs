@@ -189,7 +189,7 @@ fn geometry_report(
             let block = *plan.block(index);
             let height = set_block(context, &document, &block, style, column, &NoImages).height();
             if block.kind == BlockKind::Code {
-                code_estimated += block.height;
+                code_estimated += block.height();
                 code_measured += height;
                 code_blocks += 1;
             }

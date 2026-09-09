@@ -11,7 +11,6 @@
 //! (docs/decisions/008-parser-reference.md).
 
 mod opbuffer;
-mod packet;
 mod slug;
 
 use opbuffer::*;
@@ -22,8 +21,9 @@ use std::collections::HashMap;
 
 // The op vocabulary is the contract between parser and renderer
 // (SPEC.md, section 6). The native view decodes the buffer with these.
-pub use opbuffer::{ALLOWED_ATTR, ALLOWED_TAGS, BLOCK_WORDS, OP_CLOSE, OP_OPEN, OP_TEXT};
-pub use packet::{to_packet, Layout};
+pub use opbuffer::{
+    read_varint, ALLOWED_ATTR, ALLOWED_TAGS, BLOCK_WORDS, OP_ATTRS, OP_CLOSE, OP_TAG_MASK, OP_TEXT,
+};
 pub use slug::slug_base;
 
 /// The GFM set Hashline supports, unchanged from the marked configuration it
@@ -45,8 +45,8 @@ pub const HEADING_WORDS: usize = 6;
 
 #[derive(Default)]
 pub struct OpDocument {
-    pub ops: Vec<u32>,
-    pub attrs: Vec<u32>,
+    /// The operation stream (see `opbuffer`), a byte encoding.
+    pub ops: Vec<u8>,
     /// Attribute values, heading ids and heading texts.
     pub strings: String,
     /// The document's text in document order, with a separator between blocks.
@@ -439,7 +439,7 @@ pub fn parse(source: &str) -> OpDocument {
         if events.is_empty() {
             return;
         }
-        let op_start = (builder.enc.ops.len() / 4) as u32;
+        let op_start = builder.enc.ops.len() as u32;
         let text_start = builder.enc.text_len();
         for event in events.iter() {
             builder.event(event);
@@ -512,8 +512,17 @@ pub fn parse(source: &str) -> OpDocument {
     document.raw_html = builder.raw_html;
     document.blocks = std::mem::take(&mut builder.enc.blocks);
     document.ops = std::mem::take(&mut builder.enc.ops);
-    document.attrs = std::mem::take(&mut builder.enc.attrs);
     document.strings = std::mem::take(&mut builder.enc.strings);
     document.text = std::mem::take(&mut builder.enc.text);
+    // Every blob grew by doubling, so each can hold up to twice what it needs.
+    // On the 10 MiB fixture that slack is several megabytes against a budget of
+    // twice the file size (docs/decisions/014-competitive-targets.md,
+    // section 3.2), and the document is never appended to again.
+    document.ops.shrink_to_fit();
+    document.strings.shrink_to_fit();
+    document.text.shrink_to_fit();
+    document.blocks.shrink_to_fit();
+    document.sections.shrink_to_fit();
+    document.headings.shrink_to_fit();
     document
 }

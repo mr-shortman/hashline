@@ -12,7 +12,7 @@
 //! and hit-testing all go through that one mapping rather than each keeping
 //! its own idea of where things are.
 
-use hashline_markdown::{OpDocument, OP_OPEN, OP_TEXT};
+use hashline_markdown::{read_varint, OpDocument, OP_ATTRS, OP_CLOSE, OP_TAG_MASK, OP_TEXT};
 use pango::prelude::*;
 
 use crate::layout::{Block, BlockKind, TextMap};
@@ -488,32 +488,58 @@ fn background(color: Color) -> pango::Attribute {
     .upcast()
 }
 
-/// One operation of the buffer, decoded.
-enum Op {
-    Open { tag: u32, attrs: u32, count: u32 },
+/// One operation of the buffer, decoded. An open carries the bytes of its
+/// attributes rather than a range into a second array.
+enum Op<'a> {
+    Open { tag: u32, attrs: &'a [u8] },
     Close,
     Text { offset: u32, len: u32 },
 }
 
-fn ops_of<'a>(document: &'a OpDocument, block: &Block) -> impl Iterator<Item = Op> + 'a {
-    let first = block.op_start as usize * 4;
-    let last = first + block.op_count as usize * 4;
-    document.ops[first..last]
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .map(|op| match op[0] {
-            OP_OPEN => Op::Open {
-                tag: op[1],
-                attrs: op[2],
-                count: op[3],
-            },
-            OP_TEXT => Op::Text {
-                offset: op[1],
-                len: op[2],
-            },
-            _ => Op::Close,
-        })
+/// Walks one block's operations. The stream is byte oriented and every number
+/// is a varint, so it is read forwards from the block's first byte; a block is
+/// self-contained because its first text run carries an absolute offset.
+fn ops_of<'a>(document: &'a OpDocument, block: &Block) -> impl Iterator<Item = Op<'a>> + 'a {
+    let first = block.op_start as usize;
+    let last = first + block.op_count as usize;
+    let bytes = &document.ops[first..last];
+    let mut cursor = 0usize;
+    let mut text_seen = false;
+    let mut text_cursor = 0u32;
+    std::iter::from_fn(move || {
+        let byte = *bytes.get(cursor)?;
+        cursor += 1;
+        match byte {
+            OP_CLOSE => Some(Op::Close),
+            OP_TEXT => {
+                let value = read_varint(bytes, &mut cursor);
+                let len = read_varint(bytes, &mut cursor);
+                let offset = if text_seen {
+                    text_cursor + value
+                } else {
+                    value
+                };
+                text_seen = true;
+                text_cursor = offset;
+                Some(Op::Text { offset, len })
+            }
+            _ => {
+                let tag = (byte & OP_TAG_MASK) as u32;
+                if byte & OP_ATTRS == 0 {
+                    return Some(Op::Open { tag, attrs: &[] });
+                }
+                let count = read_varint(bytes, &mut cursor);
+                let start = cursor;
+                for _ in 0..count * 3 {
+                    read_varint(bytes, &mut cursor);
+                }
+                Some(Op::Open {
+                    tag,
+                    attrs: &bytes[start..cursor],
+                })
+            }
+        }
+    })
 }
 
 /// The part of one text run that belongs to `block`.
@@ -536,20 +562,22 @@ fn run<'a>(
     Some((from, &document.text[from as usize..to as usize]))
 }
 
-fn attribute(document: &OpDocument, attrs: u32, count: u32, name: u32) -> Option<&str> {
-    (0..count as usize).find_map(|index| {
-        let at = (attrs as usize + index) * 3;
-        if document.attrs[at] != name {
-            return None;
+/// The value of one attribute of an open, decoded out of its bytes.
+fn attribute<'a>(document: &'a OpDocument, attrs: &[u8], name: u32) -> Option<&'a str> {
+    let mut cursor = 0usize;
+    while cursor < attrs.len() {
+        let found = read_varint(attrs, &mut cursor);
+        let from = read_varint(attrs, &mut cursor) as usize;
+        let length = read_varint(attrs, &mut cursor) as usize;
+        if found == name {
+            return document.strings.get(from..from + length);
         }
-        let from = document.attrs[at + 1] as usize;
-        let to = from + document.attrs[at + 2] as usize;
-        Some(&document.strings[from..to])
-    })
+    }
+    None
 }
 
-fn has_class(document: &OpDocument, attrs: u32, count: u32, value: &str) -> bool {
-    attribute(document, attrs, count, ATTR_CLASS) == Some(value)
+fn has_class(document: &OpDocument, attrs: &[u8], value: &str) -> bool {
+    attribute(document, attrs, ATTR_CLASS) == Some(value)
 }
 
 /// The language of a fenced code block, from the `language-…` class the
@@ -557,9 +585,9 @@ fn has_class(document: &OpDocument, attrs: u32, count: u32, value: &str) -> bool
 /// block.
 pub fn code_language(document: &OpDocument, block: &Block) -> String {
     for op in ops_of(document, block) {
-        if let Op::Open { tag, attrs, count } = op {
+        if let Op::Open { tag, attrs } = op {
             if tag == TAG_CODE {
-                if let Some(class) = attribute(document, attrs, count, ATTR_CLASS) {
+                if let Some(class) = attribute(document, attrs, ATTR_CLASS) {
                     if let Some(language) = class.strip_prefix("language-") {
                         return language.to_string();
                     }
@@ -617,14 +645,14 @@ impl BlockLayout {
 fn inline_into(compose: &mut Compose, document: &OpDocument, block: &Block) {
     for op in ops_of(document, block) {
         match op {
-            Op::Open { tag, attrs, count } => {
+            Op::Open { tag, attrs } => {
                 if tag == TAG_BR {
                     compose.after_break();
                 }
                 compose.open_span(
                     tag,
-                    has_class(document, attrs, count, "raw-html"),
-                    attribute(document, attrs, count, ATTR_HREF).map(str::to_owned),
+                    has_class(document, attrs, "raw-html"),
+                    attribute(document, attrs, ATTR_HREF).map(str::to_owned),
                 )
             }
             Op::Close => compose.close_span(),
@@ -953,11 +981,11 @@ fn list(
 
     for op in ops_of(document, block) {
         match op {
-            Op::Open { tag, attrs, count } => match tag {
+            Op::Open { tag, attrs } => match tag {
                 TAG_UL | TAG_OL => {
                     levels.push(Level {
                         ordered: tag == TAG_OL,
-                        next: attribute(document, attrs, count, ATTR_START)
+                        next: attribute(document, attrs, ATTR_START)
                             .and_then(|value| value.parse().ok())
                             .unwrap_or(1),
                     });
@@ -974,7 +1002,7 @@ fn list(
                     stack.push(Frame::Item);
                 }
                 TAG_INPUT => {
-                    let checked = attribute(document, attrs, count, ATTR_CHECKED).is_some();
+                    let checked = attribute(document, attrs, ATTR_CHECKED).is_some();
                     if let Some(&index) = open_items.last() {
                         items[index].task = Some(checked);
                     }
@@ -990,8 +1018,8 @@ fn list(
                     if let Some(&index) = open_items.last() {
                         items[index].compose.open_span(
                             tag,
-                            has_class(document, attrs, count, "raw-html"),
-                            attribute(document, attrs, count, ATTR_HREF).map(str::to_owned),
+                            has_class(document, attrs, "raw-html"),
+                            attribute(document, attrs, ATTR_HREF).map(str::to_owned),
                         );
                         stack.push(Frame::Span);
                     } else {
@@ -1110,7 +1138,7 @@ fn table(
     let mut in_cell = false;
     for op in ops_of(document, block) {
         match op {
-            Op::Open { tag, attrs, count } => match tag {
+            Op::Open { tag, attrs } => match tag {
                 TAG_TABLE => {}
                 TAG_TR => rows.push(Vec::new()),
                 TAG_TH | TAG_TD => {
@@ -1130,8 +1158,8 @@ fn table(
                         if let Some(cell) = rows.last_mut().and_then(|row| row.last_mut()) {
                             cell.compose.open_span(
                                 tag,
-                                has_class(document, attrs, count, "raw-html"),
-                                attribute(document, attrs, count, ATTR_HREF).map(str::to_owned),
+                                has_class(document, attrs, "raw-html"),
+                                attribute(document, attrs, ATTR_HREF).map(str::to_owned),
                             );
                         }
                     }
@@ -1313,11 +1341,11 @@ fn picture(
     let mut elements = 0;
     for op in ops_of(document, block) {
         match op {
-            Op::Open { tag, attrs, count } => {
+            Op::Open { tag, attrs } => {
                 elements += 1;
                 if tag == TAG_IMG {
-                    source = attribute(document, attrs, count, ATTR_SRC).map(str::to_owned);
-                    alt = attribute(document, attrs, count, ATTR_ALT)
+                    source = attribute(document, attrs, ATTR_SRC).map(str::to_owned);
+                    alt = attribute(document, attrs, ATTR_ALT)
                         .unwrap_or_default()
                         .to_owned();
                 } else if tag != 0 {

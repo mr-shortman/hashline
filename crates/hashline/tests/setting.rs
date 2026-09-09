@@ -65,7 +65,7 @@ fn a_set_block_has_a_real_height_and_the_estimate_is_in_the_same_league() {
         let block = *plan.block(index);
         let measured = set_block(&context, &document, &block, &style(), 640.0, &NoImages).height();
         assert!(measured > 0.0, "block {index} measured {measured}");
-        let estimate = block.height;
+        let estimate = block.height();
         // The estimate only has to make the scrollbar plausible, so this is a
         // loose bound — but an estimate off by an order of magnitude would make
         // scrolling lurch, and that is worth catching.

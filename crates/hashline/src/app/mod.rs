@@ -9,6 +9,8 @@ use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
 
+mod outline_view;
+
 use crate::document::{self, Anchor, Watch};
 use crate::preferences::Preferences;
 use crate::theme::{document as tokens, DARK, LIGHT};
@@ -140,11 +142,9 @@ struct Ui {
     theme_ready: Cell<bool>,
     present_requested: Cell<bool>,
     outline_revealer: gtk::Revealer,
-    outline_list: gtk::ListBox,
+    outline_list: outline_view::OutlineList,
     /// The document area, indented when the outline shows as a sidebar.
     content: gtk::Box,
-    /// Which blocks the outline rows point at, by row index.
-    outline_blocks: RefCell<Vec<usize>>,
     banner: gtk::Revealer,
     banner_label: gtk::Label,
     current: RefCell<Option<PathBuf>>,
@@ -244,12 +244,11 @@ impl Ui {
 
         // The outline: an overlay over the document, given room as a sidebar
         // once the window is wide enough (SPEC.md, section 3).
-        let outline_list = gtk::ListBox::new();
-        outline_list.set_selection_mode(gtk::SelectionMode::Single);
+        let outline_list = outline_view::OutlineList::new();
         let outline_scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .width_request(260)
-            .child(&outline_list)
+            .child(&outline_list.view)
             .build();
         outline_scroller.add_css_class("sidebar");
         let outline_revealer = gtk::Revealer::builder()
@@ -358,7 +357,6 @@ impl Ui {
             outline_revealer: outline_revealer.clone(),
             outline_list,
             content,
-            outline_blocks: RefCell::new(Vec::new()),
             current: RefCell::new(None),
             watch: RefCell::new(None),
             digest: Cell::new(0),
@@ -524,12 +522,8 @@ impl Ui {
                 None
             });
         let ui = self.clone();
-        self.outline_list.connect_row_activated(move |_, row| {
-            let index = row.index();
-            if index < 0 {
-                return;
-            }
-            if let Some(&block) = ui.outline_blocks.borrow().get(index as usize) {
+        self.outline_list.view.connect_activate(move |_, position| {
+            if let Some(block) = ui.outline_list.block_at(position) {
                 ui.view.scroll_to_block(block);
             }
         });
@@ -548,35 +542,15 @@ impl Ui {
     }
 
     fn fill_outline(&self) {
-        while let Some(row) = self.outline_list.first_child() {
-            self.outline_list.remove(&row);
-        }
-        let outline = self.view.outline();
-        let mut blocks = Vec::new();
-        for entry in outline.entries() {
-            let label = gtk::Label::new(Some(&entry.text));
-            label.set_xalign(0.0);
-            label.set_ellipsize(pango::EllipsizeMode::End);
-            // Depth by indent, so the structure is visible without markup.
-            label.set_margin_start(8 + 12 * (entry.level.saturating_sub(1)) as i32);
-            label.set_margin_end(8);
-            label.set_margin_top(4);
-            label.set_margin_bottom(4);
-            self.outline_list.append(&label);
-            blocks.push(entry.block);
-        }
-        *self.outline_blocks.borrow_mut() = blocks;
+        // No widgets are built here: the model hands the list view a row only
+        // when that row is on screen.
+        self.outline_list.model.set_outline(self.view.outline());
         self.update_active_section();
     }
 
     fn update_active_section(&self) {
-        let row = self
-            .view
-            .active_section()
-            .and_then(|index| self.outline_list.row_at_index(index as i32));
-        if self.outline_list.selected_row() != row {
-            self.outline_list.select_row(row.as_ref());
-        }
+        self.outline_list
+            .select(self.view.active_section().map(|index| index as u32));
     }
 
     fn open_files(self: &Rc<Self>, files: &[gio::File]) {
@@ -650,6 +624,7 @@ impl Ui {
                     if let Some(anchor) = loaded.anchor.or(stored) {
                         ui.view.restore_anchor(&anchor);
                     }
+                    release_free_memory();
                 }
                 Err(error) => ui.show_error(&loaded.path, &error),
             }
@@ -661,7 +636,7 @@ impl Ui {
         // never the process working directory (SPEC.md, section 7).
         self.view
             .set_base_directory(path.parent().map(Path::to_path_buf));
-        self.view.set_document(Rc::new(document));
+        self.view.set_document(document);
         // The shown name changes only once the new document is actually in
         // place (SPEC.md, section 7).
         if let Some(name) = path.file_name() {
@@ -867,7 +842,7 @@ impl Ui {
             if ui.overlay_order.borrow().last() == Some(&"search") {
                 ui.search_entry.grab_focus();
             } else if ui.outline_revealer.reveals_child() {
-                ui.outline_list.grab_focus();
+                ui.outline_list.view.grab_focus();
             } else {
                 ui.view.grab_focus();
             }
@@ -1125,6 +1100,28 @@ impl Ui {
     }
 }
 
+/// Returns the memory freed by a load to the operating system.
+///
+/// Reading and parsing a document allocates a great deal that is released
+/// again immediately: the source text, the parser's events, the block table
+/// the plan has copied out. glibc keeps those pages for reuse, and they count
+/// towards PSS whether or not the reader ever uses them again — 2 MiB on a
+/// 100 KiB document and far more on a large one, against a budget that allows
+/// twice the file size in total (docs/decisions/014-competitive-targets.md,
+/// section 3.2). This is called once per load, never while drawing.
+fn release_free_memory() {
+    #[cfg(target_env = "gnu")]
+    {
+        extern "C" {
+            fn malloc_trim(pad: usize) -> std::ffi::c_int;
+        }
+        // Safe: no arguments, no pointers, and it only returns unused pages.
+        unsafe {
+            malloc_trim(0);
+        }
+    }
+}
+
 fn is_markdown(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|value| value.to_str()),
@@ -1237,8 +1234,8 @@ mod tests {
         pump();
         ui.view.verify_accessibility_and_selection();
         ui.fill_outline();
-        assert!(ui.outline_list.row_at_index(0).is_some());
-        assert_eq!(ui.outline_list.selected_row().unwrap().index(), 0);
+        assert!(ui.outline_list.model.n_items() > 0);
+        assert_eq!(ui.outline_list.selected(), Some(0));
         for mode in ["dark", "light", "system"] {
             let action = ui.window.lookup_action("theme").unwrap();
             action.activate(Some(&mode.to_variant()));
