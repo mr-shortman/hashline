@@ -277,16 +277,20 @@ Diese Punkte blockieren die Suite und sind vor ihrem Bau zu erledigen:
    `marked` und `jsdom` aus npm — die Node-Toolchain ist mit dem WebView-Stack
    entfernt worden. Ein frischer Klon kann heute **keine einzige Messung dieses
    Projekts wiederholen.** Der Generator muss nach Rust, oder die Fixtures ins
-   Repository. Ohne das ist jede Zielzahl unbelegbar.
-2. **`memory.py` und `startup-wayland.py` sind nicht committet.**
-3. **Der Inhaltsnachweis fehlt** als Werkzeug, obwohl SPEC Abschnitt 9 ihn
-   verlangt.
-4. **`benchmarks/REFERENCE.md` ist veraltet** — es beschreibt `tauri-driver`,
-   `desktop.py` und `npm run fixtures`; nichts davon existiert noch.
-5. **Die Renderer-Entscheidung steht aus.** `cairo` gegen Vulkan entscheidet über
+   Repository. Ohne das ist jede Zielzahl unbelegbar. Das ist die einzige
+   Voraussetzung, die alle anderen blockiert.
+2. **Der Inhaltsnachweis fehlt** als Werkzeug, obwohl SPEC Abschnitt 9 ihn
+   verlangt. Ohne ihn ist keine `cairo`-Startzeit als „erste lesbare
+   Darstellung" verwendbar, siehe Abschnitt 1.
+3. **Die Renderer-Entscheidung steht aus.** `cairo` gegen Vulkan entscheidet über
    rund 53 MiB Speicher und mehr als 100 ms Startzeit, und die Frametimes von
    `cairo` kennt niemand. Bis das gemessen ist, sind die Zielwerte aus
    Abschnitt 3 nicht abnehmbar.
+
+Zwei Punkte der ursprünglichen Liste sind inzwischen erledigt: `memory.py` und
+`startup-wayland.py` sind committet, und `benchmarks/REFERENCE.md` ist mit den
+übrigen WebView-Unterlagen aus dem Baum entfernt — die laufenden Messbefehle
+stehen in [Prüfungen](../testing.md).
 
 ## 7. Was diese Entscheidung nicht tut
 

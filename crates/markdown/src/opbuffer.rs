@@ -1,5 +1,5 @@
-//! The op buffer from docs/decisions/007-performance-path.md, section 4,
-//! adapted for the native renderer (SPEC.md, section 6).
+//! The op buffer (SPEC.md, section 6, and
+//! docs/decisions/010-op-buffer-for-the-native-renderer.md).
 //!
 //! Offsets and lengths are **UTF-8 byte offsets** into `strings` and `text`.
 //! They counted UTF-16 code units for as long as the consumer was JavaScript

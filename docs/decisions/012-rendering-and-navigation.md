@@ -103,7 +103,7 @@ werden. Die Zuordnung geschieht direkt über die stabilen Präfixe der
 TextMate-Scope-Konvention (`keyword`, `storage`, `string`, `constant.numeric`).
 Damit bleiben die Design-Tokens die einzige Farbquelle und es kommt keine
 Theme-Datei in den Build — dasselbe Prinzip, das
-[003-highlighting.md](003-highlighting.md) für highlight.js festgelegt hat.
+der WebView-Stand für highlight.js festgelegt hatte.
 
 `regex-fancy` statt `regex-onig`, damit keine C-Bibliothek dazukommt.
 Hervorgehoben wird je sichtbarem Codeblock auf einem Arbeitsthread, das

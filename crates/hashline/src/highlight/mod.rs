@@ -4,9 +4,7 @@
 //! carries exactly three syntax colours — keyword, string and number — so a
 //! Sublime colour scheme would have to be flattened into them anyway. Mapping
 //! scopes to those three directly keeps the design tokens the single source of
-//! colour and keeps a theme file out of the build
-//! ([003-highlighting.md](../../docs/decisions/003-highlighting.md) kept the
-//! same principle for highlight.js).
+//! colour and keeps a theme file out of the build.
 //!
 //! Highlighting never runs on the main thread and never on the whole document:
 //! it is requested per visible code block and cached by block.

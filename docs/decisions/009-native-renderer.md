@@ -1,16 +1,17 @@
 # 009 — Nativer GTK4-Renderer statt WebView
 
 Status: Entscheidung getroffen, Umsetzung offen. Stand: 8. September 2026.
-Vorgänger: [007-performance-path.md](007-performance-path.md),
-[008-parser-reference.md](008-parser-reference.md),
-[Übergabestand](../performance-progress.md), [Benchmarkbericht](../../benchmarks/REPORT.md).
+Vorgänger: [008-parser-reference.md](008-parser-reference.md).
 
-Diese Entscheidung **kehrt 007 um**. 007 hat den nativen Rewrite geprüft und
-abgelehnt; Phase 2 wurde ausdrücklich so geschnitten, dass diese Ablehnung
-umkehrbar bleibt. Die Umkehr tritt jetzt ein, weil eine neue Messung die
-tragende Annahme von 007 widerlegt.
+Diese Entscheidung **kehrt den Performancepfad des WebView-Stands um**. Jener
+Pfad hatte den nativen Rewrite geprüft und abgelehnt und seine zweite Phase
+ausdrücklich so geschnitten, dass die Ablehnung umkehrbar bleibt. Die Umkehr
+tritt jetzt ein, weil eine neue Messung die tragende Annahme widerlegt. Die
+Messreihen, auf die sich der Vergleich unten stützt, liegen im Tag
+`webview-final`; im Baum stehen nur noch die nativen Reihen unter
+`benchmarks/results/native-*`.
 
-## 1. Die Annahme aus 007 und was sie widerlegt
+## 1. Die Annahme des WebView-Pfads und was sie widerlegt
 
 007, Abschnitt 1 schließt aus fünf Stichproben:
 
@@ -98,39 +99,30 @@ Suchindex, Slug-Regel, Abschnittsbildung und deren Tests werden vollständig
 
 ## 4. Was ungültig wird
 
-- **007, Abschnitt 1, „Entscheidung"** — „Der Web-Renderer bleibt" und „Tauri
-  bleibt vorerst" sind aufgehoben. Der Rest von 007, insbesondere die Analyse der
-  strukturellen Engpässe und die Paketbeschreibungen P1.1–P2.5, bleibt als
-  Historie gültig.
-- **007, P1.5–P1.7** — die drei nie begonnenen Pakete entfallen ersatzlos. P1.7
-  (Startpfad) ist durch diese Entscheidung beantwortet: die 731 ms sind
-  WebView-Boot, und der wird entfernt statt optimiert.
-- **[006-custom-titlebar.md](006-custom-titlebar.md)** — aufgehoben, als
-  Produktentscheidung und nicht nur technisch. Unter GTK4 übernimmt
-  `GtkHeaderBar` Fensterknöpfe, Ziehflächen, Doppelklick, Tastaturfokus und
-  Barrierefreiheit; die Gründe, aus denen 006 den Eigenbau wählte, entfallen
-  damit. Die Datei bleibt als Historie erhalten und ist hiermit als überholt
-  markiert.
-- **[004-rendering-gate.md](004-rendering-gate.md)** — der abschnittsweise,
-  abbrechbare DOM-Aufbau wird durch Virtualisierung ersetzt: es gibt keinen
-  Aufbau mehr, der abgebrochen werden müsste. Die dort dokumentierten Grenzfälle
-  bleiben als Testmaterial gültig.
-- **[002-webkit-parser.md](002-webkit-parser.md)** — die Begrenzung des
-  Marked-Tokenizers war bereits mit dem Rust-Parser aus P2.3 gegenstandslos und
-  ist es nun endgültig. Reine Historie.
-- **[003-highlighting.md](003-highlighting.md)** — highlight.js entfällt mit der
-  JavaScript-Laufzeit. Das Prinzip bleibt gültig und wird übernommen: begrenzte
-  Sprachauswahl, nur sichtbare Blöcke, keine automatische Spracherkennung. Der
-  Ersatz ist `syntect` und braucht eine eigene Entscheidung, sobald die
-  Sprachliste und das Theme-Format feststehen.
-- **[001-resources.md](001-resources.md)** — Tauri-Dateifreigaben,
-  IPC-Base64-Vermeidung und Ressourcen-URLs entfallen mit der WebView. Was
-  bestehen bleibt und in SPEC Abschnitt 7 und 11 übernommen ist: die Bindung des
-  automatischen Bildzugriffs an das Dokumentverzeichnis, die Behandlung
-  entweichender Symlinks und die Größen- und Pixelbudgets.
-- **DOMPurify und die Inhaltsrichtlinie** entfallen mit dem HTML-Pfad. Rohes HTML
-  wird als Quelltext dargestellt; siehe SPEC Abschnitt 6. Das ist eine bewusste
+Diese Entscheidung hebt den gesamten WebView-Stand auf. Die Entscheidungen
+001 bis 007 beschrieben Tauri, WebKitGTK, `marked`, highlight.js, DOMPurify und
+den abschnittsweisen DOM-Aufbau; keines dieser Teile existiert noch. Sie sind
+aus dem Baum entfernt und im Tag `webview-final` erhalten. Was von ihnen
+weitergilt, steht nicht mehr dort, sondern in `SPEC.md`:
+
+- **Begrenztes, verzögertes Highlighting** — begrenzte Sprachauswahl, nur
+  sichtbare Blöcke, keine automatische Spracherkennung. Der Ersatz für
+  highlight.js ist `syntect` (SPEC Abschnitt 4 und 10).
+- **Der Ressourcenschutz** — automatischer Bildzugriff bleibt an das
+  Dokumentverzeichnis gebunden, entweichende Symlinks werden abgewiesen, Größen-
+  und Pixelbudgets gelten unverändert (SPEC Abschnitt 7 und 11).
+- **Die Grenzfälle aus dem Rendering-Gate** bleiben als Testmaterial gültig:
+  lange Zeilen, tiefe Listen, breite Tabellen, große Codeblöcke.
+- **Die eigene Titelleiste entfällt.** Unter GTK4 übernimmt `GtkHeaderBar`
+  Fensterknöpfe, Ziehflächen, Doppelklick, Tastaturfokus und Barrierefreiheit;
+  die Gründe für den Eigenbau sind damit weg (SPEC Abschnitt 3).
+- **DOMPurify und die Inhaltsrichtlinie** entfallen mit dem HTML-Pfad. Rohes
+  HTML wird als Quelltext dargestellt (SPEC Abschnitt 6). Das ist eine bewusste
   Funktionsminderung zugunsten eines erheblich kleineren Bedrohungsmodells.
+
+Der Op-Buffer selbst ist keine Historie: er entstand im WebView-Stand, wird
+vollständig übernommen und ist in [010](010-op-buffer-for-the-native-renderer.md)
+und SPEC Abschnitt 6 festgehalten.
 
 ## 5. Was die Entscheidung riskiert
 

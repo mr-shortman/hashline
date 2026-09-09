@@ -63,7 +63,7 @@ Die App verändert keine geöffneten Markdown-Dateien. Aufgabenlisten bleiben sc
 
 ### Fensteraufbau
 
-- Ein `GtkApplicationWindow` mit `GtkHeaderBar` als Titelleiste. Die frühere selbst gebaute Titelleiste entfällt: unter GTK4 liefert die HeaderBar Fensterknöpfe, Ziehflächen, Doppelklickverhalten, Tastaturfokus und Barrierefreiheit ohne Eigenbau. [006-custom-titlebar.md](docs/decisions/006-custom-titlebar.md) ist damit gegenstandslos und wird in `009` als überholt vermerkt. Dies ist die einzige beabsichtigte optische Änderung gegenüber der bestehenden Fassung.
+- Ein `GtkApplicationWindow` mit `GtkHeaderBar` als Titelleiste. Die frühere selbst gebaute Titelleiste entfällt: unter GTK4 liefert die HeaderBar Fensterknöpfe, Ziehflächen, Doppelklickverhalten, Tastaturfokus und Barrierefreiheit ohne Eigenbau. Die frühere Produktentscheidung für den Eigenbau ist damit gegenstandslos ([009](docs/decisions/009-native-renderer.md), Abschnitt 4). Dies ist die einzige beabsichtigte optische Änderung gegenüber der bestehenden Fassung.
 - Die HeaderBar vereint dieselben Bedienelemente wie bisher in derselben Anordnung: Datei öffnen, Dateiname als Titel, Inhaltsverzeichnis, Suche und Menü. Fensterknöpfe und Fokuszustand kommen vom System statt aus eigenem Code.
 - Der vollständige Pfad steht als Untertitel oder Tooltip zur Verfügung, ist aber kein dauerhaftes Gestaltungselement.
 - Der Dokumentbereich nimmt den verbleibenden Platz ein. Keine permanente Statusleiste.
@@ -78,7 +78,7 @@ Die App verändert keine geöffneten Markdown-Dateien. Aufgabenlisten bleiben sc
 
 Die **einzige beabsichtigte optische Abweichung** ist die Fensterleiste: Die selbst gebaute Titelleiste entfällt, an ihre Stelle tritt die native `GtkHeaderBar` mit den Fensterknöpfen des Systems. Sie trägt dieselben Bedienelemente in derselben Anordnung. Jede weitere sichtbare Abweichung ist ein Fehler und wird behoben, nicht nachträglich zur Absicht erklärt.
 
-Referenz sind `src/app/styles.css` und `src/ui/titlebar.css` im Stand vor der Migration. Beide werden nach Abschnitt 13 als Gestaltungsreferenz erhalten, auch nachdem `src/` entfernt ist.
+Referenz ist [`docs/design/styles.css`](docs/design/styles.css) im Stand vor der Migration. Die Werte sind in `crates/hashline/src/theme/mod.rs` übernommen; die Datei bleibt als Abgleich erhalten, auch nachdem `src/` entfernt ist.
 
 #### Design-Tokens
 
@@ -405,31 +405,40 @@ Tests prüfen Benutzerverhalten und Modulverträge, nicht bloß interne Implemen
 - **Layouttests:** Blockplan-Höhen gegen tatsächlich gemessene Höhen; Korrektur oberhalb der Leseposition verschiebt den Scrolloffset korrekt; Auswahlordnung über Blockgrenzen; Hit-Testing an Blockrändern; Umbruch bei Breiten- und Zoomwechsel. Diese Tests brauchen ein Pango-Kontextobjekt, aber kein Fenster.
 - **Integrationstests:** Schnell A und danach B öffnen; spätes Ergebnis von A darf B nicht ersetzen. Speichern über Rename, Löschen/Wiederanlegen, Watcher-Aufräumen und fehlende Dateien prüfen.
 - **UI-Abnahme:** Release-App unter Wayland, zusätzlicher X11-Smoke-Test. Dateimanager-Aufruf, Drag-and-drop, Clipboard, Instanzübergabe, Tastaturbedienung, Fokus, Leer-/Lade-/Fehlerzustände, Theme und Zoom. Die frühere Playwright-Suite entfällt ersatzlos.
-- **Visuelle Abnahme gegen die Referenzfassung:** Vor dem Entfernen von `src/` werden Referenzaufnahmen der WebView-Fassung erstellt — je Theme, bei mindestens drei Fensterbreiten, 100 und 200 Prozent Zoom, über alle Fixtures des Rendering-Vertrags. Die native Fassung wird gegen diese Aufnahmen gestellt. Abweichungen außerhalb der Fensterleiste sind zu beheben oder mit Begründung in `docs/decisions/` festzuhalten; sie gelten nicht stillschweigend als neue Gestaltung. Zusätzlich HiDPI und fraktionale Skalierung prüfen.
+- **Visuelle Abnahme:** Referenzaufnahmen der WebView-Fassung sind **nicht** entstanden und ohne lauffähige WebView-Fassung nicht herstellbar; diese Anforderung entfällt. Der Abgleich läuft stattdessen gegen [`docs/design/styles.css`](docs/design/styles.css) und gegen `examples/render`, das ein Dokument ohne Fenster in ein PNG setzt: je Theme, bei mindestens drei Fensterbreiten, 100 und 200 Prozent Zoom, über alle Fixtures des Rendering-Vertrags. Zwei Stände werden gegeneinander gestellt, damit eine Änderung sichtbar wird. Abweichungen außerhalb der Fensterleiste sind zu beheben oder mit Begründung in `docs/decisions/` festzuhalten; sie gelten nicht stillschweigend als neue Gestaltung. Zusätzlich HiDPI und fraktionale Skalierung prüfen.
 - **Performance:** Messungen aus Abschnitt 9, getrennt von variabler allgemeiner CI. Regressionen auf derselben Referenz vergleichen.
 
 Bei Codeänderungen laufen `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` und ein Release-Build.
 
 ## 13. Migration vom WebView-Stand
 
-Der Wechsel ist kein Neuanfang. Was bleibt, ist der Teil, der teuer war und nichts mit dem Renderer zu tun hat.
+**Abgeschlossen.** Der Wechsel war kein Neuanfang, sondern ein Modultausch, und
+er ist vollzogen. Was er getragen hat, steht jetzt an seinem endgültigen Platz:
 
-**Übernommen:**
+| Übernommen | Wo es jetzt steht |
+| --- | --- |
+| Parser, Op-Buffer, Slug-Regel, Abschnittsbildung samt Tests | `crates/markdown`, Abschnitt 6 |
+| Fixtures und Messwerkzeuge | `benchmarks/`, [Prüfungen](docs/testing.md) |
+| Erscheinungsbild | [`docs/design/styles.css`](docs/design/styles.css), Abschnitt 3 |
+| Desktop-Eintrag, Anwendungs-ID, MIME, Paketierung | `data/`, `packaging/`, [M3](docs/acceptance/M3.md) |
 
-- `hashline-markdown` einschließlich Op-Buffer, Slug-Regel, Abschnittsbildung und Tests, mit den Änderungen aus Abschnitt 6.
-- Der gesamte Benchmark-Bestand: Generatoren, Fixtures, Prozess- und Compositor-Werkzeuge, Rohdaten. Alte Reihen bleiben als historische Vergleichsbasis erhalten und werden nicht überschrieben.
-- Diese Spezifikation, die Entscheidungen in `docs/decisions/` und der Produktumfang.
-- Desktop-Eintrag, Anwendungs-ID, MIME-Zuordnung und Paketierungswissen aus M3.
-- **Das Erscheinungsbild.** `src/app/styles.css` und `src/ui/titlebar.css` wandern vor dem Entfernen von `src/` nach `docs/design/` und bleiben dort als Gestaltungsreferenz erhalten. Dazu die Referenzaufnahmen aus Abschnitt 12, die ohne laufende WebView-Fassung nicht mehr herstellbar wären.
+Entfernt sind `src/`, die Tauri-Hülle, die Node-Toolchain, Vite, Playwright,
+DOMPurify und der WASM-Build. Mit ihnen sind auch die Entscheidungen 001 bis 007,
+die Messreihen der WebView-Fassung und ihre Abnahmeberichte aus dem Baum
+genommen: sie beschreiben einen Stack, gegen den sich nichts mehr vergleichen
+lässt. Der letzte vollständige WebView-Stand liegt im Tag `webview-final`.
 
-**Entfernt:**
+Zwei Dinge dieser Migration sind **nicht** erreicht worden und bleiben als
+Befund stehen, nicht als offene Aufgabe:
 
-- `src/` vollständig: React-Oberfläche, Viewport, Op-Buffer-Dekoder, Worker, Content-Policy — nachdem die beiden Stylesheets nach `docs/design/` gesichert sind.
-- Die Tauri-Hülle in `src-tauri/` außer der Parser-Crate.
-- Node-Toolchain, `package.json`, Lockfiles, Vite, Playwright, DOMPurify, der WASM-Build und `scripts/`.
-- `docs/decisions/006-custom-titlebar.md` wird als überholt markiert, nicht gelöscht.
-
-**Reihenfolge:** Zuerst die Parser-Crate nach `crates/markdown` verschieben und grün halten. Dann Gestaltungsreferenz und Referenzaufnahmen sichern. Dann M0 als eigenständige Binärdatei daneben aufbauen. Erst wenn M0 abgenommen ist, den alten Stand entfernen — nicht vorher, damit Vergleichsmessung und visueller Abgleich bis zuletzt möglich bleiben.
+- **Referenzaufnahmen der WebView-Fassung** gibt es nicht; Abschnitt 12
+  beschreibt, was an ihre Stelle tritt.
+- **Die Fixtures sind nicht reproduzierbar.** `benchmarks/generated/` ist nicht
+  eingecheckt, und `benchmarks/generate.mjs` braucht die entfernte
+  Node-Toolchain. Ein frischer Klon kann keine Messung dieses Projekts
+  wiederholen. Die Behebung — Generator nach Rust oder Fixtures ins Repository —
+  ist Voraussetzung jeder weiteren Zielzahl
+  ([014](docs/decisions/014-competitive-targets.md), Abschnitt 6).
 
 ## 14. Umsetzungsschritte mit Abnahmekriterien
 

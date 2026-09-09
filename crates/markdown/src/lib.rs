@@ -1,7 +1,7 @@
 //! Hashline's Markdown parser.
 //!
 //! It reads Markdown once and emits the op buffer the renderer replays
-//! (docs/decisions/007-performance-path.md, section 4). No HTML string is
+//! (SPEC.md, section 6). No HTML string is
 //! produced at all: the native renderer has no HTML parser and no sanitizer, so
 //! raw HTML is shown as source text instead of being interpreted
 //! (SPEC.md, section 6). That removes DOMPurify and the whole class of
@@ -51,7 +51,7 @@ pub struct OpDocument {
     pub strings: String,
     /// The document's text in document order, with a separator between blocks.
     /// TEXT operations index into this, and the search runs on it directly
-    /// (docs/decisions/007, P2.4).
+    /// (SPEC.md, section 8).
     pub text: String,
     /// Top-level flow elements, `BLOCK_WORDS` words each: tag, opStart,
     /// opCount, textStart, textLen. The block plan is built straight from this

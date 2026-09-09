@@ -1,8 +1,10 @@
 # 008 — Parserreferenz: CommonMark statt marked, DOM-Vergleich statt Stringvergleich
 
 Status: Entscheidung getroffen, Umsetzung mit P2.3. Stand: 8. September 2026.
-Vorgänger: [007 – Performancepfad](007-performance-path.md), Abschnitt 4, P2.3.
-Diese Entscheidung ist Voraussetzung dafür, dass für P2.3 überhaupt Code entsteht.
+Vorgänger: der Performancepfad des WebView-Stands, Paket P2.3 (Tag
+`webview-final`). Diese Entscheidung war Voraussetzung dafür, dass für den
+Rust-Parser überhaupt Code entsteht; sie gilt für den nativen Stand unverändert
+weiter.
 
 ## 1. Warum diese Entscheidung nötig ist
 

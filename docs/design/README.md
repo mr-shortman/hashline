@@ -1,28 +1,26 @@
 # Gestaltungsreferenz
 
-Diese beiden Stylesheets sind die **verbindliche Gestaltungsreferenz** für den
-nativen Renderer (SPEC.md, Abschnitte 3 und 13). Sie sind Kopien des Standes
-der WebView-Fassung vor der Migration und werden hier erhalten, auch nachdem
-`src/` entfernt ist.
+[`styles.css`](styles.css) ist die **verbindliche Gestaltungsreferenz** für den
+nativen Renderer (SPEC.md, Abschnitte 3 und 13). Es ist eine Kopie von
+`src/app/styles.css` im Stand vor der Migration und bleibt hier erhalten,
+nachdem `src/` entfernt ist.
 
-| Datei | Herkunft |
-| --- | --- |
-| [`styles.css`](styles.css) | `src/app/styles.css` |
-| [`titlebar.css`](titlebar.css) | `src/ui/titlebar.css` |
+Die Datei ist **Referenz, kein Build-Eingang**: im ausgelieferten Programm gibt
+es kein CSS. Die Werte sind in `crates/hashline/src/theme/mod.rs` übernommen
+(SPEC.md, Abschnitt 3, „Design-Tokens") und werden nicht zur Laufzeit gelesen.
+Wer eine Farbe oder ein Maß ändert, ändert beide Stellen und hält sie
+vergleichbar.
 
-Sie sind **Referenz, kein Build-Eingang**: im ausgelieferten Programm gibt es
-kein CSS. Die Werte werden in die Rust-Token-Struktur übernommen
-(SPEC.md, Abschnitt 3, „Design-Tokens"), nicht zur Laufzeit gelesen.
+Die frühere `titlebar.css` beschrieb die selbst gebaute Titelleiste. Sie ist
+entfallen: an ihre Stelle tritt die native `GtkHeaderBar`
+([009](../decisions/009-native-renderer.md), Abschnitt 4). Welche Bedienelemente
+in welcher Anordnung die Leiste trägt, steht in SPEC.md Abschnitt 3.
 
-`titlebar.css` beschreibt die selbst gebaute Titelleiste, die entfällt: an ihre
-Stelle tritt die native `GtkHeaderBar`. Die Datei bleibt als Beleg dafür
-erhalten, welche Bedienelemente in welcher Anordnung die Leiste trug — das ist
-die Anordnung, die die HeaderBar übernimmt
-([009](../decisions/009-native-renderer.md), Abschnitt 4).
+## Was es nicht gibt
 
-## Was hier noch fehlt
-
-Die **Referenzaufnahmen** der WebView-Fassung, die SPEC.md Abschnitt 12 für die
-visuelle Abnahme verlangt, sind noch nicht erstellt. Sie brauchen eine lauffähige
-WebView-Fassung und sind ohne sie nicht mehr herstellbar. Der letzte Stand mit
-vollständiger WebView-Fassung ist als Tag `webview-final` erhalten.
+**Referenzaufnahmen der WebView-Fassung.** Sie sind ohne lauffähige
+WebView-Fassung nicht herstellbar und werden nicht nachgeliefert; der letzte
+Stand mit vollständiger WebView-Fassung liegt im Tag `webview-final`. Der
+visuelle Abgleich läuft stattdessen gegen diese Datei und gegen
+`examples/render`, das ein Dokument ohne Fenster in ein PNG setzt
+([Prüfungen](../testing.md)).

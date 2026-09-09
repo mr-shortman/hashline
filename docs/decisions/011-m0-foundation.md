@@ -89,6 +89,13 @@ kollidieren kann. Zwei Tests halten Reihenfolge und Kollisionsfall fest.
 
 ## 4. Erste Messungen
 
+> **Überholt.** Die Zahlen in diesem Abschnitt sind der Stand vom
+> 8. September 2026 und stehen hier als Datum, nicht als Auskunft. Sie werden
+> durch [013](013-oversized-blocks.md) und den
+> [nativen Messbericht](../../benchmarks/results/native-current/REPORT.md)
+> ersetzt; die Speicherzusage unten gilt insbesondere **nicht** mehr. Was heute
+> offen ist, steht in [Einschränkungen](../limitations.md).
+
 Release-Build, Entwicklungsmaschine, **n=1**. Das ist eine Peilung, **keine
 Abnahme**: SPEC Abschnitt 9 verlangt n=30 auf der festgelegten
 Referenzmaschine, und die steht noch nicht fest.

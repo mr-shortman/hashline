@@ -68,7 +68,7 @@ crates/hashline/    Die Anwendung
   preferences/      GSettings, Lesepositionen
   theme/            Design-Tokens, Hell/Dunkel
 data/               Desktop-Eintrag, MIME, Icons, GSettings-Schema
-docs/design/        Gestaltungsreferenz (CSS des alten Stands)
+docs/design/        Gestaltungsreferenz (styles.css des alten Stands)
 tests/fixtures/     Markdown-, Bild- und Fehlerfälle
 benchmarks/         Generatoren, Messwerkzeuge, Rohdaten
 ```

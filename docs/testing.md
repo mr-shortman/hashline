@@ -20,6 +20,33 @@ absichtlich ein anderes Schema prüfen will. `GSETTINGS_BACKEND=memory`
 isoliert die Unit-Tests von persönlichen Einstellungen und benötigt keinen
 schreibbaren dconf-Dienst; der Pakettest prüft zusätzlich echte Persistenz.
 
+## Integrationstests mit Fenster
+
+Die Prüfungen oben brauchen kein Fenster. Die folgenden brauchen eines und
+laufen deshalb nicht in `cargo test --workspace` mit. Beide setzen ein
+kompiliertes Schema an einem eigenen Ort voraus:
+
+```sh
+cargo build -p hashline
+mkdir -p /tmp/hashline-test-schemas
+glib-compile-schemas --strict --targetdir=/tmp/hashline-test-schemas data
+```
+
+Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft Fensterwiederverwendung, Dateiwechsel, Menüaktionen, Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen und die Textschnittstelle. Zum isolierten Betrieb kann `gtk4-broadwayd :9` in einem separaten Terminal laufen:
+
+```sh
+dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline native_ui -- --ignored --test-threads=1
+```
+
+Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterstützt diesen GTK-Backendpfad nicht. Der folgende Test verwendet temporäre Dokumente, prüft Dokumentrolle, Unicode-Textoffsets, den zweiten Prozessaufruf mit demselben Fenster und den sichtbaren Mehrdatei-Hinweis und beendet seine Anwendung anschließend. Benötigt werden `python3-gi` und `gir1.2-atspi-2.0`:
+
+```sh
+dbus-run-session -- env GDK_BACKEND=x11 GTK_A11Y=atspi GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory /usr/bin/python3 tests/desktop/native_reader.py target/debug/hashline
+```
+
+Diese Tests sind Entwicklungsprüfungen. Vollständige Orca-Bedienung, visueller
+Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen.
+
 ## Aussehen ohne Fenster
 
 `examples/render` setzt ein Dokument über denselben Layout-Code wie das Widget
@@ -127,47 +154,6 @@ Frames der Anwendung: der Wert schließt alle Clients ein und ist damit keine
 Abnahme der Anwendungsdarstellung, sondern eine Untergrenze für ihre Qualität.
 Das Werkzeug schreibt das selbst in jede Ausgabe.
 
-## Manuelle Freigabe
-
-Vor einer v1-Freigabe bleiben Installation auf sauberer Zielumgebung,
-tatsächlicher Dateimanager-Aufruf und Drag-and-drop, System-Clipboard und
-Linköffnen sowie die vollständigen SPEC-Performancebudgets zu bestätigen. Die
-Anwendungs-ID `de.kalendium.Hashline` ist aus der Spezifikation übernommen;
-ihre Herausgeberbestätigung wird nicht aus einem erfolgreichen Build abgeleitet.
-
-Der [Abnahmebericht](acceptance/REPORT.md) und das
-[Performance-Protokoll](../benchmarks/REFERENCE.md) beschreiben Prüfungen der
-WebView-Fassung. Sie bleiben als Historie und als Vergleichsbasis erhalten; die
-Befehle darin beziehen sich auf einen Stand, der nicht mehr im Baum ist.
-
-## Native Migration
-
-Die Rust-Prüfungen benötigen keine Node-Toolchain:
-
-```sh
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo build -p hashline
-mkdir -p /tmp/hashline-test-schemas
-glib-compile-schemas --strict --targetdir=/tmp/hashline-test-schemas data
-GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline preferences::
-```
-
-Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft Fensterwiederverwendung, Dateiwechsel, Menüaktionen, Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen und die Textschnittstelle. Zum isolierten Betrieb kann `gtk4-broadwayd :9` in einem separaten Terminal laufen:
-
-```sh
-dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline native_ui -- --ignored --test-threads=1
-```
-
-Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterstützt diesen GTK-Backendpfad nicht. Der folgende Test verwendet temporäre Dokumente, prüft Dokumentrolle, Unicode-Textoffsets, den zweiten Prozessaufruf mit demselben Fenster und den sichtbaren Mehrdatei-Hinweis und beendet seine Anwendung anschließend. Benötigt werden `python3-gi` und `gir1.2-atspi-2.0`:
-
-```sh
-dbus-run-session -- env GDK_BACKEND=x11 GTK_A11Y=atspi GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory /usr/bin/python3 tests/desktop/native_reader.py target/debug/hashline
-```
-
-Diese Tests sind Entwicklungsprüfungen. Vollständige Orca-Bedienung, visueller
-Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen.
-
 ## Linux-Paket
 
 ```sh
@@ -182,3 +168,17 @@ GSettings-Persistenz, Icon, MIME-Registrierung und Start über den installierten
 Desktop-Eintrag samt Instanzübergabe. Standardzuordnungen müssen erhalten
 bleiben. Details: [Installation](installation.md), Ergebnisse und verbleibende
 Freigabepunkte: [M3](acceptance/M3.md).
+
+## Manuelle Freigabe
+
+Vor einer v1-Freigabe bleiben Installation auf sauberer Zielumgebung,
+tatsächlicher Dateimanager-Aufruf und Drag-and-drop, System-Clipboard und
+Linköffnen sowie die vollständigen SPEC-Performancebudgets zu bestätigen. Die
+Anwendungs-ID `de.kalendium.Hashline` ist aus der Spezifikation übernommen;
+ihre Herausgeberbestätigung wird nicht aus einem erfolgreichen Build abgeleitet.
+
+Die Abnahmeberichte und Messprotokolle der WebView-Fassung sind aus dem Baum
+entfernt; ihre Befehle bezogen sich auf `tauri-driver`, `desktop.py` und
+`npm run fixtures`, die es nicht mehr gibt. Sie liegen im Tag `webview-final`
+und sind gegen den nativen Stand nicht vergleichbar.
+
