@@ -23,7 +23,10 @@ pub struct Entry {
     pub level: u8,
     /// Index into the block plan, so a jump needs no measuring.
     pub block: u32,
+    /// The generated id, as a range into the document's string blob.
     id: (u32, u32),
+    /// The heading's own text, as a range into the document's *text* blob —
+    /// the same range the heading block occupies, so nothing is copied.
     text: (u32, u32),
 }
 
@@ -50,11 +53,12 @@ impl Outline {
         let mut entries = Vec::with_capacity(count.min(headings.len()));
         for (index, &block) in headings.iter().enumerate().take(count) {
             let words = &document.headings[index * HEADING_WORDS..(index + 1) * HEADING_WORDS];
+            let heading = plan.block(block);
             entries.push(Entry {
                 level: words[0] as u8,
                 block: block as u32,
                 id: (words[1], words[2]),
-                text: (words[4], words[5]),
+                text: (heading.text_start, heading.text_len),
             });
         }
         entries
@@ -82,31 +86,28 @@ impl Outline {
         self.entries.get(index)
     }
 
-    fn slice(&self, (offset, len): (u32, u32)) -> &str {
+    fn slice(blob: &str, (offset, len): (u32, u32)) -> &str {
         let from = offset as usize;
-        self.document
-            .strings
-            .get(from..from + len as usize)
-            .unwrap_or("")
+        blob.get(from..from + len as usize).unwrap_or("")
     }
-    /// The heading's text, borrowed from the document's string blob.
+    /// The heading's text, borrowed from the document's text blob.
     pub fn text(&self, index: usize) -> &str {
         self.entries
             .get(index)
-            .map_or("", |entry| self.slice(entry.text))
+            .map_or("", |entry| Self::slice(&self.document.text, entry.text))
     }
     /// The heading's generated id.
     pub fn id(&self, index: usize) -> &str {
         self.entries
             .get(index)
-            .map_or("", |entry| self.slice(entry.id))
+            .map_or("", |entry| Self::slice(&self.document.strings, entry.id))
     }
 
     /// The block a `#fragment` link points at.
     pub fn block_for_id(&self, id: &str) -> Option<usize> {
         self.entries
             .iter()
-            .position(|entry| self.slice(entry.id) == id)
+            .position(|entry| Self::slice(&self.document.strings, entry.id) == id)
             .map(|index| self.entries[index].block as usize)
     }
 

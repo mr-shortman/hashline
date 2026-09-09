@@ -380,20 +380,6 @@ fn a_picture_inside_running_text_stays_running_text() {
 // Blocks the plan cut into parts. Setting a part has to give what the same
 // stretch of the block gives inside the whole (SPEC.md, section 5).
 
-/// The block the plan would have built before it learned to cut anything up:
-/// one part covering the source block's whole text.
-fn whole(plan: &BlockPlan) -> hashline::layout::Block {
-    let parts = plan.source_blocks(0);
-    let (start, end) = plan.source_text_range(0);
-    let mut block = *plan.block(parts.start);
-    block.text_start = start;
-    block.text_len = end - start;
-    block.lines = parts.map(|index| plan.block(index).lines).sum();
-    block.part = 0;
-    block.parts = 1;
-    block
-}
-
 fn piece_text(set: &hashline::layout::BlockLayout) -> String {
     set.pieces
         .iter()
@@ -413,7 +399,7 @@ fn the_parts_of_a_code_block_set_the_same_type_as_the_whole_block() {
     let entire = set_block(
         &context,
         &document,
-        &whole(&plan),
+        &plan.whole(0),
         &style(),
         640.0,
         &NoImages,

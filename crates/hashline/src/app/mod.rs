@@ -30,6 +30,7 @@ const SEARCH_DEBOUNCE_MS: u64 = 120;
 const OUTLINE_SIDEBAR_WIDTH: i32 = 900;
 
 pub fn run() -> glib::ExitCode {
+    tune_allocator();
     glib::set_application_name("Hashline");
     let application = gtk::Application::builder()
         .application_id(APP_ID)
@@ -589,6 +590,11 @@ impl Ui {
         let for_thread = path.clone();
         std::thread::spawn(move || {
             let result = read_and_parse(&for_thread);
+            // The parse ran on this thread's own allocation arena, and what it
+            // allocated and freed on the way — the source text, the parser's
+            // events, the interning table — is returned here rather than left
+            // for the arena to keep.
+            release_free_memory();
             let _ = sender.send_blocking(Loaded {
                 path: for_thread,
                 result,
@@ -1097,6 +1103,38 @@ impl Ui {
                 move || ui.reload()
             )),
         );
+    }
+}
+
+/// Two allocator settings, both about giving memory back rather than keeping
+/// it (docs/decisions/014-competitive-targets.md, section 3.2).
+///
+/// glibc gives each thread that allocates its own arena and keeps that arena
+/// for reuse. The document is read and parsed on a worker thread, so the
+/// megabytes it touches on the way stay in an arena the reader never uses
+/// again — 2 MiB of the 10 MiB fixture's footprint. One arena for the whole
+/// process costs a lock a viewer never contends for.
+///
+/// The second setting fixes the threshold above which an allocation becomes
+/// its own mapping. Left dynamic, glibc raises it as large blocks are freed,
+/// so the document blobs end up inside the arena and are kept when a document
+/// is closed; fixed, they are mappings that go back to the system.
+fn tune_allocator() {
+    #[cfg(target_env = "gnu")]
+    {
+        // Negative option ids, as glibc's malloc.h defines them.
+        const M_TRIM_THRESHOLD: std::ffi::c_int = -1;
+        const M_MMAP_THRESHOLD: std::ffi::c_int = -3;
+        const M_ARENA_MAX: std::ffi::c_int = -8;
+        extern "C" {
+            fn mallopt(param: std::ffi::c_int, value: std::ffi::c_int) -> std::ffi::c_int;
+        }
+        // Safe: two integers, and neither can invalidate an existing pointer.
+        unsafe {
+            mallopt(M_ARENA_MAX, 1);
+            mallopt(M_MMAP_THRESHOLD, 128 * 1024);
+            mallopt(M_TRIM_THRESHOLD, 128 * 1024);
+        }
     }
 }
 

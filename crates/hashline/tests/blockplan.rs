@@ -84,9 +84,9 @@ fn a_measurement_below_the_reading_position_leaves_it_where_it_was() {
 #[test]
 fn measuring_marks_the_block_and_shrinking_works_too() {
     let mut plan = plan(SOURCE);
-    assert!(!plan.block(3).measured);
+    assert!(!plan.block(3).measured());
     let delta = plan.set_measured(3, 5.0);
-    assert!(plan.block(3).measured);
+    assert!(plan.block(3).measured());
     assert!(delta < 0.0, "an over-estimate must report a negative delta");
     assert_eq!(plan.block(3).height, 5.0);
 }
@@ -111,7 +111,7 @@ fn a_reflow_drops_measurements_and_re_estimates() {
     let mut plan = plan(SOURCE);
     plan.set_measured(1, 999.0);
     plan.reflow(metrics(), 320.0);
-    assert!(!plan.block(1).measured);
+    assert!(!plan.block(1).measured());
     assert_ne!(plan.block(1).height, 999.0);
     // A wider column cannot make the document taller.
     let narrow = plan.total_height();
@@ -148,7 +148,7 @@ fn a_large_document_is_planned_without_measuring_anything() {
     let planned = started.elapsed();
     assert_eq!(plan.len(), 120_000);
     assert!(plan.total_height() > 0.0);
-    assert!((0..plan.len()).all(|i| !plan.block(i).measured));
+    assert!((0..plan.len()).all(|i| !plan.block(i).measured()));
     println!(
         "{} MiB source: parse {parsed:?}, plan {planned:?}, {} blocks",
         source.len() / (1024 * 1024),
@@ -188,23 +188,29 @@ fn a_code_block_too_large_to_set_at_once_becomes_parts_covering_it_exactly() {
     let plan = BlockPlan::new(&document, metrics(), 646.0);
     assert!(plan.len() > 4, "2000 lines stayed {} blocks", plan.len());
 
-    let parts: Vec<_> = (0..plan.len())
-        .map(|index| *plan.block(index))
-        .filter(|block| block.kind == BlockKind::Code)
+    let indices: Vec<usize> = (0..plan.len())
+        .filter(|&index| plan.block(index).kind == BlockKind::Code)
         .collect();
+    let parts: Vec<_> = indices.iter().map(|&index| *plan.block(index)).collect();
     // The parts are contiguous, cover the block's text exactly, and each holds
     // whole lines — a part that began mid-line would set differently than the
     // same line does inside the whole block.
     let first = parts.first().unwrap();
     let last = parts.last().unwrap();
     let mut cursor = first.text_start;
-    for part in &parts {
+    for (offset, part) in parts.iter().enumerate() {
+        assert_eq!(
+            plan.lines(indices[offset]) as usize,
+            document.text[part.text_start as usize..(part.text_start + part.text_len) as usize]
+                .matches('\n')
+                .count()
+        );
         assert_eq!(part.text_start, cursor);
         assert!(part.text_len > 0);
         let text =
             &document.text[part.text_start as usize..(part.text_start + part.text_len) as usize];
         assert!(text.ends_with('\n'), "a part must end at a line boundary");
-        assert_eq!(part.lines as usize, text.matches('\n').count());
+
         cursor += part.text_len;
     }
     assert_eq!(cursor, last.text_start + last.text_len);
@@ -296,10 +302,10 @@ fn only_the_outer_parts_carry_the_space_around_a_block() {
     for index in parts.start + 1..parts.end - 1 {
         let block = plan.block(index);
         assert!(
-            (block.height() - block.lines as f64 * line).abs() < 1.0,
+            (block.height() - plan.lines(index) as f64 * line).abs() < 1.0,
             "part {index} is {} high for {} lines",
             block.height,
-            block.lines
+            plan.lines(index)
         );
     }
 }

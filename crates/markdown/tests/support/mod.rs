@@ -98,14 +98,21 @@ impl Doc {
     pub fn heading_count(&self) -> usize {
         self.document.headings.len() / HEADING_WORDS
     }
-    /// `(level, id, text, section)`.
+    /// `(level, id, text, section)`. The text is not recorded per heading —
+    /// it is the text of the heading's own block, which is where the reader
+    /// takes it from too.
     pub fn heading(&self, index: usize) -> (u32, String, String, u32) {
         let start = index * HEADING_WORDS;
         let words = &self.document.headings[start..start + HEADING_WORDS];
+        let block = (0..self.block_count())
+            .filter(|&block| (1..=6).contains(&self.block(block)[0]))
+            .nth(index)
+            .expect("a block for every heading");
+        let block = self.block(block);
         (
             words[0],
             self.strings.slice(words[1], words[2]),
-            self.strings.slice(words[4], words[5]),
+            self.text.slice(block[3], block[4]),
             words[3],
         )
     }

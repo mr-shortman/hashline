@@ -109,17 +109,44 @@ pub struct Block {
     pub op_count: u32,
     pub text_start: u32,
     pub text_len: u32,
-    /// Lines of this block's text, counted when the plan is built. Only a code
-    /// block uses it: code does not wrap, so its height follows its lines.
-    pub lines: u32,
-    /// Which part of its source block this is, and how many parts that block
-    /// was cut into. A block small enough to set in one piece is part 0 of 1.
-    pub part: u16,
-    pub parts: u16,
+    /// Which part of its source block this is, how many parts that block was
+    /// cut into, and whether the height beside them has been measured — packed
+    /// into one word because three separate fields cost eight bytes of a
+    /// 24-byte entry and the plan has 144 651 of them.
+    ///
+    /// `part` in the low 15 bits, `parts` in the next 15, `measured` on top.
+    /// The source limit of 20 MiB over the smallest part keeps both counts far
+    /// below their 32 767.
+    cut: u32,
     /// Height including the space above and below the block.
     pub height: f32,
+}
+
+/// Lines of a code block's text, counted when the plan is built. Only code
+/// uses it — code does not wrap, so its height follows its lines — so it is
+/// held for those blocks alone instead of costing four bytes in every entry.
+const PART_BITS: u32 = 15;
+const PART_MASK: u32 = (1 << PART_BITS) - 1;
+
+impl Block {
+    fn pack(part: usize, parts: usize) -> u32 {
+        debug_assert!(parts <= PART_MASK as usize, "part count must fit 15 bits");
+        (part as u32 & PART_MASK) | ((parts as u32 & PART_MASK) << PART_BITS)
+    }
+    pub fn part(&self) -> u32 {
+        self.cut & PART_MASK
+    }
+    pub fn parts(&self) -> u32 {
+        (self.cut >> PART_BITS) & PART_MASK
+    }
     /// False while `height` is still an estimate.
-    pub measured: bool,
+    pub fn measured(&self) -> bool {
+        self.cut >> (2 * PART_BITS) != 0
+    }
+    fn set_measured(&mut self, measured: bool) {
+        let flag = (measured as u32) << (2 * PART_BITS);
+        self.cut = (self.cut & !(1 << (2 * PART_BITS))) | flag;
+    }
 }
 
 impl Block {
@@ -131,11 +158,11 @@ impl Block {
     /// not cut up. The space above a block, the top of a code panel and its
     /// copy control all belong to this part alone.
     pub fn is_first(&self) -> bool {
-        self.part == 0
+        self.part() == 0
     }
     /// True for the last part, and for every block that was not cut up.
     pub fn is_last(&self) -> bool {
-        self.part + 1 >= self.parts
+        self.part() + 1 >= self.parts()
     }
 }
 
@@ -233,6 +260,8 @@ fn floor_boundary(text: &str, at: usize) -> usize {
 
 pub struct BlockPlan {
     blocks: Vec<Block>,
+    /// `(plan index, lines)` for code blocks only, in index order.
+    code_lines: Vec<(u32, u32)>,
     offsets: Offsets,
     metrics: Metrics,
     width: f64,
@@ -244,6 +273,7 @@ impl BlockPlan {
     pub fn new(document: &OpDocument, metrics: Metrics, width: f64) -> Self {
         let count = document.blocks.len() / BLOCK_WORDS;
         let mut blocks = Vec::with_capacity(count);
+        let mut code_lines: Vec<(u32, u32)> = Vec::new();
         let mut cuts: Vec<Cut> = Vec::new();
         for index in 0..count {
             let words = &document.blocks[index * BLOCK_WORDS..(index + 1) * BLOCK_WORDS];
@@ -258,8 +288,7 @@ impl BlockPlan {
                 BlockKind::Rule | BlockKind::List | BlockKind::Table => cuts.push((0, len, 0)),
                 _ => text_cuts(text, &mut cuts),
             }
-            debug_assert!(cuts.len() <= u16::MAX as usize, "part count must fit u16");
-            let parts = cuts.len() as u16;
+            let parts = cuts.len();
             for (part, &(from, to, lines)) in cuts.iter().enumerate() {
                 let mut block = Block {
                     kind,
@@ -267,19 +296,21 @@ impl BlockPlan {
                     op_count: words[2],
                     text_start: start + from,
                     text_len: to - from,
-                    lines,
-                    part: part as u16,
-                    parts,
+                    cut: Block::pack(part, parts),
                     height: 0.0,
-                    measured: false,
                 };
-                block.height = estimate(&block, metrics, width) as f32;
+                if kind == BlockKind::Code {
+                    code_lines.push((blocks.len() as u32, lines));
+                }
+                block.height = estimate(&block, metrics, width, lines) as f32;
                 blocks.push(block);
             }
         }
         let offsets = Offsets::new(blocks.iter().map(|block| block.height as f64));
+        code_lines.shrink_to_fit();
         BlockPlan {
             blocks,
+            code_lines,
             offsets,
             metrics,
             width,
@@ -294,6 +325,13 @@ impl BlockPlan {
     }
     pub fn block(&self, index: usize) -> &Block {
         &self.blocks[index]
+    }
+    /// How many lines of code this block holds; zero for anything else.
+    pub fn lines(&self, index: usize) -> u32 {
+        self.code_lines
+            .binary_search_by_key(&(index as u32), |&(at, _)| at)
+            .map(|found| self.code_lines[found].1)
+            .unwrap_or(0)
     }
     pub fn metrics(&self) -> Metrics {
         self.metrics
@@ -344,7 +382,7 @@ impl BlockPlan {
             self.blocks[index].height = height as f32;
             self.offsets.add(index, height as f32 as f64 - previous);
         }
-        self.blocks[index].measured = true;
+        self.blocks[index].set_measured(true);
         delta
     }
 
@@ -354,9 +392,11 @@ impl BlockPlan {
     pub fn reflow(&mut self, metrics: Metrics, width: f64) {
         self.metrics = metrics;
         self.width = width;
-        for block in self.blocks.iter_mut() {
-            block.measured = false;
-            block.height = estimate(block, metrics, width) as f32;
+        for index in 0..self.blocks.len() {
+            let lines = self.lines(index);
+            let block = &mut self.blocks[index];
+            block.set_measured(false);
+            block.height = estimate(block, metrics, width, lines) as f32;
         }
         self.offsets = Offsets::new(self.blocks.iter().map(|block| block.height as f64));
     }
@@ -365,8 +405,22 @@ impl BlockPlan {
     /// was small enough to set in one piece is alone in its range.
     pub fn source_blocks(&self, index: usize) -> std::ops::Range<usize> {
         let block = &self.blocks[index];
-        let first = index - block.part as usize;
-        first..first + block.parts as usize
+        let first = index - block.part() as usize;
+        first..first + block.parts() as usize
+    }
+
+    /// The source block at `index` as it would be without any cut: one block
+    /// covering the whole of the author's text. Nothing in the reader sets
+    /// this — the point of cutting is that it never has to — but comparing a
+    /// part against the whole is how the cuts are checked.
+    pub fn whole(&self, index: usize) -> Block {
+        let range = self.source_blocks(index);
+        let (start, end) = self.source_text_range(index);
+        let mut block = self.blocks[range.start];
+        block.text_start = start;
+        block.text_len = end - start;
+        block.cut = Block::pack(0, 1);
+        block
     }
 
     /// The document text of the *whole* block at `index`, not just of the part
@@ -414,7 +468,7 @@ impl BlockPlan {
 /// what measuring is for. The one thing it may not do is be wrong by an order
 /// of magnitude, because then the scrollbar describes a document that does not
 /// exist and every jump lands somewhere else.
-fn estimate(block: &Block, metrics: Metrics, width: f64) -> f64 {
+fn estimate(block: &Block, metrics: Metrics, width: f64, lines: u32) -> f64 {
     let em = metrics.body_px;
     // The space around a block belongs to its outer edges: a block cut into
     // parts is still one block of the document.
@@ -447,7 +501,7 @@ fn estimate(block: &Block, metrics: Metrics, width: f64) -> f64 {
         } else {
             0.0
         };
-        return block.lines.max(1) as f64 * line_height + pad_top + pad_bottom + space;
+        return lines.max(1) as f64 * line_height + pad_top + pad_bottom + space;
     }
     let size = metrics.body_px * block.kind.size_em();
     let line_height = match block.kind {

@@ -193,6 +193,19 @@ const BLOCK_TAGS: [u32; 14] = [
 #[derive(Default)]
 pub struct Encoder {
     pub ops: Vec<u8>,
+    /// Where a short string already interned starts, keyed by a hash of it, so
+    /// the same value is stored once. The 10 MiB fixture opens 28 930 fenced
+    /// blocks whose class is the same nineteen characters, and gives every
+    /// heading an id that is also its `#fragment` target: half a megabyte
+    /// each, both of them exact repeats.
+    ///
+    /// The key is a hash rather than the string, so this table is one
+    /// allocation instead of one per distinct value — sixty thousand small
+    /// allocations and their fragmentation are what the reader would keep
+    /// paying for after the parse is over. A collision is checked against the
+    /// blob and simply not deduplicated. Dropped with the encoder, never part
+    /// of the document.
+    interned: std::collections::HashMap<u64, (u32, u32)>,
     /// Attribute values, heading ids and heading texts. Never document text.
     pub strings: String,
     /// The document's text in document order — what the search runs on.
@@ -222,10 +235,29 @@ pub struct Encoder {
 /// Words per block: tag, opStart (byte), opCount (bytes), textStart, textLen.
 pub const BLOCK_WORDS: usize = 5;
 
+/// Values longer than this are stored without being remembered: the table is
+/// there for ids, classes and link targets, and a long value is unlikely to
+/// repeat while its key would cost as much as the value itself.
+const INTERN_LIMIT: usize = 128;
+
 impl Encoder {
     fn intern(&mut self, value: &str) -> u32 {
+        let mut key = Fnv::default();
+        key.write(value.as_bytes());
+        let key = key.value();
+        if value.len() <= INTERN_LIMIT {
+            if let Some(&(offset, length)) = self.interned.get(&key) {
+                let from = offset as usize;
+                if self.strings.get(from..from + length as usize) == Some(value) {
+                    return offset;
+                }
+            }
+        }
         let offset = self.strings.len() as u32;
         self.strings.push_str(value);
+        if value.len() <= INTERN_LIMIT {
+            self.interned.insert(key, (offset, value.len() as u32));
+        }
         offset
     }
     fn current_block(&self) -> Option<u32> {

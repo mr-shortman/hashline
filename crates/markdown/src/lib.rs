@@ -41,7 +41,7 @@ const SECTION_BUDGET: usize = 16_384;
 
 /// Words per section: opStart, opCount, hashLow, hashHigh, textStart, textLen.
 pub const SECTION_WORDS: usize = 6;
-pub const HEADING_WORDS: usize = 6;
+pub const HEADING_WORDS: usize = 4;
 
 #[derive(Default)]
 pub struct OpDocument {
@@ -60,18 +60,21 @@ pub struct OpDocument {
     pub blocks: Vec<u32>,
     /// `SECTION_WORDS` words per section.
     pub sections: Vec<u32>,
-    /// 6 words per heading: level, idOffset, idLen, sectionIndex, textOffset,
-    /// textLen.
+    /// `HEADING_WORDS` words per heading: level, idOffset, idLen, sectionIndex.
+    /// The heading's text is not repeated here — it is the text of the heading
+    /// block, and the outline reads it from there.
     pub headings: Vec<u32>,
     /// Whether the document contained raw HTML shown as source text. The view
     /// uses it for the single quiet notice SPEC.md, section 6 asks for.
     pub raw_html: bool,
 }
 
+/// A heading, as the outline needs it. The heading's own text is not kept:
+/// it is the text of the heading block, and holding a second copy of it cost
+/// one allocation per heading and a megabyte on the 10 MiB fixture.
 struct Heading {
     level: u32,
     id: String,
-    text: String,
     section: u32,
 }
 
@@ -476,7 +479,6 @@ pub fn parse(source: &str) -> OpDocument {
                     builder.headings.push(Heading {
                         level: *level as u32,
                         id,
-                        text,
                         section,
                     });
                 }
@@ -499,15 +501,9 @@ pub fn parse(source: &str) -> OpDocument {
     let headings = std::mem::take(&mut builder.headings);
     for heading in &headings {
         let (id_offset, id_len) = builder.enc.reference(&heading.id);
-        let (text_offset, text_len) = builder.enc.reference(&heading.text);
-        document.headings.extend_from_slice(&[
-            heading.level,
-            id_offset,
-            id_len,
-            heading.section,
-            text_offset,
-            text_len,
-        ]);
+        document
+            .headings
+            .extend_from_slice(&[heading.level, id_offset, id_len, heading.section]);
     }
     document.raw_html = builder.raw_html;
     document.blocks = std::mem::take(&mut builder.enc.blocks);
