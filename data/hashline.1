@@ -1,0 +1,40 @@
+.TH HASHLINE 1 "September 2026" "Hashline" "User Commands"
+.SH NAME
+hashline \- a fast, quiet Markdown viewer for Linux
+.SH SYNOPSIS
+.B hashline
+.RI [ OPTIONS ] " [FILE ...]"
+.SH DESCRIPTION
+Hashline displays Markdown in a native GTK4 window without changing the file.
+With no file it opens an empty window.
+If several files are supplied, it opens the first and displays a notice.
+Subsequent invocations reuse the running window in the same desktop session.
+Relative paths are resolved against the invoking process's working directory.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show command-line help.
+.TP
+.BR \-v ", " \-\-version
+Print the application version without opening a window.
+.TP
+.B \-\-
+End option processing; use before file names beginning with a dash.
+.SH KEYBOARD
+Ctrl+O opens a file; Ctrl+F searches; Ctrl+Shift+O toggles the outline.
+Ctrl++ and Ctrl+- change text size; Ctrl+0 resets it.
+Ctrl+R reloads. Ctrl+A selects all; Ctrl+C copies.
+Escape closes the current menu, outline or search.
+.SH FILES
+Preferences and recent reading positions use the GSettings schema
+.BR de.kalendium.Hashline .
+Documents must be UTF-8 and at most 20 MiB.
+Raw HTML is displayed as text. Remote images are not loaded.
+.SH EXAMPLES
+.B hashline "notes/erste Datei.md"
+.PP
+.B hashline -- -notes.md
+.SH SEE ALSO
+.BR gio (1),
+.BR gsettings (1),
+.BR xdg-mime (1)

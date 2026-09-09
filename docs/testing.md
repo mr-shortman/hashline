@@ -9,14 +9,16 @@ keinen WebDriver und keine WebView mehr; alles unten läuft mit Rust, GTK4 und
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+GSETTINGS_BACKEND=memory cargo test --workspace
 cargo build --release --workspace
 ```
 
 `build.rs` übersetzt `data/de.kalendium.Hashline.gschema.xml` bei jedem Bau in
 das Ausgabeverzeichnis, und die Anwendung findet es dort, wenn kein Schema
 installiert ist. `GSETTINGS_SCHEMA_DIR` ist damit nur nötig, wenn man
-absichtlich ein anderes Schema prüfen will.
+absichtlich ein anderes Schema prüfen will. `GSETTINGS_BACKEND=memory`
+isoliert die Unit-Tests von persönlichen Einstellungen und benötigt keinen
+schreibbaren dconf-Dienst; der Pakettest prüft zusätzlich echte Persistenz.
 
 ## Aussehen ohne Fenster
 
@@ -129,4 +131,20 @@ Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterst�
 dbus-run-session -- env GDK_BACKEND=x11 GTK_A11Y=atspi GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory /usr/bin/python3 tests/desktop/native_reader.py target/debug/hashline
 ```
 
-Diese Tests sind Entwicklungsprüfungen. Paketinstallation, vollständige Orca-Bedienung, visueller Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen; M3 ist nicht umgesetzt.
+Diese Tests sind Entwicklungsprüfungen. Vollständige Orca-Bedienung, visueller
+Referenzvergleich sowie die Performance-Abnahme bleiben gesonderte Prüfungen.
+
+## Linux-Paket
+
+```sh
+python3 packaging/build_deb.py
+docker build -f packaging/Dockerfile -t hashline-package-test .
+docker run --rm hashline-package-test
+```
+
+Die CI baut auf Ubuntu 26.04 und prüft das `.deb` in einem frischen Container.
+Geprüft werden APT-Installation, Reinstallation, Entfernung, Cache-Trigger,
+GSettings-Persistenz, Icon, MIME-Registrierung und Start über den installierten
+Desktop-Eintrag samt Instanzübergabe. Standardzuordnungen müssen erhalten
+bleiben. Details: [Installation](installation.md), Ergebnisse und verbleibende
+Freigabepunkte: [M3](acceptance/M3.md).

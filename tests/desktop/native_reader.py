@@ -3,11 +3,24 @@
 Requires python3-gi and gir1.2-atspi-2.0, plus an X11/Wayland display.
 Broadway does not expose GTK's AT-SPI backend.
 """
-import gi, subprocess, time, tempfile, sys
+import gi, subprocess, time, tempfile, sys, os, signal
 from pathlib import Path
-BINARY = sys.argv[1] if len(sys.argv) > 1 else 'target/debug/hashline'
+BINARY = str(Path(sys.argv[1] if len(sys.argv) > 1 else 'target/debug/hashline').resolve())
+DESKTOP = '--desktop' in sys.argv[2:]
 gi.require_version('Atspi', '2.0')
-from gi.repository import Atspi
+from gi.repository import Atspi, Gio, GLib
+
+if DESKTOP:
+    launcher = Gio.DesktopAppInfo.new('de.kalendium.Hashline.desktop')
+    assert launcher is not None, 'Installed desktop entry missing'
+    assert launcher.get_name() == 'Hashline'
+    assert launcher.get_generic_name() == 'Markdown Viewer'
+    assert launcher.get_commandline() == 'hashline %f'
+    assert launcher.get_icon().to_string() == 'de.kalendium.Hashline'
+    for content_type in ('text/markdown', 'text/x-markdown'):
+        assert any(app.get_id() == launcher.get_id()
+                   for app in Gio.AppInfo.get_all_for_type(content_type)), content_type
+    assert Gio.SettingsSchemaSource.get_default().lookup('de.kalendium.Hashline', True)
 
 def descendants(node):
     yield node
@@ -36,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix='hashline-atspi-') as tmp:
         print('AT-SPI Document role, Text interface, Unicode offsets: OK',flush=True)
         subprocess.run([BINARY,str(second),str(first)],check=True,timeout=5)
         node,text=document('Zweite Datei')
-        applications=[n for n in descendants(Atspi.get_desktop(0)) if n.get_role()==Atspi.Role.APPLICATION and n.get_name()=='hashline']
+        applications=[n for n in descendants(Atspi.get_desktop(0)) if n.get_role()==Atspi.Role.APPLICATION and n.get_process_id()==app.pid]
         assert len(applications)==1, len(applications)
         frames=[n for n in descendants(applications[0]) if n.get_role()==Atspi.Role.FRAME]
         assert len(frames)==1,len(frames)
@@ -44,5 +57,48 @@ with tempfile.TemporaryDirectory(prefix='hashline-atspi-') as tmp:
         labels=[n.get_name() for n in descendants(applications[0])]
         assert any('erste Datei wurde gewählt' in label for label in labels), labels
         print('Second process reuses one window; multi-file notice visible: OK',flush=True)
+
+        other = Path(tmp) / 'anderes Verzeichnis'
+        other.mkdir()
+        relative = other / '-Grüße %20 #.md'
+        relative.write_text('# Relativer Aufruf\n\nAufruferverzeichnis und Sonderzeichen.\n')
+        subprocess.run([BINARY, '--', relative.name], cwd=other, check=True, timeout=5)
+        document('Relativer Aufruf')
+        subprocess.run([BINARY], cwd=other, check=True, timeout=5)
+        document('Relativer Aufruf')
+        print('Caller-relative paths, Unicode, spaces, %, #, -- and empty activation: OK', flush=True)
+
+        if DESKTOP:
+            # GIO's desktop launch is the same association/Exec expansion path
+            # used by file managers. % in a literal path must not become an escape.
+            desktop_file = other / 'Dateimanager Grüße %20 #.md'
+            desktop_file.write_text('# Desktop-Aufruf\n\nInstalliertes Paket.\n')
+            assert launcher.launch([Gio.File.new_for_path(str(desktop_file))], None)
+            node, _ = document('Desktop-Aufruf')
+            assert node.get_process_id() == app.pid
+            frames = [n for n in descendants(applications[0]) if n.get_role() == Atspi.Role.FRAME]
+            assert len(frames) == 1, len(frames)
+            print('Installed desktop/MIME launcher forwards to the same process and window: OK', flush=True)
     finally:
         app.terminate(); app.wait(timeout=5)
+
+    if DESKTOP:
+        launched = []
+        assert launcher.launch_uris_as_manager(
+            [first.as_uri()], None, GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            None, None, lambda info, pid, data: launched.append(pid), None)
+        assert len(launched) == 1, launched
+        pid = launched[0]
+        try:
+            node, _ = document('Grüße 🌍')
+            assert node.get_process_id() == pid
+            print('Cold start through the installed desktop entry: OK', flush=True)
+        finally:
+            os.kill(pid, signal.SIGTERM)
+            for _ in range(50):
+                if os.waitpid(pid, os.WNOHANG)[0]:
+                    break
+                time.sleep(.1)
+            else:
+                os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)

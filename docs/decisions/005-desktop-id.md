@@ -1,5 +1,11 @@
 # 005 — Desktop-Dateiname an GTK-Anwendungs-ID angleichen
 
+Der folgende Tauri-Buildschritt ist historisch. Seit der nativen M3-Paketierung
+installiert `packaging/build_deb.py` direkt `de.kalendium.Hashline.desktop`
+und das gleichnamige Icon. Die Identitätsentscheidung bleibt bestehen;
+[Installation](../installation.md) und [M3-Bericht](../acceptance/M3.md)
+beschreiben den aktuellen Weg.
+
 Tauri 2.11 erzeugt den Desktop-Dateinamen aus `productName` (`Hashline.desktop`).
 Wayland ordnet Fenster anhand der GTK-Anwendungs-ID zu. Die App aktiviert deshalb
 `enableGTKAppId` mit `de.kalendium.Hashline`.

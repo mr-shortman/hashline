@@ -8,22 +8,36 @@ on:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    container: ubuntu:26.04
     steps:
-      - uses: actions/checkout@v4
       # GTK4 development files; everything else gtk4-rs needs — GLib, Pango,
       # Cairo, gdk-pixbuf, Graphene — arrives as a dependency of these.
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y libgtk-4-dev build-essential pkg-config
+      - run: apt-get update
+      - run: apt-get install -y libgtk-4-dev build-essential pkg-config python3 dpkg-dev desktop-file-utils libglib2.0-bin shared-mime-info curl ca-certificates git
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.98.1"
           components: rustfmt, clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
-      - run: cargo test --locked --workspace
+      - run: GSETTINGS_BACKEND=memory cargo test --locked --workspace
       - run: cargo build --locked --release --workspace
+      - run: python3 packaging/build_deb.py
       - uses: actions/upload-artifact@v4
         with:
-          name: hashline
-          path: target/release/hashline
+          name: hashline-ubuntu-26.04-amd64
+          path: target/packages/*
           if-no-files-found: error
+
+  package-install:
+    needs: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hashline-ubuntu-26.04-amd64
+          path: target/packages
+      - run: docker build -f packaging/Dockerfile -t hashline-package-test .
+      - run: docker run --rm hashline-package-test

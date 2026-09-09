@@ -28,11 +28,33 @@ const SEARCH_DEBOUNCE_MS: u64 = 120;
 const OUTLINE_SIDEBAR_WIDTH: i32 = 900;
 
 pub fn run() -> glib::ExitCode {
+    glib::set_application_name("Hashline");
     let application = gtk::Application::builder()
         .application_id(APP_ID)
-        .flags(gio::ApplicationFlags::HANDLES_OPEN)
+        .flags(gio::ApplicationFlags::HANDLES_OPEN | gio::ApplicationFlags::HANDLES_COMMAND_LINE)
         .build();
 
+    application.set_option_context_parameter_string(Some("[FILE …]"));
+    application.set_option_context_summary(Some(
+        "Open Markdown in one window. If several files are given, the first is opened.",
+    ));
+    application.add_main_option(
+        "version",
+        glib::Char::from(b'v'),
+        glib::OptionFlags::NONE,
+        glib::OptionArg::None,
+        "Show the application version",
+        None,
+    );
+    application.connect_handle_local_options(|_, options| {
+        if options.contains("version") {
+            println!("Hashline {}", env!("CARGO_PKG_VERSION"));
+            std::ops::ControlFlow::Break(glib::ExitCode::SUCCESS)
+        } else {
+            std::ops::ControlFlow::Continue(())
+        }
+    });
+    application.connect_startup(|_| gtk::Window::set_default_icon_name(APP_ID));
     install_application(&application);
     application.run()
 }
@@ -54,6 +76,33 @@ fn install_application(application: &gtk::Application) {
         *current.borrow_mut() = Some(ui.clone());
         ui
     };
+    let command_ui = get_ui.clone();
+    application.connect_command_line(move |application, command| {
+        // GOption can retain the option terminator in the remaining arguments.
+        // Consume it once, then treat even a literal "--" as a filename. GIO
+        // resolves each path against the *calling* process's working directory.
+        let mut terminated = false;
+        let files: Vec<_> = command
+            .arguments()
+            .into_iter()
+            .skip(1)
+            .filter(|argument| {
+                if !terminated && argument == "--" {
+                    terminated = true;
+                    false
+                } else {
+                    true
+                }
+            })
+            .map(|argument| command.create_file_for_arg(argument))
+            .collect();
+        let ui = command_ui(application);
+        if !files.is_empty() {
+            ui.open_files(&files);
+        }
+        ui.present();
+        glib::ExitCode::SUCCESS
+    });
     let activate_ui = get_ui.clone();
     application.connect_open(move |application, files, _| {
         let ui = get_ui(application);

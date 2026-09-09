@@ -1,7 +1,8 @@
 # Entwicklung
 
 Hashline ist ein nativer GTK4-Prozess in Rust. Es gibt keine Node-Toolchain,
-kein Bundling und keinen Frontend-Build (SPEC.md, Abschnitt 4).
+keinen Frontend-Build (SPEC.md, Abschnitt 4). Die native `.deb`-Paketierung
+steht in [installation.md](installation.md).
 
 ## Voraussetzungen
 
@@ -87,8 +88,6 @@ cargo test --workspace
 
 ## Was noch fehlt
 
-M3 — Installation, Desktop-Eintrag registrieren, MIME-Zuordnung, Icon, `.deb` —
-ist nicht umgesetzt; die Dateien dafür liegen unter `data/`. Die offenen
-technischen Punkte stehen in
-[011](decisions/011-m0-foundation.md) und
-[012](decisions/012-rendering-and-navigation.md).
+Die M3-Auslieferungsfunktionen sind umgesetzt. Die vollständige Freigabe bleibt
+wegen der [bekannten Einschränkungen](limitations.md) offen; Paketprüfungen
+und Abnahmegrenzen stehen im [M3-Bericht](acceptance/M3.md).

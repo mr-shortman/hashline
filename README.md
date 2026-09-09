@@ -12,11 +12,11 @@ Textsuche, Code-Kopieren, Syntaxhervorhebung, lokale Bilder, relative
 Markdown-Links, automatische Aktualisierung unter Erhalt der Leseposition,
 Lesepositionen, Themes und Textzoom.
 
-**Status:** M0 bis M2 nach [SPEC.md](SPEC.md) sind umgesetzt. **M3 —
-Installation, Desktop-Eintrag, MIME-Zuordnung, Icon und Paket — ist offen**, und
-die v1-Abnahme ist nicht erteilt. Was aussteht, steht in
-[011](docs/decisions/011-m0-foundation.md) und
-[012](docs/decisions/012-rendering-and-navigation.md).
+**Status:** Der native Reader hat die M3-Auslieferung nach [SPEC.md](SPEC.md),
+einschließlich `.deb` für Ubuntu 26.04 amd64. Die vollständige
+M3-/v1-Abnahme steht aus: bekannte Performance- und Darstellungslücken sind
+in [Einschränkungen](docs/limitations.md) und im
+[M3-Bericht](docs/acceptance/M3.md) festgehalten.
 
 Der Dokumentbereich ist ein eigenes Widget: es setzt den Op-Buffer des Parsers
 mit Pango und zeichnet mit GSK, blockweise virtualisiert. Für kein Dokument
@@ -32,6 +32,20 @@ cargo run -p hashline -- README.md
 
 Mehr in [docs/development.md](docs/development.md), Prüfungen in
 [docs/testing.md](docs/testing.md).
+
+## Installation
+
+Paketbau und Installation auf Ubuntu 26.04:
+
+```sh
+python3 packaging/build_deb.py
+sudo apt install ./target/packages/hashline_0.1.0-1_amd64.deb
+```
+
+Voraussetzungen, Entfernen und isolierter Installationstest stehen in
+[docs/installation.md](docs/installation.md). Hashline erscheint im
+Anwendungsmenü und unter „Öffnen mit“ für Markdown. Eine bestehende
+Standardzuordnung bleibt erhalten.
 
 ## Bedienung
 

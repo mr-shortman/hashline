@@ -1,0 +1,10 @@
+**
+!packaging/
+!packaging/Dockerfile
+!packaging/smoke.sh
+!tests/
+!tests/desktop/
+!tests/desktop/native_reader.py
+!target/
+!target/packages/
+!target/packages/*.deb

@@ -466,7 +466,7 @@ CLI, Instanzübergabe, Desktop-Eintrag, MIME-Zuordnung, GSettings-Schema, Icon u
 
 ### Stand der ergänzten Migration (8. September 2026)
 
-Die folgenden Lücken der nativen Fassung sind umgesetzt. **M3 bleibt ausdrücklich offen**; die Änderungen an den vorhandenen Öffnen-Handlern und am bestehenden Einstellungsschema sind keine Installations- oder Paketierungsabnahme.
+Die folgenden Lücken der nativen Fassung sind umgesetzt. Auch die **M3-Auslieferungsfunktionen sind implementiert**: nativer `.deb`-Build, Desktop-/MIME-Registrierung, Icon, Schema-Installation und Pakettests. Build und Installation stehen in [docs/installation.md](docs/installation.md), Nachweise und offene Freigabekriterien im [M3-Bericht](docs/acceptance/M3.md). **Die vollständige M3-/v1-Abnahme bleibt offen**; Pakettests ersetzen keine Performance- und Darstellungsabnahme.
 
 | Punkt | Umsetzung |
 | --- | --- |
