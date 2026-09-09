@@ -49,6 +49,12 @@ impl ImageCache {
         }
     }
 
+    /// Forgets every decoded picture. A tab that is not showing keeps no
+    /// textures; the pictures decode again when it is looked at.
+    pub fn clear(&self) {
+        self.entries.borrow_mut().clear();
+    }
+
     /// The texture for a source, if it was accepted.
     pub fn texture(&self, source: &str) -> Option<gdk::Texture> {
         self.load(source);

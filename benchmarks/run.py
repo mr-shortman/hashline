@@ -112,6 +112,10 @@ def summarize(rows, repetitions):
                 continue
             if name == 'searchLargeMs' and fixture != 'large':
                 continue
+            # Ten tabs of a megabyte each is one number, and only the medium
+            # fixture is a megabyte.
+            if name == 'tenTabsMiB' and fixture != 'medium':
+                continue
             if isinstance(limits, list) and fixture not in SIZE:
                 continue
             limit = limits[SIZE[fixture]] if isinstance(limits, list) and fixture in SIZE else limits
@@ -204,7 +208,7 @@ def main():
     configuration = catalog()
     catalog_viewers = configuration['viewers']
     catalog_viewers['hashline'] = {'name': 'Hashline', 'role': 'self', 'version': 'workspace',
-                          'renderer': 'GSK', 'backend': 'Wayland', 'reload': True, 'tabs': False}
+                          'renderer': 'GSK', 'backend': 'Wayland', 'reload': True, 'tabs': True}
     fixture_records = {row['name']: row for row in json.loads(MANIFEST.read_text())}
     fixtures = list(fixture_records)
     try:

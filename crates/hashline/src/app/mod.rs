@@ -10,11 +10,13 @@ use gtk::glib;
 use gtk::prelude::*;
 
 mod outline_view;
+mod tab;
 
-use crate::document::{self, Anchor, Watch};
+use crate::document::{self, Anchor};
 use crate::preferences::Preferences;
 use crate::theme::{document as tokens, DARK, LIGHT};
 use crate::view::DocumentView;
+use tab::Tab;
 
 pub const APP_ID: &str = "de.kalendium.Hashline";
 
@@ -39,7 +41,7 @@ pub fn run() -> glib::ExitCode {
 
     application.set_option_context_parameter_string(Some("[FILE …]"));
     application.set_option_context_summary(Some(
-        "Open Markdown in one window. If several files are given, the first is opened.",
+        "Open Markdown in one window. Each file given opens in its own tab.",
     ));
     application.add_main_option(
         "version",
@@ -127,7 +129,15 @@ struct Loaded {
 
 struct Ui {
     window: gtk::ApplicationWindow,
-    view: DocumentView,
+    /// One page per open document (docs/decisions/017-tabs.md).
+    notebook: gtk::Notebook,
+    tabs: RefCell<Vec<Rc<Tab>>>,
+    /// The tab the window is currently showing, so that what belongs to it can
+    /// be taken off the shared widgets before another tab takes them over.
+    showing: RefCell<Option<Rc<Tab>>>,
+    /// Set while a tab is being switched to, so the search field's own change
+    /// notification does not run a search the reader did not ask for.
+    restoring: Cell<bool>,
     title: gtk::Label,
     stack: gtk::Stack,
     search_bar: gtk::SearchBar,
@@ -148,16 +158,7 @@ struct Ui {
     content: gtk::Box,
     banner: gtk::Revealer,
     banner_label: gtk::Label,
-    current: RefCell<Option<PathBuf>>,
-    /// The watch on the open file. Replacing it stops the previous one.
-    watch: RefCell<Option<Watch>>,
-    /// Digest of the source now showing, so a watch event that changed
-    /// nothing does not cost a re-render (SPEC.md, section 7).
-    digest: Cell<u64>,
     preferences: Preferences,
-    /// Rising request id; only the newest load may replace the document
-    /// (SPEC.md, section 5, "Zustandsmodell").
-    request: Cell<u64>,
 }
 
 impl Ui {
@@ -187,12 +188,7 @@ impl Ui {
             window.maximize();
         }
 
-        let view = DocumentView::new();
-        let scroller = gtk::ScrolledWindow::builder()
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .vexpand(true)
-            .child(&view)
-            .build();
+        let notebook = tab::notebook();
 
         let title = gtk::Label::new(Some("Hashline"));
         title.add_css_class("title");
@@ -218,7 +214,7 @@ impl Ui {
 
         let stack = gtk::Stack::new();
         stack.add_named(&empty, Some("empty"));
-        stack.add_named(&scroller, Some("document"));
+        stack.add_named(&notebook, Some("document"));
         stack.set_visible_child_name("empty");
 
         // Search: a bar over the document, with the hit count beside the field
@@ -334,7 +330,10 @@ impl Ui {
 
         let ui = Rc::new(Ui {
             window,
-            view,
+            notebook,
+            tabs: RefCell::new(Vec::new()),
+            showing: RefCell::new(None),
+            restoring: Cell::new(false),
             title,
             stack,
             banner,
@@ -358,11 +357,7 @@ impl Ui {
             outline_revealer: outline_revealer.clone(),
             outline_list,
             content,
-            current: RefCell::new(None),
-            watch: RefCell::new(None),
-            digest: Cell::new(0),
             preferences,
-            request: Cell::new(0),
         });
 
         ui.install_theme();
@@ -371,7 +366,7 @@ impl Ui {
         ui.install_outline();
         ui.install_actions(application);
         ui.install_drop_target();
-        ui.install_links();
+        ui.install_tabs();
 
         for button in [&open_button, &empty_button] {
             button.connect_clicked(glib::clone!(
@@ -396,7 +391,6 @@ impl Ui {
 
         // The stored view preferences take effect before anything is shown,
         // so no wrong zoom or layout flashes (SPEC.md, section 3).
-        ui.view.set_zoom(ui.preferences.zoom());
         let showing = ui.preferences.outline_visible();
         outline_button.set_active(showing);
         ui.outline_revealer.set_reveal_child(showing);
@@ -408,15 +402,16 @@ impl Ui {
             #[strong]
             ui,
             move |window| {
-                ui.remember_position();
-                ui.watch.borrow_mut().take();
-                ui.request.set(ui.request.get() + 1);
+                for tab in ui.tabs.borrow().iter() {
+                    ui.remember_position_of(tab);
+                    tab.close();
+                }
                 ui.preferences.set_window_size(
                     window.width(),
                     window.height(),
                     window.is_maximized(),
                 );
-                ui.preferences.set_zoom(ui.view.zoom());
+                ui.preferences.set_zoom(ui.zoom());
                 ui.preferences
                     .set_outline_visible(ui.outline_revealer.reveals_child());
                 glib::Propagation::Proceed
@@ -427,13 +422,139 @@ impl Ui {
         ui
     }
 
-    /// Records where reading stopped in the file that is showing.
-    fn remember_position(&self) {
-        let path = self.current.borrow().clone();
+    /// The tab showing, if a document is open at all.
+    fn tab(&self) -> Option<Rc<Tab>> {
+        let index = self.notebook.current_page()?;
+        self.tabs.borrow().get(index as usize).cloned()
+    }
+
+    fn view(&self) -> Option<DocumentView> {
+        self.tab().map(|tab| tab.view.clone())
+    }
+
+    /// Sets the type size of every tab, so switching never resizes the text.
+    fn set_zoom(&self, percent: i32) {
+        for tab in self.tabs.borrow().iter() {
+            tab.view.set_zoom(percent);
+        }
+        self.preferences.set_zoom(self.zoom());
+    }
+
+    /// Moves to the next or previous tab, wrapping round.
+    fn step_tab(&self, step: i32) {
+        let count = self.notebook.n_pages() as i32;
+        if count < 2 {
+            return;
+        }
+        let current = self.notebook.current_page().unwrap_or(0) as i32;
+        let next = (current + step).rem_euclid(count);
+        self.notebook.set_current_page(Some(next as u32));
+    }
+
+    /// The zoom every tab is set at. It is a window-wide setting, so the tabs
+    /// never disagree and any one of them can be asked.
+    fn zoom(&self) -> i32 {
+        self.tabs
+            .borrow()
+            .first()
+            .map(|tab| tab.view.zoom())
+            .unwrap_or_else(|| self.preferences.zoom())
+    }
+
+    /// Records where reading stopped in one tab's file.
+    fn remember_position_of(&self, tab: &Tab) {
+        let path = tab.path.borrow().clone();
         if let Some(path) = path {
             self.preferences
-                .remember_position(&path, &self.view.reading_anchor());
+                .remember_position(&path, &tab.view.reading_anchor());
         }
+    }
+
+    /// A new page of the notebook, with everything a document needs wired to
+    /// it: links, the outline's notifications, and its own close button.
+    fn new_tab(self: &Rc<Self>) -> Rc<Tab> {
+        let tab = Tab::new();
+        tab.view.set_zoom(self.zoom());
+        self.install_links(&tab);
+        self.install_section_notice(&tab);
+        let index = self.notebook.append_page(&tab.page, Some(&tab.handle));
+        self.tabs.borrow_mut().insert(index as usize, tab.clone());
+        tab::update_strip(&self.notebook);
+        let ui = self.clone();
+        let weak = Rc::downgrade(&tab);
+        tab.close.connect_clicked(move |_| {
+            if let Some(tab) = weak.upgrade() {
+                ui.close_tab(&tab);
+            }
+        });
+        self.stack.set_visible_child_name("document");
+        tab
+    }
+
+    /// Closes one tab, keeping the reading position of the file it held.
+    fn close_tab(self: &Rc<Self>, tab: &Rc<Tab>) {
+        let Some(index) = self.notebook.page_num(&tab.page) else {
+            return;
+        };
+        self.remember_position_of(tab);
+        tab.close();
+        self.tabs.borrow_mut().retain(|open| !Rc::ptr_eq(open, tab));
+        self.notebook.remove_page(Some(index));
+        tab::update_strip(&self.notebook);
+        if self.tabs.borrow().is_empty() {
+            self.stack.set_visible_child_name("empty");
+            self.title.set_text("Hashline");
+            self.window.set_tooltip_text(None);
+            self.banner.set_reveal_child(false);
+            self.outline_list.model.set_outline(Rc::default());
+            self.showing.replace(None);
+        } else {
+            self.enter_tab();
+        }
+    }
+
+    /// Everything the window shows for the tab that is now in front.
+    ///
+    /// The search field is one widget shared by every tab, so what the tab
+    /// being left had in it is taken off it here rather than when it was
+    /// typed: `GtkSearchEntry` reports a change after a delay of its own, and
+    /// that report can arrive after the switch.
+    fn enter_tab(self: &Rc<Self>) {
+        let Some(tab) = self.tab() else {
+            return;
+        };
+        let left = self.showing.replace(Some(tab.clone()));
+        if let Some(left) = left.filter(|left| !Rc::ptr_eq(left, &tab)) {
+            *left.query.borrow_mut() = self.search_entry.text().to_string();
+            left.searching.set(self.search_bar.is_search_mode());
+        }
+        for other in self.tabs.borrow().iter() {
+            if !Rc::ptr_eq(other, &tab) {
+                other.deactivate();
+            }
+        }
+        self.title.set_text(&tab.title.text());
+        self.window
+            .set_tooltip_text(tab.handle.tooltip_text().as_deref());
+        // The search field belongs to the window, its contents to the tab.
+        self.restoring.set(true);
+        self.search_entry.set_text(&tab.query.borrow());
+        self.search_bar.set_search_mode(tab.searching.get());
+        self.restoring.set(false);
+        self.update_search_count();
+        self.fill_outline();
+        self.banner.set_reveal_child(false);
+    }
+
+    /// Switching pages, closing with Ctrl+W and cycling with Ctrl+Tab.
+    fn install_tabs(self: &Rc<Self>) {
+        let ui = self.clone();
+        self.notebook.connect_switch_page(move |_, _, _| {
+            // The notebook reports the page it is switching *to* before it is
+            // current, so the rest of the window is updated once it is.
+            let ui = ui.clone();
+            glib::idle_add_local_once(move || ui.enter_tab());
+        });
     }
 
     /// Debounced so that typing does not run a scan per keystroke, and the
@@ -444,6 +565,9 @@ impl Ui {
         let ui = self.clone();
         let token = pending.clone();
         self.search_entry.connect_search_changed(move |entry| {
+            if ui.restoring.get() {
+                return;
+            }
             token.set(token.get() + 1);
             let generation = token.get();
             let needle = entry.text().to_string();
@@ -462,22 +586,30 @@ impl Ui {
 
         let ui = self.clone();
         self.search_entry.connect_activate(move |_| {
-            ui.view.search_next();
+            if let Some(view) = ui.view() {
+                view.search_next();
+            }
             ui.update_search_count();
         });
         let ui = self.clone();
         self.search_entry.connect_previous_match(move |_| {
-            ui.view.search_previous();
+            if let Some(view) = ui.view() {
+                view.search_previous();
+            }
             ui.update_search_count();
         });
         let ui = self.clone();
         next.connect_clicked(move |_| {
-            ui.view.search_next();
+            if let Some(view) = ui.view() {
+                view.search_next();
+            }
             ui.update_search_count();
         });
         let ui = self.clone();
         previous.connect_clicked(move |_| {
-            ui.view.search_previous();
+            if let Some(view) = ui.view() {
+                view.search_previous();
+            }
             ui.update_search_count();
         });
         // Closing the bar clears the marks, and the document keeps the focus
@@ -485,26 +617,35 @@ impl Ui {
         let ui = self.clone();
         self.search_bar
             .connect_search_mode_enabled_notify(move |bar| {
-                if !bar.is_search_mode() {
-                    ui.view.clear_search();
+                if !bar.is_search_mode() && !ui.restoring.get() {
+                    if let Some(view) = ui.view() {
+                        view.clear_search();
+                        view.grab_focus();
+                    }
                     ui.search_count.set_text("");
-                    ui.view.grab_focus();
                 }
             });
     }
 
     fn run_search(&self, needle: &str) {
+        let Some(view) = self.view() else {
+            return;
+        };
         if needle.is_empty() {
-            self.view.clear_search();
+            view.clear_search();
             self.search_count.set_text("");
             return;
         }
-        self.view.search(needle);
+        view.search(needle);
         self.update_search_count();
     }
 
     fn update_search_count(&self) {
-        let (current, total) = self.view.search_position();
+        let Some(view) = self.view() else {
+            self.search_count.set_text("");
+            return;
+        };
+        let (current, total) = view.search_position();
         self.search_count.set_text(&match (current, total) {
             (_, 0) => "Kein Treffer".to_string(),
             (0, total) => format!("{total} Treffer"),
@@ -512,20 +653,28 @@ impl Ui {
         });
     }
 
-    fn install_outline(self: &Rc<Self>) {
+    /// One tab's report that the reader has moved into another section.
+    fn install_section_notice(self: &Rc<Self>, tab: &Rc<Tab>) {
         let ui = Rc::downgrade(self);
-        self.view
+        let page = tab.page.clone();
+        tab.view
             .connect_local("active-section-changed", false, move |_| {
                 if let Some(ui) = ui.upgrade() {
-                    ui.update_active_section();
-                    ui.update_outline_mode();
+                    // Only the tab in front may move the outline's selection.
+                    if ui.tab().is_some_and(|tab| tab.page == page) {
+                        ui.update_active_section();
+                        ui.update_outline_mode();
+                    }
                 }
                 None
             });
+    }
+
+    fn install_outline(self: &Rc<Self>) {
         let ui = self.clone();
         self.outline_list.view.connect_activate(move |_, position| {
-            if let Some(block) = ui.outline_list.block_at(position) {
-                ui.view.scroll_to_block(block);
+            if let (Some(block), Some(view)) = (ui.outline_list.block_at(position), ui.view()) {
+                view.scroll_to_block(block);
             }
         });
         // Wide enough for a sidebar: the document moves over rather than
@@ -545,47 +694,78 @@ impl Ui {
     fn fill_outline(&self) {
         // No widgets are built here: the model hands the list view a row only
         // when that row is on screen.
-        self.outline_list.model.set_outline(self.view.outline());
+        let outline = self.view().map(|view| view.outline()).unwrap_or_default();
+        self.outline_list.model.set_outline(outline);
         self.update_active_section();
     }
 
     fn update_active_section(&self) {
-        self.outline_list
-            .select(self.view.active_section().map(|index| index as u32));
+        let active = self.view().and_then(|view| view.active_section());
+        self.outline_list.select(active.map(|index| index as u32));
     }
 
+    /// Every file opens in its own tab, and a file that is already open is
+    /// brought to the front instead of read again
+    /// (docs/decisions/014-competitive-targets.md, section 2.2).
     fn open_files(self: &Rc<Self>, files: &[gio::File]) {
-        if let Some(file) = files.first() {
-            if let Some(path) = file.path() {
-                self.open(&path);
-            } else {
-                self.note("Nur lokale Markdown-Dateien können geöffnet werden.");
+        let mut refused = false;
+        for file in files {
+            match file.path() {
+                Some(path) => self.open(&path),
+                None => refused = true,
             }
         }
-        if files.len() > 1 {
-            self.note("Es kann nur eine Datei geöffnet sein. Die erste Datei wurde gewählt.");
+        if refused {
+            self.note("Nur lokale Markdown-Dateien können geöffnet werden.");
         }
     }
 
     /// Reads and parses off the main thread, then applies the result if it is
     /// still the newest request (SPEC.md, sections 5 and 10).
     fn open(self: &Rc<Self>, path: &Path) {
-        self.load(path, None);
+        if let Some(open) = self.tab_for(path) {
+            if let Some(index) = self.notebook.page_num(&open.page) {
+                self.notebook.set_current_page(Some(index));
+            }
+            return;
+        }
+        let tab = self.new_tab();
+        if let Some(index) = self.notebook.page_num(&tab.page) {
+            self.notebook.set_current_page(Some(index));
+        }
+        self.load(&tab, path, None);
     }
 
-    /// A reload of the file already showing, keeping the reading position.
-    fn reload(self: &Rc<Self>) {
-        let path = self.current.borrow().clone();
+    /// The tab already showing `path`, if there is one.
+    fn tab_for(&self, path: &Path) -> Option<Rc<Tab>> {
+        self.tabs
+            .borrow()
+            .iter()
+            .find(|tab| tab.path.borrow().as_deref() == Some(path))
+            .cloned()
+    }
+
+    /// A reload of the file showing in one tab, keeping the reading position.
+    fn reload_tab(self: &Rc<Self>, tab: &Rc<Tab>) {
+        let path = tab.path.borrow().clone();
         if let Some(path) = path {
-            let anchor = self.view.reading_anchor();
-            self.load(&path, Some(anchor));
+            let anchor = tab.view.reading_anchor();
+            self.load(tab, &path, Some(anchor));
         }
     }
 
-    fn load(self: &Rc<Self>, path: &Path, anchor: Option<Anchor>) {
+    /// A reload of the file that is showing.
+    fn reload(self: &Rc<Self>) {
+        if let Some(tab) = self.tab() {
+            self.reload_tab(&tab);
+        }
+    }
+
+    fn load(self: &Rc<Self>, tab: &Rc<Tab>, path: &Path, anchor: Option<Anchor>) {
         let path = path.to_path_buf();
-        self.request.set(self.request.get() + 1);
-        let request = self.request.get();
+        tab.request.set(tab.request.get() + 1);
+        let request = tab.request.get();
+        let tab = tab.clone();
         let (sender, receiver) = async_channel::bounded(1);
         let for_thread = path.clone();
         std::thread::spawn(move || {
@@ -607,69 +787,77 @@ impl Ui {
                 return;
             };
             // A later request has already been made: this answer is stale.
-            if ui.request.get() != request {
+            if tab.request.get() != request {
                 return;
             }
             match loaded.result {
                 Ok((parsed, digest)) => {
                     let reloading = loaded.anchor.is_some();
                     // Nothing changed: leave the view, and the reader, alone.
-                    if reloading && digest == ui.digest.get() {
+                    if reloading && digest == tab.digest.get() {
                         return;
-                    }
-                    // Leaving one document for another: keep the place in the
-                    // one being left (SPEC.md, section 7).
-                    if !reloading {
-                        ui.remember_position();
                     }
                     let stored = (!reloading)
                         .then(|| ui.preferences.reading_position(&loaded.path))
                         .flatten();
-                    ui.digest.set(digest);
-                    ui.show(loaded.path, parsed);
+                    tab.digest.set(digest);
+                    ui.show(&tab, loaded.path, parsed);
                     if let Some(anchor) = loaded.anchor.or(stored) {
-                        ui.view.restore_anchor(&anchor);
+                        tab.view.restore_anchor(&anchor);
                     }
                     release_free_memory();
                 }
-                Err(error) => ui.show_error(&loaded.path, &error),
+                Err(error) => ui.show_error(&tab, &loaded.path, &error),
             }
         });
     }
 
-    fn show(self: &Rc<Self>, path: PathBuf, document: hashline_markdown::OpDocument) {
+    fn show(
+        self: &Rc<Self>,
+        tab: &Rc<Tab>,
+        path: PathBuf,
+        document: hashline_markdown::OpDocument,
+    ) {
         // Relative picture paths resolve against the document's directory,
         // never the process working directory (SPEC.md, section 7).
-        self.view
+        tab.view
             .set_base_directory(path.parent().map(Path::to_path_buf));
-        self.view.set_document(document);
+        tab.view.set_document(document);
         // The shown name changes only once the new document is actually in
         // place (SPEC.md, section 7).
-        if let Some(name) = path.file_name() {
-            self.title.set_text(&name.to_string_lossy());
-        }
-        self.window.set_tooltip_text(Some(&path.to_string_lossy()));
-        *self.current.borrow_mut() = Some(path.clone());
-        self.start_watch(&path);
+        tab.set_path(&path);
+        self.start_watch(tab, &path);
         self.stack.set_visible_child_name("document");
-        self.banner.set_reveal_child(false);
-        self.fill_outline();
+        if self.tab().is_some_and(|current| Rc::ptr_eq(&current, tab)) {
+            self.title.set_text(&tab.title.text());
+            self.window.set_tooltip_text(Some(&path.to_string_lossy()));
+            self.banner.set_reveal_child(false);
+            self.fill_outline();
+        }
     }
 
     /// Replaces the watch, which stops the previous one, and reloads on
     /// change. A failure to watch is not fatal: manual reload stays available
     /// (SPEC.md, section 7).
-    fn start_watch(self: &Rc<Self>, path: &Path) {
+    fn start_watch(self: &Rc<Self>, tab: &Rc<Tab>, path: &Path) {
         let ui = Rc::downgrade(self);
+        let weak = Rc::downgrade(tab);
+        // Every tab watches its own file, whether or not it is the one in
+        // front (docs/decisions/014-competitive-targets.md, section 2.2).
         let watch = document::watch(path, move || {
-            if let Some(ui) = ui.upgrade() {
-                ui.reload();
+            if let (Some(ui), Some(tab)) = (ui.upgrade(), weak.upgrade()) {
+                ui.reload_tab(&tab);
             }
         });
-        *self.watch.borrow_mut() = watch;
+        *tab.watch.borrow_mut() = watch;
     }
 
-    fn show_error(&self, path: &Path, error: &str) {
+    fn show_error(self: &Rc<Self>, tab: &Rc<Tab>, path: &Path, error: &str) {
+        // A tab opened for a file that cannot be read has nothing to show, so
+        // it goes again rather than standing there empty.
+        if tab.path.borrow().is_none() {
+            self.close_tab(tab);
+        }
         // The file that failed is named, because the one still on screen is a
         // different one.
         self.banner_label
@@ -719,9 +907,13 @@ impl Ui {
     /// What a clicked link means. The view resolves nothing itself; this is the
     /// single place a document's content can ask for anything
     /// (SPEC.md, sections 7 and 11).
-    fn install_links(self: &Rc<Self>) {
+    fn install_links(self: &Rc<Self>, tab: &Rc<Tab>) {
         let ui = self.clone();
-        self.view.connect_link_activated(move |href| {
+        let weak = Rc::downgrade(tab);
+        tab.view.connect_link_activated(move |href| {
+            let Some(tab) = weak.upgrade() else {
+                return;
+            };
             let decoded = glib::Uri::unescape_string(href, None)
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| href.to_string());
@@ -729,8 +921,8 @@ impl Ui {
             if let Some(fragment) = decoded.strip_prefix('#') {
                 // Markdown writes `#kapitel`; the generated ids are prefixed,
                 // so both spellings are tried before giving up.
-                if !ui.view.scroll_to_anchor(fragment)
-                    && !ui.view.scroll_to_anchor(&format!("doc-{fragment}"))
+                if !tab.view.scroll_to_anchor(fragment)
+                    && !tab.view.scroll_to_anchor(&format!("doc-{fragment}"))
                 {
                     ui.note(&format!("Kein Abschnitt „{fragment}“ in diesem Dokument"));
                 }
@@ -749,8 +941,8 @@ impl Ui {
                 }
                 Some(other) => ui.note(&format!("Nicht unterstütztes Schema „{other}:“")),
                 None => {
-                    let base = ui
-                        .current
+                    let base = tab
+                        .path
                         .borrow()
                         .as_ref()
                         .and_then(|path| path.parent().map(Path::to_path_buf))
@@ -768,7 +960,9 @@ impl Ui {
                             // The jump happens once the document is in place.
                             let ui = ui.clone();
                             glib::idle_add_local_once(move || {
-                                ui.view.scroll_to_anchor(&format!("doc-{fragment}"));
+                                if let Some(view) = ui.view() {
+                                    view.scroll_to_anchor(&format!("doc-{fragment}"));
+                                }
                             });
                         }
                     } else {
@@ -850,7 +1044,9 @@ impl Ui {
             } else if ui.outline_revealer.reveals_child() {
                 ui.outline_list.view.grab_focus();
             } else {
-                ui.view.grab_focus();
+                if let Some(view) = ui.view() {
+                    view.grab_focus();
+                }
             }
             glib::Propagation::Stop
         });
@@ -880,7 +1076,10 @@ impl Ui {
         if let Some(settings) = gtk::Settings::default() {
             settings.set_gtk_application_prefer_dark_theme(dark);
         }
-        self.view.set_palette(if dark { DARK } else { LIGHT });
+        let palette = if dark { DARK } else { LIGHT };
+        for tab in self.tabs.borrow().iter() {
+            tab.view.set_palette(palette);
+        }
     }
 
     fn install_theme(self: &Rc<Self>) {
@@ -1002,7 +1201,6 @@ impl Ui {
             }
         });
         self.window.add_action(&theme);
-        let view = &self.view;
         add(
             "open",
             &["<Control>o"],
@@ -1022,7 +1220,9 @@ impl Ui {
                     if let Some(editable) = ui.focused_editable() {
                         editable.emit_by_name::<()>("copy-clipboard", &[]);
                     } else {
-                        ui.view.copy_selection();
+                        if let Some(view) = ui.view() {
+                            view.copy_selection();
+                        }
                     }
                 }
             )),
@@ -1037,36 +1237,71 @@ impl Ui {
                     if let Some(editable) = ui.focused_editable() {
                         editable.select_region(0, -1);
                     } else {
-                        ui.view.select_all();
+                        if let Some(view) = ui.view() {
+                            view.select_all();
+                        }
                     }
                 }
             )),
         );
+        // Zoom is a window setting, so every tab is set to the same size and
+        // a tab switch never changes the type.
         add(
             "zoom-in",
             &["<Control>plus", "<Control>equal"],
             Box::new(glib::clone!(
-                #[weak]
-                view,
-                move || view.set_zoom(view.zoom() + tokens::ZOOM_STEP)
+                #[weak(rename_to = ui)]
+                self,
+                move || ui.set_zoom(ui.zoom() + tokens::ZOOM_STEP)
             )),
         );
         add(
             "zoom-out",
             &["<Control>minus"],
             Box::new(glib::clone!(
-                #[weak]
-                view,
-                move || view.set_zoom(view.zoom() - tokens::ZOOM_STEP)
+                #[weak(rename_to = ui)]
+                self,
+                move || ui.set_zoom(ui.zoom() - tokens::ZOOM_STEP)
             )),
         );
         add(
             "zoom-reset",
             &["<Control>0"],
             Box::new(glib::clone!(
-                #[weak]
-                view,
-                move || view.set_zoom(100)
+                #[weak(rename_to = ui)]
+                self,
+                move || ui.set_zoom(100)
+            )),
+        );
+        add(
+            "close-tab",
+            &["<Control>w"],
+            Box::new(glib::clone!(
+                #[strong(rename_to = ui)]
+                self,
+                move || {
+                    if let Some(tab) = ui.tab() {
+                        ui.close_tab(&tab);
+                    }
+                }
+            )),
+        );
+        add(
+            "next-tab",
+            &["<Control>Tab", "<Control>Page_Down"],
+            Box::new(glib::clone!(
+                #[strong(rename_to = ui)]
+                self,
+                move || ui.step_tab(1)
+            )),
+        );
+        add(
+            "previous-tab",
+            &["<Control><Shift>Tab", "<Control>Page_Up"],
+            Box::new(glib::clone!(
+                #[strong(rename_to = ui)]
+                self,
+                move || ui.step_tab(-1)
             )),
         );
         add(
@@ -1270,7 +1505,8 @@ mod tests {
         let ui = Ui::build(&application);
         ui.window.present();
         pump();
-        ui.view.verify_accessibility_and_selection();
+        let probe = ui.new_tab();
+        probe.view.verify_accessibility_and_selection();
         ui.fill_outline();
         assert!(ui.outline_list.model.n_items() > 0);
         assert_eq!(ui.outline_list.selected(), Some(0));
@@ -1317,16 +1553,48 @@ mod tests {
         let second = dir.join("zwei.md");
         std::fs::write(&first, "# Eins\n\nText\n").unwrap();
         std::fs::write(&second, "# Zwei\n\nAnderer Text\n").unwrap();
+        ui.close_tab(&probe);
+        // Two files given at once open two tabs, and the second is in front.
         ui.open_files(&[gio::File::for_path(&first), gio::File::for_path(&second)]);
         pump();
-        assert_eq!(ui.current.borrow().as_ref(), Some(&first));
-        assert!(
-            ui.notice.reveals_child(),
-            "loading must not hide the multiple-file notice"
-        );
+        assert_eq!(ui.tabs.borrow().len(), 2);
+        assert_eq!(ui.tab().unwrap().path.borrow().as_ref(), Some(&second));
+        assert!(ui.notebook.shows_tabs());
+        // A file that is already open is brought forward, not read again.
+        ui.open_files(&[gio::File::for_path(&first)]);
+        pump();
+        assert_eq!(ui.tabs.borrow().len(), 2);
+        assert_eq!(ui.tab().unwrap().path.borrow().as_ref(), Some(&first));
+        // Each tab keeps its own search, and only the tab in front is set.
+        ui.search_bar.set_search_mode(true);
+        ui.search_entry.set_text("Text");
+        ui.run_search("Text");
+        pump();
+        let (front, back) = (ui.tabs.borrow()[0].clone(), ui.tabs.borrow()[1].clone());
+        assert_eq!(front.view.search_position().1, 1);
+        assert_eq!(back.view.search_position().1, 0);
+        ui.step_tab(1);
+        pump();
+        assert_eq!(ui.tab().unwrap().path.borrow().as_ref(), Some(&second));
+        assert_eq!(ui.search_entry.text().as_str(), "");
+        // An inactive tab holds no layout cache.
+        assert!(!front.view.holds_layouts());
+        assert!(back.view.holds_layouts());
+        ui.step_tab(-1);
+        pump();
+        assert_eq!(ui.tab().unwrap().path.borrow().as_ref(), Some(&first));
+        assert_eq!(ui.search_entry.text().as_str(), "Text");
+        // Ctrl+W closes the tab in front and leaves the other open.
+        ui.window.lookup_action("close-tab").unwrap().activate(None);
+        pump();
+        assert_eq!(ui.tabs.borrow().len(), 1);
+        assert!(!ui.notebook.shows_tabs());
+        ui.window.lookup_action("close-tab").unwrap().activate(None);
+        pump();
+        assert!(ui.tabs.borrow().is_empty());
+        assert_eq!(ui.stack.visible_child_name().as_deref(), Some("empty"));
         ui.open_files(&[gio::File::for_path(&second)]);
         pump();
-        assert_eq!(ui.current.borrow().as_ref(), Some(&second));
         assert_eq!(application.windows().len(), 1);
         ui.window.close();
         // Exercise the real activation/open handlers, including a fresh
@@ -1340,6 +1608,7 @@ mod tests {
         application.open(&[gio::File::for_path(&first)], "");
         application.open(&[gio::File::for_path(&second)], "");
         pump();
+        // A second invocation opens another tab of the same window.
         assert_eq!(application.windows().len(), 1);
         assert_eq!(application.active_window().unwrap(), window);
         assert_eq!(window.tooltip_text().as_deref(), second.to_str());

@@ -180,6 +180,39 @@ sys.exit(1)
         raise RuntimeError('Cannot verify benchmark window focus via AT-SPI; no keys sent')
 
 
+def tab_memory(command, fixture, renderer, options, artifact):
+    """PSS with one, two and ten copies of a fixture open at once.
+
+    The copies are real files with their own names, because a viewer that
+    already shows a path may bring that tab forward rather than open a
+    second one — which would measure nothing.
+    """
+    import shlex
+    copies = artifact / 'copies'
+    copies.mkdir(parents=True, exist_ok=True)
+    extras = []
+    for index in range(9):
+        path = copies / f'{fixture.stem}-{index}{fixture.suffix}'
+        path.write_bytes(fixture.read_bytes())
+        extras.append(str(path))
+    readings = {}
+    for tabs in (1, 2, 10):
+        wrapper = artifact / f'viewer-{tabs}'
+        wrapper.write_text('#!/bin/sh\nexec ' + shlex.join(command)
+                           + (' ' + shlex.join(extras[:tabs - 1]) if tabs > 1 else '') + ' "$@"\n')
+        wrapper.chmod(0o755)
+        with isolated(renderer, options.connector) as (bus, home):
+            result = memory_measure(str(wrapper), fixture, bus,
+                                    renderer if renderer != 'default' else None,
+                                    options.settle, options.sample_seconds, home)
+        if not (result.get('alive') and result.get('isolated') and result.get('pssKibMedian')):
+            return {'status': 'missing', 'reason': f'no settled reading with {tabs} tabs',
+                    'raw': result}
+        readings[tabs] = result['pssKibMedian'] / 1024
+    return {'status': 'ok', 'pssMiB': readings,
+            'inactiveTabMiB': readings[2] - readings[1], 'tenTabsMiB': readings[10]}
+
+
 def measure(group, command, fixture, renderer, spec, options, artifact, hz=None):
     artifact.mkdir(parents=True, exist_ok=True)
     if group in ('startup', 'content'):
@@ -268,6 +301,19 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
             result = readable(command, fixture, renderer, options, artifact, action)
             key = 'searchOpenUpperMs' if group == 'interaction' else 'tabSwitchUpperMs'
             result['metrics'] = {key: result.get('readableUpperMs')}
+            if group == 'tabs':
+                # What a tab that is not showing costs, and what ten of them
+                # cost together (decision 014, section 3.2). Every tab needs
+                # its own path: a viewer may bring an open file forward
+                # instead of opening it twice.
+                held = tab_memory(command, fixture, renderer, options, artifact)
+                result['tabMemory'] = held
+                result['metrics'].update(
+                    {'inactiveTabMiB': held.get('inactiveTabMiB'),
+                     'tenTabsMiB': held.get('tenTabsMiB')})
+                if held.get('status') != 'ok':
+                    result['status'] = 'missing'
+                    result['reason'] = held.get('reason', 'tab memory unmeasured')
             return result
         finally:
             pointer.close()

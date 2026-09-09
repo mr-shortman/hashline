@@ -405,6 +405,29 @@ impl DocumentView {
         self.queue_draw();
     }
 
+    /// Drops everything that can be built again from the document and the
+    /// plan: the set blocks and their syntax colours.
+    ///
+    /// A tab that is not showing must not hold a layout cache
+    /// (docs/decisions/014-competitive-targets.md, section 2.2). What stays is
+    /// the document, the plan with its measured heights and the reading
+    /// position, which is what makes coming back a few milliseconds rather
+    /// than a reload.
+    pub fn release_layout_cache(&self) {
+        let mut state = self.imp().state.borrow_mut();
+        state.cache.clear();
+        state.recent.clear();
+        state.highlights.clear();
+        state.coloured.clear();
+        state.images.clear();
+    }
+
+    /// Whether any block of this document is currently set. What a tab that
+    /// is not showing must not answer with yes.
+    pub fn holds_layouts(&self) -> bool {
+        !self.imp().state.borrow().cache.is_empty()
+    }
+
     /// The directory relative picture paths resolve against. Setting it clears
     /// what was cached for the previous document.
     pub fn set_base_directory(&self, directory: Option<std::path::PathBuf>) {
