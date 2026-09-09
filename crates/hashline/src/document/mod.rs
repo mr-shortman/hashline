@@ -8,7 +8,8 @@
 
 use std::path::{Path, PathBuf};
 
-use notify::{RecursiveMode, Watcher as _};
+use notify::event::{AccessKind, AccessMode};
+use notify::{EventKind, RecursiveMode, Watcher as _};
 
 /// Keeps a watch alive. Dropping it stops the watch, which is how a document
 /// switch releases the previous one (SPEC.md, section 5).
@@ -26,14 +27,21 @@ pub fn watch(path: &Path, on_change: impl Fn() + 'static) -> Option<Watch> {
 
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else { return };
+        // Reading the file is not a change to it, and the reader reads it on
+        // every reload: counting an open or a read as a reason to reload makes
+        // the process wake itself up for as long as it runs
+        // (crates/hashline/tests/reload.rs). Closing after *writing* is a save
+        // and stays.
+        if matches!(event.kind, EventKind::Access(kind)
+            if !matches!(kind, AccessKind::Close(AccessMode::Write)))
+        {
+            return;
+        }
         let touches_file = event.paths.iter().any(|changed| {
             changed.file_name() == Some(name.as_os_str())
                 // A rename into place shows up as the temporary name too, so a
                 // create or remove in the directory is worth a look as well.
-                || matches!(
-                    event.kind,
-                    notify::EventKind::Create(_) | notify::EventKind::Remove(_)
-                )
+                || matches!(event.kind, EventKind::Create(_) | EventKind::Remove(_))
         });
         if touches_file {
             let _ = sender.try_send(());
@@ -45,11 +53,30 @@ pub fn watch(path: &Path, on_change: impl Fn() + 'static) -> Option<Watch> {
         .ok()?;
 
     gtk::glib::spawn_future_local(async move {
-        // Events arrive in bursts — a save is several of them. They are
-        // coalesced by draining whatever is already queued and waiting out a
-        // short quiet period before reacting (SPEC.md, section 7).
+        // Events arrive in bursts — one save is several of them, and a burst of
+        // saves is many. They are coalesced by waiting for a quiet period
+        // rather than for a fixed delay: waiting once and reacting turned
+        // twenty writes into four reloads, because the events the file system
+        // had not delivered yet started the next round
+        // (crates/hashline/tests/reload.rs).
+        //
+        // The wait is extended only up to `DEBOUNCE_CEILING_MS` from the first
+        // event, so a file that is being written continuously still refreshes
+        // instead of waiting for a quiet moment that never comes.
+        let ceiling = std::time::Duration::from_millis(DEBOUNCE_CEILING_MS);
         while receiver.recv().await.is_ok() {
-            gtk::glib::timeout_future(std::time::Duration::from_millis(DEBOUNCE_MS)).await;
+            let first = std::time::Instant::now();
+            loop {
+                // Take everything already queued, then wait. What matters is
+                // whether anything arrives *during* the wait — one save is
+                // several events, and counting those as a reason to wait again
+                // would double the delay of every single write.
+                while receiver.try_recv().is_ok() {}
+                gtk::glib::timeout_future(std::time::Duration::from_millis(DEBOUNCE_MS)).await;
+                if receiver.is_empty() || first.elapsed() >= ceiling {
+                    break;
+                }
+            }
             while receiver.try_recv().is_ok() {}
             on_change();
         }
@@ -58,7 +85,11 @@ pub fn watch(path: &Path, on_change: impl Fn() + 'static) -> Option<Watch> {
     Some(Watch { _watcher: watcher })
 }
 
+/// The quiet period a change waits out before it is acted on
+/// (SPEC.md, section 7).
 const DEBOUNCE_MS: u64 = 150;
+/// How far that wait may be extended by further events.
+const DEBOUNCE_CEILING_MS: u64 = 750;
 
 /// Where the reader is, in terms that survive the document being reparsed.
 ///

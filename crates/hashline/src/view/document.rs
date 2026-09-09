@@ -1469,6 +1469,15 @@ fn font_families() -> (String, String) {
 
 #[cfg(test)]
 impl DocumentView {
+    /// Where the reader is, in document coordinates, and where a block sits.
+    /// The reload test compares the two across a reparse.
+    pub(crate) fn scroll_offset(&self) -> f64 {
+        self.scroll_top()
+    }
+    pub(crate) fn block_top(&self, index: usize) -> f64 {
+        self.imp().state.borrow().plan.y_of(index)
+    }
+
     pub(crate) fn verify_accessibility_and_selection(&self) {
         self.set_document(hashline_markdown::parse("# Grüße 🌍\n\nÄpfel und Öl.\n"));
         assert_eq!(self.accessible_role(), gtk::AccessibleRole::Document);

@@ -251,23 +251,49 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
     if group == 'reload':
         if not spec.get('reload'):
             return {'status': 'unsupported', 'reason': 'Live reload not supported by configured viewer', 'metrics': {}}
+        # The changed text is put where the reader is, not at the top of the
+        # file, and a paragraph is added above everything so that every block
+        # index below it moves. A frame that shows the change therefore proves
+        # two things at once: how long the reload took, and that the reading
+        # position survived it (decision 014, section 3.3). A viewer that jumps
+        # to the top after a reload shows the first section instead and fails.
+        anchor = '\n\n## Ankerabschnitt\n\nAnkerzeile eins zwei drei.\n'
+        changed = '\n\n## Ankerabschnitt\n\nAnkerzeile geaendert vier.\n'
         with tempfile.TemporaryDirectory(prefix='hashline-reload-') as temp:
             path = Path(temp) / fixture.name
-            path.write_bytes(fixture.read_bytes())
+            path.write_text(fixture.read_text() + anchor)
             for image in fixture.parent.glob('*.png'):
                 (Path(temp) / image.name).symlink_to(image)
-            def reload_action(application, capture, document):
-                # A new visible paragraph; original fixture on disk is untouched.
-                marker = 'Benchmark reload completed'
-                replacement = document.with_suffix('.new')
-                replacement.write_text(marker + '\n\n' + fixture.read_text())
-                started = time.monotonic_ns()
-                replacement.replace(document)
-                return started, [marker]
-            result = readable(command, path, renderer, options, artifact, reload_action)
-            result['metrics'] = {'reloadUpperMs': result.get('readableUpperMs')}
-            result['anchorVerified'] = False
-            result['stimulus'] = 'Atomic rename of temporary fixture copy, with new first paragraph'
+            pointer = module('scroll-native').Pointer(options.connector)
+            try:
+                def reload_action(application, capture, document):
+                    require_focus(application.pid)
+                    # Find the anchor section with the viewer's own search, so
+                    # the reader is far from the top when the file changes.
+                    keyboard(pointer, [65507, ord('f')]); time.sleep(.5)
+                    for char in 'Ankerzeile':
+                        keyboard(pointer, [ord(char)])
+                    time.sleep(.6)
+                    keyboard(pointer, [65293]); time.sleep(.4)
+                    keyboard(pointer, [65307]); time.sleep(.4)
+                    # Exclude the setup frames, keeping one pre-stimulus baseline.
+                    with capture.lock:
+                        capture.frames = capture.frames[-1:]
+                    replacement = document.with_suffix('.new')
+                    replacement.write_text('Neuer Absatz oben.\n\n'
+                                           + fixture.read_text() + changed)
+                    started = time.monotonic_ns()
+                    replacement.replace(document)
+                    return started, ['Ankerzeile geaendert vier']
+                result = readable(command, path, renderer, options, artifact, reload_action)
+            finally:
+                pointer.close()
+            preserved = bool(result.get('contentVerified'))
+            result['metrics'] = {'reloadUpperMs': result.get('readableUpperMs'),
+                                 'reloadAnchorPreserved': preserved}
+            result['anchorVerified'] = preserved
+            result['stimulus'] = ('Atomic rename of a temporary copy: a paragraph added above '
+                                  'everything and the paragraph at the reading position changed')
             return result
     if group in ('interaction', 'tabs'):
         if group == 'tabs' and not spec.get('tabs'):

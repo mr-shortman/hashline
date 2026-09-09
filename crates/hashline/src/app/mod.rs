@@ -1493,6 +1493,91 @@ mod tests {
         }
     }
 
+    /// A reload must leave the reader where they were, even when the text
+    /// above them changed length (SPEC.md, section 7, and
+    /// docs/decisions/014-competitive-targets.md, section 3.3).
+    ///
+    /// It runs against a mapped window, because the scroll position only
+    /// exists once the view has been given a size.
+    fn verify_reading_anchor_survives_a_reload(view: &DocumentView) {
+        let sections = |prefix: &str| {
+            let mut source = String::from(prefix);
+            for index in 0..60 {
+                source.push_str(&format!(
+                    "## Abschnitt {index}\n\nEin Absatz mit genug Text, um Höhe zu haben.\n\n"
+                ));
+            }
+            source
+        };
+        view.set_document(hashline_markdown::parse(&sections("")));
+        pump();
+        let target = view
+            .outline()
+            .block_for_id("doc-abschnitt-40")
+            .expect("the forty-first heading");
+        view.scroll_to_block(target);
+        pump();
+        assert!(
+            view.scroll_offset() > 0.0,
+            "the check must actually scroll away from the top"
+        );
+        let anchor = view.reading_anchor();
+        let held = anchor.heading.clone().expect("a heading to anchor to");
+
+        // The reload: three paragraphs appear above everything, so every block
+        // below them moves.
+        view.set_document(hashline_markdown::parse(&sections(
+            "Neu eins.\n\nNeu zwei.\n\nNeu drei.\n\n",
+        )));
+        pump();
+        view.restore_anchor(&anchor);
+        pump();
+        let moved = view
+            .outline()
+            .block_for_id(&held)
+            .expect("the heading is still there");
+        assert_ne!(moved, target, "the block index must have moved");
+        assert!(
+            view.scroll_offset() > 0.0,
+            "a reload must not send the reader to the top"
+        );
+        // Within a line of where it sat. Not to the pixel: the blocks now on
+        // screen are measured as they are drawn, and each measurement that
+        // replaces an estimate above the reader moves the whole document by
+        // that difference — which is the mechanism that keeps the *text* still.
+        let wanted = view.block_top(moved) + anchor.distance;
+        assert!(
+            (view.scroll_offset() - wanted).abs() < 40.0,
+            "the anchored heading must sit where it sat: {} against {wanted}",
+            view.scroll_offset()
+        );
+        assert_eq!(
+            view.reading_anchor().heading.as_deref(),
+            Some(held.as_str()),
+            "the reader must still be under the heading they were under"
+        );
+
+        // A heading that is gone falls back to the block index rather than to
+        // the top of the document.
+        view.set_document(hashline_markdown::parse(&sections("").replace(
+            &format!(
+                "## Abschnitt {}\n",
+                held.trim_start_matches("doc-abschnitt-")
+            ),
+            "## Umbenannt\n",
+        )));
+        pump();
+        view.restore_anchor(&anchor);
+        pump();
+        assert!(
+            view.scroll_offset() > 0.0,
+            "a renamed heading must not send the reader to the top"
+        );
+        // Left at the top of a short document, for the checks that follow.
+        view.set_document(hashline_markdown::parse("# Eins\n\nText\n"));
+        pump();
+    }
+
     #[test]
     #[ignore = "requires a GTK display; run with gtk4-broadwayd and GDK_BACKEND=broadway"]
     fn native_ui() {
@@ -1507,6 +1592,7 @@ mod tests {
         pump();
         let probe = ui.new_tab();
         probe.view.verify_accessibility_and_selection();
+        verify_reading_anchor_survives_a_reload(&probe.view);
         ui.fill_outline();
         assert!(ui.outline_list.model.n_items() > 0);
         assert_eq!(ui.outline_list.selected(), Some(0));
