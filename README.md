@@ -57,6 +57,11 @@ Systems und trägt Öffnen, Dateiname, Inhaltsverzeichnis, Suche und Menü. Das
 Menü enthält Darstellungsmodus, Textgröße, Nachladen und Inhaltsverzeichnis.
 Der vollständige Pfad steht als Tooltip.
 
+Jede geöffnete Datei bekommt einen eigenen Tab; eine bereits offene Datei wird
+nach vorn geholt statt erneut gelesen. Die Tableiste erscheint erst ab dem
+zweiten Dokument. Jeder Tab hält seine eigene Leseposition, seine eigene Suche
+und seine eigene Dateiüberwachung.
+
 | Aktion | Tastatur |
 | --- | --- |
 | Öffnen | `Ctrl+O` |
@@ -65,6 +70,9 @@ Der vollständige Pfad steht als Tooltip.
 | Inhaltsverzeichnis | `Ctrl+Shift+O` |
 | Text vergrößern / verkleinern / zurücksetzen | `Ctrl++` / `Ctrl+-` / `Ctrl+0` |
 | Nachladen | `Ctrl+R` |
+| Tab schließen | `Ctrl+W` |
+| Nächster / vorheriger Tab | `Ctrl+Tab` / `Ctrl+Shift+Tab` |
+| Menü | `F10` |
 | Dokument auswählen / kopieren | `Ctrl+A` / `Ctrl+C` |
 | Menü, Inhaltsverzeichnis oder Suche schließen | `Escape` |
 

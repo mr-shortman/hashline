@@ -7,8 +7,10 @@ hashline \- a fast, quiet Markdown viewer for Linux
 .SH DESCRIPTION
 Hashline displays Markdown in a native GTK4 window without changing the file.
 With no file it opens an empty window.
-If several files are supplied, it opens the first and displays a notice.
-Subsequent invocations reuse the running window in the same desktop session.
+Each file given opens in a tab of its own; a file that is already open is
+brought to the front rather than read again.
+Subsequent invocations open further tabs in the running window of the same
+desktop session.
 Relative paths are resolved against the invoking process's working directory.
 .SH OPTIONS
 .TP
@@ -22,9 +24,11 @@ Print the application version without opening a window.
 End option processing; use before file names beginning with a dash.
 .SH KEYBOARD
 Ctrl+O opens a file; Ctrl+F searches; Ctrl+Shift+O toggles the outline.
+Ctrl+W closes the tab in front; Ctrl+Tab and Ctrl+Page_Down move to the next
+tab, Ctrl+Shift+Tab and Ctrl+Page_Up to the previous one.
 Ctrl++ and Ctrl+- change text size; Ctrl+0 resets it.
 Ctrl+R reloads. Ctrl+A selects all; Ctrl+C copies.
-Escape closes the current menu, outline or search.
+F10 opens the menu. Escape closes the current menu, outline or search.
 .SH FILES
 Preferences and recent reading positions use the GSettings schema
 .BR de.kalendium.Hashline .
