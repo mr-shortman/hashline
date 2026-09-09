@@ -155,3 +155,195 @@ fn a_large_document_is_planned_without_measuring_anything() {
         plan.len()
     );
 }
+
+// Blocks the plan has to cut up, because setting them whole is what
+// virtualization exists to avoid (SPEC.md, sections 5 and 9).
+
+/// One fenced code block of `lines` lines.
+fn code_document(lines: usize) -> String {
+    format!("```text\n{}```\n", "eine Zeile Code\n".repeat(lines))
+}
+
+#[test]
+fn a_code_block_is_estimated_by_its_lines_and_not_as_a_single_one() {
+    // The estimate used to take every code block for one line high. On a
+    // document of two-line blocks that makes the scrollbar half as long as it
+    // should be; on one 70 000 line block it makes it 28 000 times too short,
+    // and every jump into the document lands somewhere else.
+    let short = plan(&code_document(1));
+    let long = plan(&code_document(400));
+    let line = 17.0 * document::INLINE_CODE_EM * document::CODE_LINE_HEIGHT;
+    let grown = long.total_height() - short.total_height();
+    assert!(
+        (grown - 399.0 * line).abs() < 1.0,
+        "399 further lines added {grown} instead of {}",
+        399.0 * line
+    );
+}
+
+#[test]
+fn a_code_block_too_large_to_set_at_once_becomes_parts_covering_it_exactly() {
+    let source = code_document(2000);
+    let document = hashline_markdown::parse(&source);
+    let plan = BlockPlan::new(&document, metrics(), 646.0);
+    assert!(plan.len() > 4, "2000 lines stayed {} blocks", plan.len());
+
+    let parts: Vec<_> = (0..plan.len())
+        .map(|index| *plan.block(index))
+        .filter(|block| block.kind == BlockKind::Code)
+        .collect();
+    // The parts are contiguous, cover the block's text exactly, and each holds
+    // whole lines — a part that began mid-line would set differently than the
+    // same line does inside the whole block.
+    let first = parts.first().unwrap();
+    let last = parts.last().unwrap();
+    let mut cursor = first.text_start;
+    for part in &parts {
+        assert_eq!(part.text_start, cursor);
+        assert!(part.text_len > 0);
+        let text =
+            &document.text[part.text_start as usize..(part.text_start + part.text_len) as usize];
+        assert!(text.ends_with('\n'), "a part must end at a line boundary");
+        assert_eq!(part.lines as usize, text.matches('\n').count());
+        cursor += part.text_len;
+    }
+    assert_eq!(cursor, last.text_start + last.text_len);
+    assert_eq!(
+        cursor as usize - first.text_start as usize,
+        source.len() - "```text\n```\n".len()
+    );
+
+    // Only the outer parts are outer.
+    assert!(first.is_first() && !first.is_last());
+    assert!(last.is_last() && !last.is_first());
+    assert!(parts[1..parts.len() - 1]
+        .iter()
+        .all(|part| !part.is_first() && !part.is_last()));
+}
+
+#[test]
+fn a_paragraph_too_large_to_set_at_once_is_cut_between_words() {
+    let word = "Wortfolge mit Leerzeichen und etwas Text darin. ";
+    let source = word.repeat(1000);
+    let document = hashline_markdown::parse(&source);
+    let plan = BlockPlan::new(&document, metrics(), 646.0);
+    assert!(
+        plan.len() > 4,
+        "a 47 KiB paragraph stayed {} blocks",
+        plan.len()
+    );
+
+    let mut cursor = 0;
+    for index in 0..plan.len() {
+        let block = plan.block(index);
+        assert_eq!(block.text_start, cursor);
+        let text =
+            &document.text[block.text_start as usize..(block.text_start + block.text_len) as usize];
+        // Text with spaces in it is never cut inside a word.
+        if !block.is_first() {
+            assert!(!text.starts_with(' '), "a part must begin at a word");
+            assert!(document.text[..block.text_start as usize].ends_with(' '));
+        }
+        cursor += block.text_len;
+    }
+    assert_eq!(cursor as usize, document.text.len());
+}
+
+#[test]
+fn text_without_a_single_space_is_still_cut_up() {
+    // The fixture that took 172 ms and held one Pango layout over a million
+    // characters. There is no word boundary anywhere in it.
+    let source = "abcdefghij".repeat(20_000);
+    let document = hashline_markdown::parse(&source);
+    let plan = BlockPlan::new(&document, metrics(), 646.0);
+    assert!(
+        plan.len() > 20,
+        "{} blocks for 200 000 characters",
+        plan.len()
+    );
+    assert!((0..plan.len()).all(|index| plan.block(index).text_len <= 4096));
+}
+
+#[test]
+fn the_parts_of_one_block_know_they_belong_together() {
+    let source = format!("Kurz.\n\n{}\n", code_document(2000));
+    let document = hashline_markdown::parse(&source);
+    let plan = BlockPlan::new(&document, metrics(), 646.0);
+    // The short paragraph is alone in its range; every part of the code block
+    // resolves to the same range and to the same text.
+    assert_eq!(plan.source_blocks(0), 0..1);
+    let expected = plan.source_blocks(1);
+    assert!(expected.len() > 1);
+    let range = plan.source_text_range(1);
+    for index in expected.clone() {
+        assert_eq!(plan.source_blocks(index), expected);
+        assert_eq!(plan.source_text_range(index), range);
+    }
+    assert_eq!(range.0, plan.block(expected.start).text_start);
+    let last = plan.block(expected.end - 1);
+    assert_eq!(range.1, last.text_start + last.text_len);
+}
+
+#[test]
+fn only_the_outer_parts_carry_the_space_around_a_block() {
+    let source = format!("{}\nDanach.\n", code_document(2000));
+    let document = hashline_markdown::parse(&source);
+    let plan = BlockPlan::new(&document, metrics(), 646.0);
+    let parts = plan.source_blocks(0);
+    assert!(parts.len() > 2);
+    // Every middle part is exactly its lines high: no padding, no spacing.
+    let line = 17.0 * document::INLINE_CODE_EM * document::CODE_LINE_HEIGHT;
+    for index in parts.start + 1..parts.end - 1 {
+        let block = plan.block(index);
+        assert!(
+            (block.height - block.lines as f64 * line).abs() < 1.0,
+            "part {index} is {} high for {} lines",
+            block.height,
+            block.lines
+        );
+    }
+}
+
+#[test]
+fn a_list_or_a_table_is_never_cut_up() {
+    // Their parts are items and rows, which the plan addresses by text range
+    // and therefore cannot cut through (docs/limitations.md).
+    let list = plan(&"- ein Punkt mit etwas Text darin\n".repeat(500));
+    assert_eq!(list.len(), 1);
+    let row = format!("|{}\n", " Zelle |".repeat(60));
+    let table = plan(&format!(
+        "{row}|{}\n{}",
+        " --- |".repeat(60),
+        row.repeat(60)
+    ));
+    assert_eq!(
+        table.len(),
+        1,
+        "the wide table became {} blocks",
+        table.len()
+    );
+}
+
+#[test]
+fn a_cut_never_lands_inside_a_character() {
+    // The limit falling inside a multi-byte character is the normal case, not
+    // the exception: slicing there would panic, and the panic would be in the
+    // document that happens to be long and not in English.
+    for filler in ["Grüße über Grüße ", "🌍🌍🌍🌍", "日本語のテキストです"] {
+        let source = filler.repeat(40_000);
+        let document = hashline_markdown::parse(&source);
+        let plan = BlockPlan::new(&document, metrics(), 646.0);
+        assert!(plan.len() > 1, "{filler:?} stayed one block");
+        let mut cursor = 0;
+        for index in 0..plan.len() {
+            let block = plan.block(index);
+            assert_eq!(block.text_start, cursor);
+            // Slicing is what would have panicked.
+            let text = &document.text
+                [block.text_start as usize..(block.text_start + block.text_len) as usize];
+            assert!(!text.is_empty());
+            cursor += block.text_len;
+        }
+        assert_eq!(cursor as usize, document.text.len());
+    }
+}

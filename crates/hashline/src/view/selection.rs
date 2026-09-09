@@ -100,24 +100,66 @@ impl Selection {
         if self.is_empty() {
             return String::new();
         }
-        let mut parts: Vec<&str> = Vec::new();
+        let mut result = String::new();
         for index in self.blocks() {
             if index >= plan.len() {
                 break;
             }
             let block = plan.block(index);
-            if let Some((from, to)) = self.in_block(index, block.text_len) {
-                let base = block.text_start as usize;
-                parts.push(&document[base + from as usize..base + to as usize]);
+            let Some((from, to)) = self.in_block(index, block.text_len) else {
+                continue;
+            };
+            // The parts a large block was cut into are one block of the
+            // document, so they are joined back without a separator.
+            if !result.is_empty() && block.is_first() {
+                result.push_str("\n\n");
             }
+            let base = block.text_start as usize;
+            result.push_str(&document[base + from as usize..base + to as usize]);
         }
-        parts.join("\n\n")
+        result
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Position, Selection};
+    use crate::layout::{BlockPlan, Metrics};
+
+    fn planned(source: &str) -> (hashline_markdown::OpDocument, BlockPlan) {
+        let document = hashline_markdown::parse(source);
+        let plan = BlockPlan::new(
+            &document,
+            Metrics {
+                char_width: 8.5,
+                body_px: 17.0,
+            },
+            646.0,
+        );
+        (document, plan)
+    }
+
+    #[test]
+    fn a_blank_line_separates_blocks_but_not_the_parts_of_one() {
+        let (document, plan) = planned("Kurz.\n\nEin Absatz. Noch einer.\n");
+        let last = plan.len() - 1;
+        let all =
+            Selection::at(Position::new(0, 0)).to(Position::new(last, plan.block(last).text_len));
+        assert_eq!(
+            all.text(&plan, &document.text),
+            "Kurz.\n\nEin Absatz. Noch einer."
+        );
+
+        // The same for a paragraph the plan had to cut up: selecting all of it
+        // must give back the paragraph, not its parts with blank lines between.
+        let long = "Wortfolge mit Leerzeichen und etwas Text darin. ".repeat(500);
+        let (document, plan) = planned(&long);
+        assert!(plan.len() > 1, "the paragraph was not cut up");
+        let last = plan.len() - 1;
+        let all =
+            Selection::at(Position::new(0, 0)).to(Position::new(last, plan.block(last).text_len));
+        assert_eq!(all.text(&plan, &document.text), document.text);
+    }
 
     #[test]
     fn positions_order_by_block_then_offset() {

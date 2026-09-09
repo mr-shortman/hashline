@@ -48,7 +48,41 @@ cargo build --release -p hashline --example measure
 ./target/release/examples/measure benchmarks/generated/{small,medium,large}.md
 ```
 
-Speicher der laufenden Anwendung als PSS der Prozessgruppe:
+Mit `--geometry` setzt derselbe Aufruf statt des ersten Schirms **jeden** Block
+einmal und meldet, wie weit die geschätzte Gesamthöhe von der gemessenen
+abweicht — die Zahl, an der Bildlaufleiste und jeder Sprung in einen noch nicht
+gesetzten Block hängen. Einer Zeitmessung entgeht sie vollständig: ein
+Codeblock, der als eine einzige Zeile geschätzt wurde, war um den Faktor 28.000
+zu kurz und kostete im Schätzen nichts.
+
+```sh
+./target/release/examples/measure --geometry benchmarks/generated/*.md
+```
+
+Speicher der laufenden Anwendung als PSS der Prozessgruppe, ein eigener Prozess
+je Fixture:
+
+```sh
+python3 benchmarks/memory.py target/release/hashline \
+    --fixture - --fixture benchmarks/generated/small.md \
+    --fixture benchmarks/generated/large.md \
+    --renderer default --renderer gl --renderer cairo --repeat 3 \
+    --output benchmarks/results/<lauf>/memory.json
+```
+
+Zwei Dinge machen eine Speicherzahl auf einem Desktop unbrauchbar, und
+`memory.py` umgeht beide. Die laufende installierte Instanz hält den Busnamen,
+also übergäbe ein erneuter Start die Datei nur an jenes Fenster;
+`dbus-run-session` löst das, wird aber zum Elternprozess des gesamten
+Portal-Stacks und misst dessen rund 60 MiB mit. Das Werkzeug startet den
+privaten Bus deshalb **neben** der Anwendung, hält Portale, gvfs und dconf über
+die Umgebung ganz von ihm fern und schreibt die Prozessgruppe des Busses in
+jede Zeile — die Isolierung ist damit prüfbar statt geglaubt. `--fixture -`
+misst das leere Fenster, also den Boden des jeweiligen Renderers. Der erste
+Durchgang wärmt Treiber und Shadercache und gehört nicht in eine Auswertung;
+dafür ist `--repeat` da.
+
+Für einen einzelnen laufenden Prozess reicht weiterhin der einfache Sampler:
 
 ```sh
 ./target/release/hashline benchmarks/generated/large.md &

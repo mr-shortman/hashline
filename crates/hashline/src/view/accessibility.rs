@@ -14,7 +14,10 @@ impl Text {
     pub fn build(plan: &BlockPlan, source: &str) -> Self {
         let mut result = Self::default();
         for index in 0..plan.len() {
-            if index > 0 {
+            // A blank line separates blocks. The parts a large block was cut
+            // into are one block of the document and are joined seamlessly, so
+            // that a screen reader hears the paragraph the author wrote.
+            if index > 0 && plan.block(index).is_first() {
                 result.content.push_str("\n\n");
                 result.len += 2;
             }

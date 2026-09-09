@@ -122,7 +122,10 @@ pub enum Decoration {
         y: f64,
         width: f64,
         height: f64,
-        radius: f32,
+        /// Corner radii, clockwise from the top left. A code block cut into
+        /// parts is one panel drawn in several pieces, so only its first part
+        /// rounds the top and only its last one rounds the bottom.
+        radius: [f32; 4],
         color: Color,
     },
     Line {
@@ -513,6 +516,26 @@ fn ops_of<'a>(document: &'a OpDocument, block: &Block) -> impl Iterator<Item = O
         })
 }
 
+/// The part of one text run that belongs to `block`.
+///
+/// A block the plan cut into parts shares its operations with its siblings:
+/// every part walks all of them and keeps only the text inside its own range.
+/// For a block that was not cut this returns the run unchanged, because the
+/// block's range already covers every run it has.
+fn run<'a>(
+    document: &'a OpDocument,
+    block: &Block,
+    offset: u32,
+    len: u32,
+) -> Option<(u32, &'a str)> {
+    let from = offset.max(block.text_start);
+    let to = (offset + len).min(block.text_start + block.text_len);
+    if from >= to {
+        return None;
+    }
+    Some((from, &document.text[from as usize..to as usize]))
+}
+
 fn attribute(document: &OpDocument, attrs: u32, count: u32, name: u32) -> Option<&str> {
     (0..count as usize).find_map(|index| {
         let at = (attrs as usize + index) * 3;
@@ -558,7 +581,7 @@ pub fn set_block(
 ) -> BlockLayout {
     let em = style.body_px;
     if let Some(layout) = picture(context, document, block, style, width, images) {
-        return layout.with_spacing(block.kind, em);
+        return layout.with_spacing(block, em);
     }
     match block.kind {
         BlockKind::Rule => rule(style, width),
@@ -568,21 +591,23 @@ pub fn set_block(
         BlockKind::Quote => quote(context, document, block, style, width),
         _ => simple(context, document, block, style, width),
     }
-    .with_spacing(block.kind, em)
+    .with_spacing(block, em)
 }
 
 impl BlockLayout {
-    fn with_spacing(mut self, kind: BlockKind, em: f64) -> Self {
-        self.space_before = match kind {
-            BlockKind::Heading(_) => document::HEADING_SPACE_BEFORE_EM * em,
-            _ => 0.0,
+    /// The space around a block, from the same two functions the estimate
+    /// reads — so a measurement can never disagree with the estimate it
+    /// replaces about anything but the type itself.
+    fn with_spacing(mut self, block: &Block, em: f64) -> Self {
+        self.space_before = if block.is_first() {
+            block.kind.space_before_em() * em
+        } else {
+            0.0
         };
-        self.space_after = match kind {
-            BlockKind::Heading(_) => document::HEADING_SPACE_AFTER_EM * em,
-            BlockKind::Rule => document::RULE_SPACING_EM * em,
-            BlockKind::Code => document::CODE_SPACING_EM * em,
-            BlockKind::Table => document::TABLE_SPACING_EM * em,
-            _ => document::BLOCK_SPACING_EM * em,
+        self.space_after = if block.is_last() {
+            block.kind.space_after_em() * em
+        } else {
+            0.0
         };
         self
     }
@@ -604,8 +629,9 @@ fn inline_into(compose: &mut Compose, document: &OpDocument, block: &Block) {
             }
             Op::Close => compose.close_span(),
             Op::Text { offset, len } => {
-                let from = offset as usize;
-                compose.document(offset, &document.text[from..from + len as usize], true);
+                if let Some((offset, value)) = run(document, block, offset, len) {
+                    compose.document(offset, value, true);
+                }
             }
         }
     }
@@ -733,7 +759,7 @@ fn quote(
             y: 0.0,
             width: document::QUOTE_BAR_PX,
             height: content_height,
-            radius: 0.0,
+            radius: [0.0; 4],
             color: style.palette.accent,
         }],
         pieces: vec![piece],
@@ -753,12 +779,15 @@ fn code(
 ) -> BlockLayout {
     let mut compose = Compose::new();
     // A fenced block's content ends in the newline that closed its last line;
-    // setting it would put an empty line under every code block.
+    // setting it would put an empty line under every code block. The plan cuts
+    // a code block between lines, so this holds for a part as much as for a
+    // whole block: a part of n lines ends in the newline that closed line n.
     let mut runs: Vec<(u32, &str)> = Vec::new();
     for op in ops_of(document, block) {
         if let Op::Text { offset, len } = op {
-            let from = offset as usize;
-            runs.push((offset, &document.text[from..from + len as usize]));
+            if let Some(run) = run(document, block, offset, len) {
+                runs.push(run);
+            }
         }
     }
     if let Some(last) = runs.last_mut() {
@@ -783,58 +812,81 @@ fn code(
         None,
         style.palette.text,
     );
+    // The panel's padding, its borders and its copy control belong to the
+    // block, not to each part: a cut-up code block has to read as one panel
+    // whose middle is drawn in several pieces.
+    let pad_top = if block.is_first() {
+        document::CODE_PAD_TOP
+    } else {
+        0.0
+    };
+    let pad_bottom = if block.is_last() {
+        document::CODE_PAD_BOTTOM
+    } else {
+        0.0
+    };
     piece.x = document::CODE_PAD_X;
-    piece.y = document::CODE_PAD_TOP;
+    piece.y = pad_top;
     let (_, logical) = piece.layout.pixel_extents();
-    let content_height =
-        document::CODE_PAD_TOP + logical.height() as f64 + document::CODE_PAD_BOTTOM;
+    let content_height = pad_top + logical.height() as f64 + pad_bottom;
 
-    // `.copy-code { top: 6px; right: 8px; font: 11px }` — the generous top
-    // padding of a code block exists for exactly this.
-    let mut control = Compose::new();
-    control.insert("Kopieren");
-    let mut label_font = style.body.clone();
-    label_font.set_absolute_size(11.0 * pango::SCALE as f64);
-    let mut label = control.finish(
-        context,
-        &label_font,
-        style,
-        11.0,
-        1.0,
-        None,
-        style.palette.muted,
-    );
-    let (_, label_extents) = label.layout.pixel_extents();
-    label.x = width - label_extents.width() as f64 - 8.0;
-    label.y = 6.0;
-    label.control = true;
+    let round = crate::theme::RADIUS;
+    let top = if block.is_first() { round } else { 0.0 };
+    let bottom = if block.is_last() { round } else { 0.0 };
+    let mut decorations = vec![Decoration::Fill {
+        x: 0.0,
+        y: 0.0,
+        width,
+        height: content_height,
+        radius: [top, top, bottom, bottom],
+        color: style.palette.code,
+    }];
+    if block.is_first() {
+        decorations.push(Decoration::Line {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height: document::CELL_BORDER_PX,
+            color: style.palette.border,
+        });
+    }
+    if block.is_last() {
+        decorations.push(Decoration::Line {
+            x: 0.0,
+            y: content_height - document::CELL_BORDER_PX,
+            width,
+            height: document::CELL_BORDER_PX,
+            color: style.palette.border,
+        });
+    }
+
+    let mut pieces = vec![piece];
+    if block.is_first() {
+        // `.copy-code { top: 6px; right: 8px; font: 11px }` — the generous top
+        // padding of a code block exists for exactly this.
+        let mut control = Compose::new();
+        control.insert("Kopieren");
+        let mut label_font = style.body.clone();
+        label_font.set_absolute_size(11.0 * pango::SCALE as f64);
+        let mut label = control.finish(
+            context,
+            &label_font,
+            style,
+            11.0,
+            1.0,
+            None,
+            style.palette.muted,
+        );
+        let (_, label_extents) = label.layout.pixel_extents();
+        label.x = width - label_extents.width() as f64 - 8.0;
+        label.y = 6.0;
+        label.control = true;
+        pieces.push(label);
+    }
     let content_width = (logical.width() as f64 + 2.0 * document::CODE_PAD_X).max(width);
     BlockLayout {
-        decorations: vec![
-            Decoration::Fill {
-                x: 0.0,
-                y: 0.0,
-                width,
-                height: content_height,
-                radius: crate::theme::RADIUS,
-                color: style.palette.code,
-            },
-            Decoration::Line {
-                x: 0.0,
-                y: 0.0,
-                width,
-                height: document::CELL_BORDER_PX,
-                color: style.palette.border,
-            },
-            Decoration::Line {
-                x: 0.0,
-                y: content_height - document::CELL_BORDER_PX,
-                width,
-                height: document::CELL_BORDER_PX,
-                color: style.palette.border,
-            },
-        ],
-        pieces: vec![piece, label],
+        decorations,
+        pieces,
         space_before: 0.0,
         space_after: 0.0,
         content_height,
@@ -973,13 +1025,10 @@ fn list(
                 _ => {}
             },
             Op::Text { offset, len } => {
-                if let Some(&index) = open_items.last() {
-                    let from = offset as usize;
-                    items[index].compose.document(
-                        offset,
-                        &document.text[from..from + len as usize],
-                        true,
-                    );
+                if let (Some(&index), Some((offset, value))) =
+                    (open_items.last(), run(document, block, offset, len))
+                {
+                    items[index].compose.document(offset, value, true);
                 }
             }
         }
@@ -1099,13 +1148,11 @@ fn table(
             }
             Op::Text { offset, len } => {
                 if in_cell {
-                    if let Some(cell) = rows.last_mut().and_then(|row| row.last_mut()) {
-                        let from = offset as usize;
-                        cell.compose.document(
-                            offset,
-                            &document.text[from..from + len as usize],
-                            true,
-                        );
+                    if let (Some(cell), Some((offset, value))) = (
+                        rows.last_mut().and_then(|row| row.last_mut()),
+                        run(document, block, offset, len),
+                    ) {
+                        cell.compose.document(offset, value, true);
                     }
                 }
             }
@@ -1189,7 +1236,7 @@ fn table(
                 y,
                 width: content_width,
                 height: row_height,
-                radius: 0.0,
+                radius: [0.0; 4],
                 color: style.palette.subtle,
             });
         }

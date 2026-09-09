@@ -376,3 +376,133 @@ fn a_picture_inside_running_text_stays_running_text() {
     );
     assert!(set.pieces[0].layout.text().contains("Davor"));
 }
+
+// Blocks the plan cut into parts. Setting a part has to give what the same
+// stretch of the block gives inside the whole (SPEC.md, section 5).
+
+/// The block the plan would have built before it learned to cut anything up:
+/// one part covering the source block's whole text.
+fn whole(plan: &BlockPlan) -> hashline::layout::Block {
+    let parts = plan.source_blocks(0);
+    let (start, end) = plan.source_text_range(0);
+    let mut block = *plan.block(parts.start);
+    block.text_start = start;
+    block.text_len = end - start;
+    block.lines = parts.map(|index| plan.block(index).lines).sum();
+    block.part = 0;
+    block.parts = 1;
+    block
+}
+
+fn piece_text(set: &hashline::layout::BlockLayout) -> String {
+    set.pieces
+        .iter()
+        .filter(|piece| !piece.control)
+        .map(|piece| piece.layout.text().to_string())
+        .collect()
+}
+
+#[test]
+fn the_parts_of_a_code_block_set_the_same_type_as_the_whole_block() {
+    let source = format!("```text\n{}```\n", "eine Zeile Code\n".repeat(2000));
+    let (document, plan) = parse_plan(&source);
+    let context = context();
+    let parts = plan.source_blocks(0);
+    assert!(parts.len() > 1, "the block was not cut up");
+
+    let entire = set_block(
+        &context,
+        &document,
+        &whole(&plan),
+        &style(),
+        640.0,
+        &NoImages,
+    );
+    let mut set_parts: Vec<String> = Vec::new();
+    let mut height = 0.0;
+    for index in parts.clone() {
+        let block = *plan.block(index);
+        let set = set_block(&context, &document, &block, &style(), 640.0, &NoImages);
+        // The panel's padding, its copy control and the space under the block
+        // belong to the outer parts only, so the parts stack into one panel.
+        assert_eq!(
+            set.pieces.iter().filter(|piece| piece.control).count(),
+            usize::from(block.is_first())
+        );
+        assert_eq!(set.space_after > 0.0, block.is_last());
+        set_parts.push(piece_text(&set));
+        height += set.height();
+    }
+    // Each part drops the newline that closed its last line, exactly as the
+    // whole block does — the parts are stacked, not concatenated. Put those
+    // newlines back and the two are the same 2000 lines.
+    let text = set_parts.join("\n");
+    assert_eq!(text.lines().count(), 2000);
+    assert_eq!(text, piece_text(&entire));
+    // Pango reports a layout's extents in whole pixels, so each part rounds
+    // once where the whole block rounded once — the only difference there is.
+    assert!(
+        (height - entire.height()).abs() <= parts.len() as f64,
+        "parts stack to {height} over {} parts, the whole block is {} high",
+        parts.len(),
+        entire.height()
+    );
+}
+
+#[test]
+fn the_parts_of_a_paragraph_carry_its_text_once_and_in_order() {
+    let word = "Wortfolge mit Leerzeichen und etwas Text darin. ";
+    let source = word.repeat(1000);
+    let (document, plan) = parse_plan(&source);
+    let context = context();
+    let parts = plan.source_blocks(0);
+    assert!(parts.len() > 1, "the block was not cut up");
+
+    let mut text = String::new();
+    for index in parts.clone() {
+        let block = *plan.block(index);
+        let set = set_block(&context, &document, &block, &style(), 640.0, &NoImages);
+        text.push_str(&piece_text(&set));
+        // Every byte of a part still names a byte of the document, and it is a
+        // byte of that part.
+        for piece in set.pieces.iter().filter(|piece| !piece.control) {
+            let (from, to) = piece.map.document_range().unwrap();
+            assert!(from >= block.text_start);
+            assert!(to <= block.text_start + block.text_len);
+        }
+    }
+    assert_eq!(text, document.text);
+}
+
+#[test]
+fn setting_one_part_of_a_huge_code_block_is_not_setting_the_block() {
+    // `large-code.md` in miniature. Setting the whole block took 67 seconds on
+    // the reference machine because a code block was one block of the plan;
+    // what the view now sets for one screen is a part.
+    let source = format!("```text\n{}```\n", "eine Zeile Code\n".repeat(70_000));
+    let (document, plan) = parse_plan(&source);
+    let context = context();
+    let parts = plan.source_blocks(0);
+    assert!(
+        parts.len() > 200,
+        "70 000 lines became {} parts",
+        parts.len()
+    );
+
+    let started = std::time::Instant::now();
+    for index in parts.clone().take(3) {
+        set_block(
+            &context,
+            &document,
+            plan.block(index),
+            &style(),
+            640.0,
+            &NoImages,
+        );
+    }
+    let elapsed = started.elapsed();
+    println!("three parts of a 70 000 line block: {elapsed:?}");
+    // Generous, because a test machine is not a reference machine — but three
+    // orders of magnitude below the freeze this replaces.
+    assert!(elapsed.as_millis() < 500, "three parts took {elapsed:?}");
+}

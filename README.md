@@ -21,7 +21,10 @@ in [Einschränkungen](docs/limitations.md) und im
 Der Dokumentbereich ist ein eigenes Widget: es setzt den Op-Buffer des Parsers
 mit Pango und zeichnet mit GSK, blockweise virtualisiert. Für kein Dokument
 existiert ein Zustand, in dem alles gesetzt ist — eine 10-MiB-Datei wird lesbar,
-indem 15 von rund 145 000 Blöcken gesetzt werden.
+indem 15 von rund 145 000 Blöcken gesetzt werden. Ein Block, der viel höher als
+ein Schirm ist, zerfällt dafür in Teile: ein Codeblock mit 70 000 Zeilen ist
+sonst genau ein Block, und Virtualisierung käme nicht an ihn heran
+([013](docs/decisions/013-oversized-blocks.md)).
 
 ## Entwickeln
 

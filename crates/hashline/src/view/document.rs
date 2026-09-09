@@ -44,11 +44,14 @@ pub(crate) struct State {
     /// them is the current one.
     hits: Vec<Hit>,
     current_hit: Option<usize>,
-    /// Syntax colours per code block, and which blocks have been asked for.
-    /// Cached by block so scrolling back does not re-parse
-    /// (SPEC.md, section 10).
-    highlights: std::collections::HashMap<usize, Vec<Span>>,
-    requested: std::collections::HashSet<usize>,
+    /// Syntax colours per code block, `None` while the worker is still
+    /// running. Cached by block so scrolling back does not re-parse
+    /// (SPEC.md, section 10), and bounded like the layout cache beside it: a
+    /// long reading session through a document of 28 931 code blocks must not
+    /// end up holding the spans of all of them.
+    highlights: std::collections::HashMap<usize, Option<Vec<Span>>>,
+    /// Insertion order of `highlights`, for evicting the oldest entry.
+    coloured: std::collections::VecDeque<usize>,
     /// Called when a link is clicked. The view resolves nothing itself: what a
     /// relative path or a fragment means is the document controller's business.
     on_link: Option<LinkHandler>,
@@ -63,6 +66,15 @@ type LinkHandler = Rc<dyn Fn(&str)>;
 /// How many set blocks to keep. A block that is evicted keeps its measured
 /// height in the plan, so eviction costs re-setting, never a jump.
 const CACHE_LIMIT: usize = 240;
+
+/// How many code blocks keep their syntax colours. Twice the layout cache,
+/// because a span is 12 bytes where a set block is a Pango layout: scrolling
+/// back a little further than the layouts reach then shows colour at once
+/// instead of a frame of grey. It is still a bound, and a small one: nothing
+/// over `highlight::MAX_CODE_BYTES` is coloured at all, and the plan keeps a
+/// code block's parts well under that. Evicting an entry costs re-parsing that
+/// block, never a jump.
+const HIGHLIGHT_LIMIT: usize = 480;
 
 impl State {
     fn empty() -> Self {
@@ -86,7 +98,7 @@ impl State {
             hits: Vec::new(),
             current_hit: None,
             highlights: std::collections::HashMap::new(),
-            requested: std::collections::HashSet::new(),
+            coloured: std::collections::VecDeque::new(),
             on_link: None,
             adjusting: false,
         }
@@ -101,6 +113,19 @@ impl State {
         while self.recent.len() > CACHE_LIMIT {
             if let Some(oldest) = self.recent.pop_front() {
                 self.cache.remove(&oldest);
+            }
+        }
+    }
+    /// Records that a block's colours were asked for, and later what came
+    /// back. An entry that is evicted while its worker is still running is
+    /// simply not put back: the block asks again when it is next drawn.
+    fn remember_highlight(&mut self, index: usize, spans: Option<Vec<Span>>) {
+        if self.highlights.insert(index, spans).is_none() {
+            self.coloured.push_back(index);
+        }
+        while self.coloured.len() > HIGHLIGHT_LIMIT {
+            if let Some(oldest) = self.coloured.pop_front() {
+                self.highlights.remove(&oldest);
             }
         }
     }
@@ -334,7 +359,7 @@ impl DocumentView {
             state.hits.clear();
             state.current_hit = None;
             state.highlights.clear();
-            state.requested.clear();
+            state.coloured.clear();
         }
         let width = self.view_width().max(1.0);
         self.reflow_for(width);
@@ -529,12 +554,14 @@ impl DocumentView {
         set: &BlockLayout,
     ) {
         let palette = self.imp().state.borrow().palette;
-        if let Some(spans) = self.imp().state.borrow().highlights.get(&index) {
-            apply_highlight(set, spans, palette);
-            return;
-        }
-        if self.imp().state.borrow().requested.contains(&index) {
-            return;
+        match self.imp().state.borrow().highlights.get(&index) {
+            Some(Some(spans)) => {
+                apply_highlight(set, spans, palette);
+                return;
+            }
+            // Asked for and still running.
+            Some(None) => return,
+            None => {}
         }
         let language = crate::layout::code_language(document, block);
         if !highlight::is_supported(&language) {
@@ -546,7 +573,14 @@ impl DocumentView {
         if (to - from) as usize > highlight::MAX_CODE_BYTES {
             return;
         }
-        self.imp().state.borrow_mut().requested.insert(index);
+        self.imp()
+            .state
+            .borrow_mut()
+            .remember_highlight(index, None);
+        // A code block the plan cut into parts is coloured part by part, which
+        // is the whole point: colouring it as one would cost what setting it
+        // as one costs. A string or comment running across a cut is coloured
+        // as if it began there.
         let code = document.text[from as usize..to as usize].to_string();
         let (sender, receiver) = async_channel::bounded(1);
         std::thread::spawn(move || {
@@ -560,10 +594,15 @@ impl DocumentView {
             let palette = widget.imp().state.borrow().palette;
             {
                 let mut state = widget.imp().state.borrow_mut();
-                state.highlights.insert(index, spans);
+                // Evicted while the worker ran, or the document was replaced:
+                // the answer belongs to a question nobody is asking any more.
+                if !state.highlights.contains_key(&index) {
+                    return;
+                }
+                state.highlights.insert(index, Some(spans));
             }
             let state = widget.imp().state.borrow();
-            if let (Some(set), Some(spans)) =
+            if let (Some(set), Some(Some(spans))) =
                 (state.cache.get(&index), state.highlights.get(&index))
             {
                 apply_highlight(set, spans, palette);
@@ -638,8 +677,15 @@ impl DocumentView {
                             *w as f32,
                             *h as f32,
                         );
-                        if *radius > 0.0 {
-                            let rounded = gtk::gsk::RoundedRect::from_rect(rect, *radius);
+                        if radius.iter().any(|corner| *corner > 0.0) {
+                            let size = |corner: f32| gtk::graphene::Size::new(corner, corner);
+                            let rounded = gtk::gsk::RoundedRect::new(
+                                rect,
+                                size(radius[0]),
+                                size(radius[1]),
+                                size(radius[2]),
+                                size(radius[3]),
+                            );
                             snapshot.push_rounded_clip(&rounded);
                             snapshot.append_color(&color.to_gdk(), &rect);
                             snapshot.pop();
@@ -838,10 +884,12 @@ impl DocumentView {
     fn set_selection_at(&self, position: Position, clicks: i32, extend: bool) {
         let mut state = self.imp().state.borrow_mut();
         let selection = if clicks >= 3 {
-            Selection::at(Position::new(position.block, 0)).to(Position::new(
-                position.block,
-                state.plan.block(position.block).text_len,
-            ))
+            // The whole block, which for a block the plan cut up means all of
+            // its parts: a reader who selects a paragraph means the paragraph.
+            let parts = state.plan.source_blocks(position.block);
+            let last = parts.end - 1;
+            Selection::at(Position::new(parts.start, 0))
+                .to(Position::new(last, state.plan.block(last).text_len))
         } else if clicks == 2 {
             let block = state.plan.block(position.block);
             let text = &state.document.text
@@ -1094,10 +1142,12 @@ impl DocumentView {
             if !set.control_at(x - left, y - block_top) {
                 return false;
             }
-            // The original code text, without the control's own label
-            // (SPEC.md, section 8).
-            set.content_range()
-                .map(|(from, to)| state.document.text[from as usize..to as usize].to_string())
+            // The original code text of the whole block — the control sits on
+            // its first part, but a cut-up block is copied entire — without
+            // the newline that closed its last line (SPEC.md, section 8).
+            let (from, to) = state.plan.source_text_range(index);
+            let text = &state.document.text[from as usize..to as usize];
+            Some(text.strip_suffix('\n').unwrap_or(text).to_string())
         };
         match text {
             Some(text) if !text.is_empty() => {
@@ -1426,6 +1476,26 @@ impl DocumentView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_syntax_colour_cache_is_bounded_like_the_layout_cache() {
+        // Both caches used to be cleared only when the document changed, so a
+        // reader scrolling through the 28 931 code blocks of `large.md` in one
+        // sitting collected the spans of all of them. The fifty-switch
+        // stability run never saw it, because every switch cleared everything.
+        let mut state = State::empty();
+        for index in 0..HIGHLIGHT_LIMIT * 3 {
+            state.remember_highlight(index, None);
+            // The worker answering must not enter the block a second time.
+            state.remember_highlight(index, Some(Vec::new()));
+        }
+        assert_eq!(state.highlights.len(), HIGHLIGHT_LIMIT);
+        assert_eq!(state.coloured.len(), HIGHLIGHT_LIMIT);
+        // What it keeps is what was asked for last, which is what scrolling
+        // back a screen needs.
+        assert!(state.highlights.contains_key(&(HIGHLIGHT_LIMIT * 3 - 1)));
+        assert!(!state.highlights.contains_key(&0));
+    }
 
     #[test]
     fn selection_covers_each_wrapped_line_at_its_actual_position() {

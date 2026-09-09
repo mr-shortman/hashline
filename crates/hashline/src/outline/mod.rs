@@ -25,8 +25,13 @@ pub struct Outline {
 
 impl Outline {
     pub fn build(document: &OpDocument, plan: &BlockPlan) -> Self {
+        // One entry per heading of the document, so a heading long enough for
+        // the plan to cut into parts still counts once, at its first part.
         let headings: Vec<usize> = (0..plan.len())
-            .filter(|&index| matches!(plan.block(index).kind, BlockKind::Heading(_)))
+            .filter(|&index| {
+                let block = plan.block(index);
+                matches!(block.kind, BlockKind::Heading(_)) && block.is_first()
+            })
             .collect();
         let count = document.headings.len() / HEADING_WORDS;
         let mut entries = Vec::with_capacity(count.min(headings.len()));

@@ -21,7 +21,10 @@ Die frühere Fassung dieses Dokuments beschrieb den WebView-Aufbau mit
    dargestellt (SPEC.md, Abschnitt 6).
 3. **Der Blockplan** entsteht in einem Durchgang aus `blocks` und schätzt jede
    Blockhöhe. Er ist die einzige Struktur, die über das ganze Dokument
-   existiert.
+   existiert. Ein Block, der viel höher als ein Schirm ist — ein Codeblock mit
+   70.000 Zeilen, ein Absatz aus einer Million Zeichen — zerfällt dabei in
+   Teile, damit die Virtualisierung in ihn hineinreicht
+   ([013](decisions/013-oversized-blocks.md)).
 4. **Gesetzt** wird nur der Sichtbereich plus ein Bildschirmpuffer. Eine
    gemessene Höhe ersetzt die Schätzung; liegt der Block über der Leseposition,
    wandert der Scrolloffset um denselben Betrag mit, damit der sichtbare Text

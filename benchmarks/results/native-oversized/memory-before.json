@@ -1,0 +1,4556 @@
+{
+  "environment": {
+    "binary": "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+    "binarySha256": "e2313fdaa9171281b81fc54be00f7647e47bb93312f46e3b9f03367de5826dbf",
+    "kernel": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+    "distribution": {
+      "NAME": "Ubuntu",
+      "ID": "ubuntu",
+      "PRETTY_NAME": "Ubuntu 26.04 LTS",
+      "VERSION_ID": "26.04",
+      "VERSION": "26.04 LTS (Resolute Raccoon)",
+      "VERSION_CODENAME": "resolute",
+      "ID_LIKE": "debian",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "UBUNTU_CODENAME": "resolute",
+      "LOGO": "ubuntu-logo"
+    },
+    "sessionType": "wayland",
+    "gdkBackend": null,
+    "loadAverage": [
+      0.56201171875,
+      0.46923828125,
+      0.43701171875
+    ],
+    "competingHashlineProcesses": {
+      "command": [
+        "pgrep",
+        "-a",
+        "-x",
+        "hashline"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "desktopUnattendedVerified": false,
+    "cpu": {
+      "command": [
+        "lscpu"
+      ],
+      "exitCode": 0,
+      "stdout": "Architektur:                             x86_64\nCPU Operationsmodus:                     32-bit, 64-bit\nAdressgr\u00f6\u00dfen:                            48 bits physical, 48 bits virtual\nByte-Reihenfolge:                        Little Endian\nCPU(s):                                  24\nListe der Online-CPU(s):                 0-23\nAnbieterkennung:                         AuthenticAMD\nModellname:                              AMD Ryzen 9 9900X 12-Core Processor\nProzessorfamilie:                        26\nModell:                                  68\nThread(s) pro Kern:                      2\nKern(e) pro Sockel:                      12\nSockel:                                  1\nStepping:                                0\n\u00dcbertaktung:                             aktiviert\nSkalierung der CPU(s):                   77%\nMaximale Taktfrequenz der CPU:           5662,0161\nMinimale Taktfrequenz der CPU:           613,9540\nBogoMIPS:                                8799,76\nMarkierungen:                            fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze\nVirtualisierung:                         AMD-V\nL1d Cache:                               576 KiB (12 Instanzen)\nL1i Cache:                               384 KiB (12 Instanzen)\nL2 Cache:                                12 MiB (12 Instanzen)\nL3 Cache:                                64 MiB (2 Instanzen)\nNUMA-Knoten:                             1\nNUMA-Knoten0 CPU(s):                     0-23\nSchwachstelle Gather data sampling:      Not affected\nSchwachstelle Ghostwrite:                Not affected\nSchwachstelle Indirect target selection: Not affected\nSchwachstelle Itlb multihit:             Not affected\nSchwachstelle L1tf:                      Not affected\nSchwachstelle Mds:                       Not affected\nSchwachstelle Meltdown:                  Not affected\nSchwachstelle Mmio stale data:           Not affected\nSchwachstelle Old microcode:             Not affected\nSchwachstelle Reg file data sampling:    Not affected\nSchwachstelle Retbleed:                  Not affected\nSchwachstelle Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nSchwachstelle Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nSchwachstelle Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nSchwachstelle Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected\nSchwachstelle Srbds:                     Not affected\nSchwachstelle Tsa:                       Not affected\nSchwachstelle Tsx async abort:           Not affected\nSchwachstelle Vmscape:                   Mitigation; IBPB on VMEXIT",
+      "stderr": ""
+    },
+    "memory": "MemTotal:       31967208 kB\nMemFree:        13762668 kB\nMemAvailable:   23947336 kB\nBuffers:          551892 kB\nCached:         10529616 kB\nSwapCached:            0 kB\nActive:         10151204 kB\nInactive:        6170944 kB\nActive(anon):    6261896 kB\nInactive(anon):        0 kB\nActive(file):    3889308 kB\nInactive(file):  6170944 kB\nUnevictable:         184 kB\nMlocked:             184 kB\nSwapTotal:       8388604 kB\nSwapFree:        8388604 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             14064 kB\nWriteback:             0 kB\nAnonPages:       5240660 kB\nMapped:          2356416 kB\nShmem:           1021568 kB\nKReclaimable:     590624 kB\nSlab:             936268 kB\nSReclaimable:     525352 kB\nSUnreclaim:       410916 kB\nKernelStack:       36540 kB\nPageTables:       101776 kB\nSecPageTables:      5004 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    24372208 kB\nCommitted_AS:   40411200 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:      129124 kB\nVmallocChunk:          0 kB\nPercpu:            35712 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    329728 kB\nFilePmdMapped:      4096 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     1312596 kB\nDirectMap2M:    14051328 kB\nDirectMap1G:    17825792 kB\n",
+    "graphics": {
+      "command": [
+        "lspci",
+        "-nn"
+      ],
+      "exitCode": 0,
+      "stdout": "00:00.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Root Complex [1022:14d8]\n00:00.2 IOMMU [0806]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge IOMMU [1022:14d9]\n00:01.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:01.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:02.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:02.2 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge GPP Bridge [1022:14db]\n00:03.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:04.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Dummy Host Bridge [1022:14da]\n00:08.1 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:08.3 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Internal GPP Bridge to Bus [C:A] [1022:14dd]\n00:14.0 SMBus [0c05]: Advanced Micro Devices, Inc. [AMD] FCH SMBus Controller [1022:790b] (rev 71)\n00:14.3 ISA bridge [0601]: Advanced Micro Devices, Inc. [AMD] FCH LPC Bridge [1022:790e] (rev 51)\n00:18.0 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 0 [1022:14e0]\n00:18.1 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 1 [1022:14e1]\n00:18.2 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 2 [1022:14e2]\n00:18.3 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 3 [1022:14e3]\n00:18.4 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 4 [1022:14e4]\n00:18.5 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 5 [1022:14e5]\n00:18.6 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 6 [1022:14e6]\n00:18.7 Host bridge [0600]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge Data Fabric; Function 7 [1022:14e7]\n01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA106 [GeForce RTX 3060 Lite Hash Rate] [10de:2504] (rev a1)\n01:00.1 Audio device [0403]: NVIDIA Corporation GA106 High Definition Audio Controller [10de:228e] (rev a1)\n02:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Upstream Port [1022:43f4] (rev 01)\n03:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:08.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:09.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0a.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0b.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0c.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n03:0d.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset PCIe Switch Downstream Port [1022:43f5] (rev 01)\n07:00.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller [10ec:8125] (rev 05)\n09:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset USB 3.2 Controller [1022:43f7] (rev 01)\n0a:00.0 SATA controller [0106]: Advanced Micro Devices, Inc. [AMD] 600 Series Chipset SATA Controller [1022:43f6] (rev 01)\n0b:00.0 Non-Volatile memory controller [0108]: Samsung Electronics Co Ltd NVMe SSD Controller SM981/PM981/PM983 [144d:a808]\n0c:00.0 Non-Essential Instrumentation [1300]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge PCIe Dummy Function [1022:14de] (rev c2)\n0c:00.2 Encryption controller [1080]: Advanced Micro Devices, Inc. [AMD] Family 19h PSP/CCP [1022:1649]\n0c:00.3 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b6]\n0c:00.4 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 3.1 xHCI [1022:15b7]\n0c:00.6 Audio device [0403]: Advanced Micro Devices, Inc. [AMD] Ryzen HD Audio Controller [1022:15e3]\n0d:00.0 USB controller [0c03]: Advanced Micro Devices, Inc. [AMD] Raphael/Granite Ridge USB 2.0 xHCI [1022:15b8]",
+      "stderr": ""
+    },
+    "storage": {
+      "command": [
+        "lsblk",
+        "-d",
+        "-o",
+        "NAME,MODEL,ROTA,SIZE"
+      ],
+      "exitCode": 0,
+      "stdout": "NAME    MODEL                     ROTA    SIZE\nloop0                                0   55,5M\nloop1                                0  519,4M\nloop2                                0      4K\nloop3                                0  521,1M\nloop4                                0   63,8M\nloop5                                0     74M\nloop6                                0     74M\nloop7                                0   66,8M\nloop8                                0   49,1M\nloop9                                0   66,8M\nloop10                               0   47,9M\nloop11                               0   19,6M\nloop12                               0     20M\nloop13                               0  266,9M\nloop14                               0  265,4M\nloop15                               0  257,7M\nloop16                               0  260,3M\nloop17                               0   16,5M\nloop18                               0  164,8M\nloop19                               0  349,7M\nloop20                               0  531,5M\nloop21                               0  606,1M\nloop22                               0  614,5M\nloop23                               0   91,7M\nloop24                               0   72,8M\nloop25                               0    395M\nloop26                               0    402M\nloop27                               0 1009,1M\nloop28                               0   18,8M\nloop29                               0   18,8M\nloop30                               0   73,8M\nloop31                               0   15,7M\nloop32                               0   11,8M\nloop33                               0   50,1M\nloop34                               0   50,3M\nloop35                               0    828K\nloop36                               0    828K\nloop37                               0  219,9M\nloop38                               0  221,1M\nloop39                               0  321,1M\nsda     Samsung SSD 870 QVO 1TB      0  931,5G\nnvme0n1 Samsung SSD 970 EVO 500GB    0  465,8G",
+      "stderr": ""
+    },
+    "webkit": {
+      "command": [
+        "dpkg-query",
+        "-W",
+        "libwebkit2gtk-4.1-0"
+      ],
+      "exitCode": 0,
+      "stdout": "libwebkit2gtk-4.1-0:amd64\t2.52.6-0ubuntu0.26.04.1",
+      "stderr": ""
+    },
+    "displays": {
+      "command": [
+        "gdbus",
+        "call",
+        "--session",
+        "--dest",
+        "org.gnome.Mutter.DisplayConfig",
+        "--object-path",
+        "/org/gnome/Mutter/DisplayConfig",
+        "--method",
+        "org.gnome.Mutter.DisplayConfig.GetCurrentState"
+      ],
+      "exitCode": 0,
+      "stdout": "(uint32 1, [(('DP-1', 'SNY', 'SONY TV', '0x01010101'), [('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@29.972', 1920, 1080, 29.971717834472656, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@23.977', 1920, 1080, 23.977373123168945, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1600x900@60.000', 1600, 900, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@29.972', 1280, 720, 29.971717834472656, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@23.976', 1280, 720, 23.975757598876953, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'Sony SONY TV'>, 'min-refresh-rate': <48>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>}), (('DP-3', 'GBT', 'G27FC', '0x0000110e'), [('1920x1080@165.003', 1920, 1080, 165.00346374511719, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@143.992', 1920, 1080, 143.99191284179688, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@119.982', 1920, 1080, 119.982177734375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@99.930', 1920, 1080, 99.930412292480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1440x900@59.887', 1440, 900, 59.887443542480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1440x576@50.000', 1440, 576, 50.0, 1.0, [1.0, 1.3333333730697632], {}), ('1440x480@59.940', 1440, 480, 59.940059661865234, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x1024@75.025', 1280, 1024, 75.024673461914062, 1.0, [1.0, 1.3333333730697632], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x960@60.000', 1280, 960, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@75.029', 1024, 768, 75.028579711914062, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@70.069', 1024, 768, 70.069358825683594, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@75.000', 800, 600, 75.0, 1.0, [1.0], {}), ('800x600@72.188', 800, 600, 72.187568664550781, 1.0, [1.0], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('800x600@56.250', 800, 600, 56.25, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'GIGA-BYTE TECHNOLOGY CO., LTD. 27\"'>, 'min-refresh-rate': <48>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>}), (('HDMI-1', 'ACI', 'VS248', 'J7LMQS050673'), [('1920x1080@60.000', 1920, 1080, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {'is-current': <true>, 'is-preferred': <true>}), ('1920x1080@59.988', 1920, 1080, 59.987873077392578, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@59.939', 1920, 1080, 59.93939208984375, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1920x1080@50.000', 1920, 1080, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368, 2.0], {}), ('1680x1050@59.954', 1680, 1050, 59.954250335693359, 1.0, [1.0, 1.25, 1.5, 1.6666666269302368, 1.75, 2.0], {}), ('1600x1200@60.000', 1600, 1200, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368, 2.0], {}), ('1440x900@59.887', 1440, 900, 59.887443542480469, 1.0, [1.0, 1.25, 1.3333333730697632, 1.5, 1.6666666269302368], {}), ('1366x768@59.790', 1366, 768, 59.789539337158203, 1.0, [1.0], {}), ('1280x1024@75.025', 1280, 1024, 75.024673461914062, 1.0, [1.0, 1.3333333730697632], {}), ('1280x1024@60.020', 1280, 1024, 60.019741058349609, 1.0, [1.0, 1.3333333730697632], {}), ('1280x960@60.000', 1280, 960, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632, 1.6666666269302368], {}), ('1280x720@60.000', 1280, 720, 60.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@59.943', 1280, 720, 59.943435668945312, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1280x720@50.000', 1280, 720, 50.0, 1.0, [1.0, 1.25, 1.3333333730697632], {}), ('1152x864@75.000', 1152, 864, 75.0, 1.0, [1.0, 1.3333333730697632, 1.5], {}), ('1024x768@75.029', 1024, 768, 75.028579711914062, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@70.069', 1024, 768, 70.069358825683594, 1.0, [1.0, 1.3333333730697632], {}), ('1024x768@60.004', 1024, 768, 60.003841400146484, 1.0, [1.0, 1.3333333730697632], {}), ('800x600@75.000', 800, 600, 75.0, 1.0, [1.0], {}), ('800x600@72.188', 800, 600, 72.187568664550781, 1.0, [1.0], {}), ('800x600@60.317', 800, 600, 60.316539764404297, 1.0, [1.0], {}), ('800x600@56.250', 800, 600, 56.25, 1.0, [1.0], {}), ('720x576@50.000', 720, 576, 50.0, 1.0, [1.0], {})], {'is-builtin': <false>, 'display-name': <'Ancor Communications Inc 24\"'>, 'min-refresh-rate': <50>, 'is-for-lease': <false>, 'color-mode': <uint32 0>, 'supported-color-modes': <[uint32 0, 2]>, 'rgb-range': <uint32 1>})], [(985, 0, 1.0, uint32 0, false, [('DP-1', 'SNY', 'SONY TV', '0x01010101')], @a{sv} {}), (1920, 1080, 1.0, 0, false, [('HDMI-1', 'ACI', 'VS248', 'J7LMQS050673')], {}), (0, 1080, 1.0, 0, true, [('DP-3', 'GBT', 'G27FC', '0x0000110e')], {})], {'layout-mode': <uint32 1>, 'supports-changing-layout-mode': <true>})",
+      "stderr": ""
+    },
+    "installedPackage": {
+      "command": [
+        "dpkg-query",
+        "-W",
+        "hashline"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "dpkg-query: Kein Paket gefunden, das auf hashline passt"
+    },
+    "referenceVerified": false
+  },
+  "method": "One release process per fixture on a private session bus started beside it, not around it; recursive process-group PSS/CPU over /proc after settling. Portals, gvfs and dconf are kept off that bus and are therefore neither started by the run nor counted in it. No application instrumentation.",
+  "isolation": {
+    "GTK_USE_PORTAL": "0",
+    "GIO_USE_VFS": "local",
+    "GSETTINGS_BACKEND": "memory",
+    "NO_AT_BRIDGE": "1"
+  },
+  "otherInstancesAtStart": [],
+  "settleSeconds": 5.0,
+  "sampleSeconds": 10.0,
+  "rows": [
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007343760000367183,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 1.0148852239999542,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 2.0226927550002074,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 3.0301158510001187,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 4.037853073000406,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 5.045381537000139,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 6.053158138000072,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 7.060494665000078,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 8.068611962999967,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 72,
+          "cpuTicksByPid": {
+            "93054": 72
+          }
+        },
+        {
+          "seconds": 9.076177177000318,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 73,
+          "cpuTicksByPid": {
+            "93054": 73
+          }
+        },
+        {
+          "seconds": 10.084020797999983,
+          "pids": [
+            93054
+          ],
+          "processIdentities": [
+            [
+              93054,
+              787374
+            ]
+          ],
+          "pssKiB": 134251,
+          "cpuTicks": 73,
+          "cpuTicksByPid": {
+            "93054": 73
+          }
+        }
+      ],
+      "pssKibMedian": 134251,
+      "pssKibMax": 134251,
+      "cpuCoreShare": 0.0009923906424994606,
+      "spanSeconds": 10.076677037999616,
+      "pids": [
+        93054
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.0074349090000396245,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 1.0150857220005491,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 2.0224581880002006,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 3.030275019000328,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 4.037645406000593,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 5.045575025000289,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 6.053046470000481,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93197": 51
+          }
+        },
+        {
+          "seconds": 7.0608800010004416,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93197": 52
+          }
+        },
+        {
+          "seconds": 8.068292997000754,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93197": 52
+          }
+        },
+        {
+          "seconds": 9.076209597000343,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93197": 52
+          }
+        },
+        {
+          "seconds": 10.083633182000085,
+          "pids": [
+            93197
+          ],
+          "processIdentities": [
+            [
+              93197,
+              788895
+            ]
+          ],
+          "pssKiB": 126609,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93197": 52
+          }
+        }
+      ],
+      "pssKibMedian": 126609,
+      "pssKibMax": 126609,
+      "cpuCoreShare": 0.0009924377953931074,
+      "spanSeconds": 10.076198273000045,
+      "pids": [
+        93197
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/many-blocks.md",
+      "bytes": 180018,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/many-blocks.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007206522000160476,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 41,
+          "cpuTicksByPid": {
+            "93243": 41
+          }
+        },
+        {
+          "seconds": 1.0146001880002586,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 41,
+          "cpuTicksByPid": {
+            "93243": 41
+          }
+        },
+        {
+          "seconds": 2.0223737400001482,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 3.029699896999773,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 4.03732496900011,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 5.044570576999831,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 6.052394538000044,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 7.059484076999979,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 8.06700161200024,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 9.074439705999794,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        },
+        {
+          "seconds": 10.082114259000264,
+          "pids": [
+            93243
+          ],
+          "processIdentities": [
+            [
+              93243,
+              790416
+            ]
+          ],
+          "pssKiB": 94108,
+          "cpuTicks": 42,
+          "cpuTicksByPid": {
+            "93243": 42
+          }
+        }
+      ],
+      "pssKibMedian": 94108,
+      "pssKibMax": 94108,
+      "cpuCoreShare": 0.0009925649207957504,
+      "spanSeconds": 10.074907737000103,
+      "pids": [
+        93243
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/wide-table.md",
+      "bytes": 91722,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/wide-table.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.0073413699992670445,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 1.01528947999941,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 2.0226437060000535,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 3.0307249629995567,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 4.038142398999298,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 5.0456674929992005,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135543,
+          "cpuTicks": 58,
+          "cpuTicksByPid": {
+            "93277": 58
+          }
+        },
+        {
+          "seconds": 6.053639741999177,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135795,
+          "cpuTicks": 60,
+          "cpuTicksByPid": {
+            "93277": 60
+          }
+        },
+        {
+          "seconds": 7.061172316000011,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135795,
+          "cpuTicks": 60,
+          "cpuTicksByPid": {
+            "93277": 60
+          }
+        },
+        {
+          "seconds": 8.069245444999979,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135795,
+          "cpuTicks": 60,
+          "cpuTicksByPid": {
+            "93277": 60
+          }
+        },
+        {
+          "seconds": 9.076829467999232,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135795,
+          "cpuTicks": 60,
+          "cpuTicksByPid": {
+            "93277": 60
+          }
+        },
+        {
+          "seconds": 10.085154322999188,
+          "pids": [
+            93277
+          ],
+          "processIdentities": [
+            [
+              93277,
+              791936
+            ]
+          ],
+          "pssKiB": 135999,
+          "cpuTicks": 60,
+          "cpuTicksByPid": {
+            "93277": 60
+          }
+        }
+      ],
+      "pssKibMedian": 135543,
+      "pssKibMax": 135999,
+      "cpuCoreShare": 0.001984557571496352,
+      "spanSeconds": 10.07781295299992,
+      "pids": [
+        93277
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007169462000092608,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93315": 51
+          }
+        },
+        {
+          "seconds": 1.0148712039999737,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93315": 51
+          }
+        },
+        {
+          "seconds": 2.0240077219996238,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93315": 51
+          }
+        },
+        {
+          "seconds": 3.031542486000035,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93315": 51
+          }
+        },
+        {
+          "seconds": 4.040082128999529,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 51,
+          "cpuTicksByPid": {
+            "93315": 51
+          }
+        },
+        {
+          "seconds": 5.047447764999561,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        },
+        {
+          "seconds": 6.055052847999832,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        },
+        {
+          "seconds": 7.0625964029995885,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        },
+        {
+          "seconds": 8.06993829899966,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122414,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        },
+        {
+          "seconds": 9.077789879000193,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122415,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        },
+        {
+          "seconds": 10.085261514000194,
+          "pids": [
+            93315
+          ],
+          "processIdentities": [
+            [
+              93315,
+              793457
+            ]
+          ],
+          "pssKiB": 122415,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93315": 52
+          }
+        }
+      ],
+      "pssKibMedian": 122414,
+      "pssKibMax": 122415,
+      "cpuCoreShare": 0.0009922513059419215,
+      "spanSeconds": 10.078092052000102,
+      "pids": [
+        93315
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/long-line.md",
+      "bytes": 1000015,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/long-line.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007863443999667652,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 1.0163886780001121,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 2.023965360999682,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 3.0327415720003046,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 4.040667702000064,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 5.049265974999798,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 6.057041187000323,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 7.065483080999911,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 8.073241103000328,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 9.081852725999852,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93351": 54
+          }
+        },
+        {
+          "seconds": 10.089613586999803,
+          "pids": [
+            93351
+          ],
+          "processIdentities": [
+            [
+              93351,
+              794978
+            ]
+          ],
+          "pssKiB": 180181,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93351": 55
+          }
+        }
+      ],
+      "pssKibMedian": 180181,
+      "pssKibMax": 180181,
+      "cpuCoreShare": 0.0009918912746457126,
+      "spanSeconds": 10.081750143000136,
+      "pids": [
+        93351
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.008497907000673877,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93405": 110
+          }
+        },
+        {
+          "seconds": 1.0175774839999576,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93405": 110
+          }
+        },
+        {
+          "seconds": 2.0263229749998573,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "93405": 111
+          }
+        },
+        {
+          "seconds": 3.0362878129999444,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "93405": 111
+          }
+        },
+        {
+          "seconds": 4.045022173000689,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 5.05460780500016,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 6.063074669000343,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 7.073145946000295,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 8.082989774999987,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 9.091976812000212,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        },
+        {
+          "seconds": 10.101565994000339,
+          "pids": [
+            93405
+          ],
+          "processIdentities": [
+            [
+              93405,
+              796499
+            ]
+          ],
+          "pssKiB": 330850,
+          "cpuTicks": 112,
+          "cpuTicksByPid": {
+            "93405": 112
+          }
+        }
+      ],
+      "pssKibMedian": 330850,
+      "pssKibMax": 330850,
+      "cpuCoreShare": 0.00198155801859307,
+      "spanSeconds": 10.093068086999665,
+      "pids": [
+        93405
+      ],
+      "busActivatedPids": [
+        93053,
+        93142
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 0
+    },
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007464847999472113,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 1.0150220019995686,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 2.022882313000082,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 3.030878112999744,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 4.037938381999993,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 5.045562614999653,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93439": 39
+          }
+        },
+        {
+          "seconds": 6.052617995000219,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 40,
+          "cpuTicksByPid": {
+            "93439": 40
+          }
+        },
+        {
+          "seconds": 7.060302308000246,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 40,
+          "cpuTicksByPid": {
+            "93439": 40
+          }
+        },
+        {
+          "seconds": 8.067351616999986,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 40,
+          "cpuTicksByPid": {
+            "93439": 40
+          }
+        },
+        {
+          "seconds": 9.07505607999974,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 40,
+          "cpuTicksByPid": {
+            "93439": 40
+          }
+        },
+        {
+          "seconds": 10.082066658999793,
+          "pids": [
+            93439
+          ],
+          "processIdentities": [
+            [
+              93439,
+              798022
+            ]
+          ],
+          "pssKiB": 90022,
+          "cpuTicks": 41,
+          "cpuTicksByPid": {
+            "93439": 41
+          }
+        }
+      ],
+      "pssKibMedian": 90022,
+      "pssKibMax": 90022,
+      "cpuCoreShare": 0.0019851901221706126,
+      "spanSeconds": 10.07460181100032,
+      "pids": [
+        93439
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007241711000460782,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 1.0144987690000562,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 2.022245680999731,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 3.0293502599997737,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 4.03750922800009,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 5.044919273000232,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 6.052338378000059,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 7.060154689000228,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 8.067280027999914,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 9.074925542000528,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98710,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        },
+        {
+          "seconds": 10.082037791000403,
+          "pids": [
+            93473
+          ],
+          "processIdentities": [
+            [
+              93473,
+              799542
+            ]
+          ],
+          "pssKiB": 98709,
+          "cpuTicks": 45,
+          "cpuTicksByPid": {
+            "93473": 45
+          }
+        }
+      ],
+      "pssKibMedian": 98710,
+      "pssKibMax": 98710,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 10.074796079999942,
+      "pids": [
+        93473
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/many-blocks.md",
+      "bytes": 180018,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/many-blocks.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007126401999812515,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 1.0144987980002043,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 2.0217097459999422,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 3.028749037000125,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 4.036488947999715,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 5.043725497000196,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 6.051424778999717,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 7.05922862099942,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 8.066598786999748,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 9.073679676999745,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        },
+        {
+          "seconds": 10.08124860999942,
+          "pids": [
+            93531
+          ],
+          "processIdentities": [
+            [
+              93531,
+              801063
+            ]
+          ],
+          "pssKiB": 94197,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93531": 43
+          }
+        }
+      ],
+      "pssKibMedian": 94197,
+      "pssKibMax": 94197,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 10.074122207999608,
+      "pids": [
+        93531
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/wide-table.md",
+      "bytes": 91722,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/wide-table.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007330729999921459,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 1.0154615179999382,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 2.0226231859996915,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 3.030834192999464,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 4.03795989199989,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 5.046772292000242,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 6.053576374999466,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108575,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 7.061855500999627,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108575,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 8.069073298999683,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 9.077116737999859,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108574,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93574": 53
+          }
+        },
+        {
+          "seconds": 10.084390504999647,
+          "pids": [
+            93574
+          ],
+          "processIdentities": [
+            [
+              93574,
+              802583
+            ]
+          ],
+          "pssKiB": 108575,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93574": 54
+          }
+        }
+      ],
+      "pssKibMedian": 108574,
+      "pssKibMax": 108575,
+      "cpuCoreShare": 0.0009923529504914813,
+      "spanSeconds": 10.077059774999725,
+      "pids": [
+        93574
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.0073012099992411095,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93609": 52
+          }
+        },
+        {
+          "seconds": 1.0145823079992624,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93609": 52
+          }
+        },
+        {
+          "seconds": 2.0228230739994615,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93609": 53
+          }
+        },
+        {
+          "seconds": 3.030181930999788,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93609": 53
+          }
+        },
+        {
+          "seconds": 4.038320867999573,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93609": 53
+          }
+        },
+        {
+          "seconds": 5.045621304999258,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93609": 53
+          }
+        },
+        {
+          "seconds": 6.053654303999792,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93609": 54
+          }
+        },
+        {
+          "seconds": 7.060837701999844,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93609": 54
+          }
+        },
+        {
+          "seconds": 8.06873398299922,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93609": 54
+          }
+        },
+        {
+          "seconds": 9.075973969999723,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93609": 54
+          }
+        },
+        {
+          "seconds": 10.083623853999597,
+          "pids": [
+            93609
+          ],
+          "processIdentities": [
+            [
+              93609,
+              804104
+            ]
+          ],
+          "pssKiB": 119880,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93609": 54
+          }
+        }
+      ],
+      "pssKibMedian": 119880,
+      "pssKibMax": 119880,
+      "cpuCoreShare": 0.0019848510916736476,
+      "spanSeconds": 10.076322644000356,
+      "pids": [
+        93609
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/long-line.md",
+      "bytes": 1000015,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/long-line.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007604487000207882,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 1.0157103049996294,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 2.023402777999763,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 3.031519885000307,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 4.039304525999796,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 5.048543472000347,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 6.056331803999456,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 7.064574420000099,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93643": 55
+          }
+        },
+        {
+          "seconds": 8.07228743199994,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 56,
+          "cpuTicksByPid": {
+            "93643": 56
+          }
+        },
+        {
+          "seconds": 9.080619337999451,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 56,
+          "cpuTicksByPid": {
+            "93643": 56
+          }
+        },
+        {
+          "seconds": 10.088344390000202,
+          "pids": [
+            93643
+          ],
+          "processIdentities": [
+            [
+              93643,
+              805625
+            ]
+          ],
+          "pssKiB": 180021,
+          "cpuTicks": 56,
+          "cpuTicksByPid": {
+            "93643": 56
+          }
+        }
+      ],
+      "pssKibMedian": 180021,
+      "pssKibMax": 180021,
+      "cpuCoreShare": 0.0009919906768970435,
+      "spanSeconds": 10.080739902999994,
+      "pids": [
+        93643
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.008534396999493765,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 1.0179372220000005,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 2.02637159599999,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 3.0357118299998547,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 4.044368981999469,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 5.0536133280002105,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 6.062248829999589,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 7.0715729639996425,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 8.081704080000236,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 9.090362051999364,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        },
+        {
+          "seconds": 10.099731276000057,
+          "pids": [
+            93688
+          ],
+          "processIdentities": [
+            [
+              93688,
+              807146
+            ]
+          ],
+          "pssKiB": 330827,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "93688": 110
+          }
+        }
+      ],
+      "pssKibMedian": 330827,
+      "pssKibMax": 330827,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 10.091196879000563,
+      "pids": [
+        93688
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 1
+    },
+    {
+      "fixture": null,
+      "bytes": null,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007168510999690625,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 1.0151241209996442,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 2.022241050000048,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 3.0300024420002956,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 4.037049001000014,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 5.04501190100018,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 6.052125639000224,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 7.059440715999699,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 8.066712382000333,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 9.073880181000277,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        },
+        {
+          "seconds": 10.081509964999896,
+          "pids": [
+            93750
+          ],
+          "processIdentities": [
+            [
+              93750,
+              808668
+            ]
+          ],
+          "pssKiB": 90032,
+          "cpuTicks": 39,
+          "cpuTicksByPid": {
+            "93750": 39
+          }
+        }
+      ],
+      "pssKibMedian": 90032,
+      "pssKibMax": 90032,
+      "cpuCoreShare": 0.0,
+      "spanSeconds": 10.074341454000205,
+      "pids": [
+        93750
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/small.md",
+      "bytes": 102465,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/small.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007733086000371259,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 1.0148715539999102,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 2.0228395040003306,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 3.029937072999928,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 4.0382324300007895,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 5.04529114900015,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 6.053664654000386,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 7.0607299930006775,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 8.067932132000351,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 9.075642372999937,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 46,
+          "cpuTicksByPid": {
+            "93785": 46
+          }
+        },
+        {
+          "seconds": 10.08189916200081,
+          "pids": [
+            93785
+          ],
+          "processIdentities": [
+            [
+              93785,
+              810189
+            ]
+          ],
+          "pssKiB": 98352,
+          "cpuTicks": 47,
+          "cpuTicksByPid": {
+            "93785": 47
+          }
+        }
+      ],
+      "pssKibMedian": 98352,
+      "pssKibMax": 98352,
+      "cpuCoreShare": 0.0009926379935132176,
+      "spanSeconds": 10.074166076000438,
+      "pids": [
+        93785
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/many-blocks.md",
+      "bytes": 180018,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/many-blocks.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.006884734999403008,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 1.0139618449993577,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 2.0215721690001374,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 3.028716447000079,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 4.036423468999601,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 5.043660747000104,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 6.0514758879999135,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 7.0584886579999875,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 43,
+          "cpuTicksByPid": {
+            "93819": 43
+          }
+        },
+        {
+          "seconds": 8.066187260999868,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 44,
+          "cpuTicksByPid": {
+            "93819": 44
+          }
+        },
+        {
+          "seconds": 9.078639671999554,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 44,
+          "cpuTicksByPid": {
+            "93819": 44
+          }
+        },
+        {
+          "seconds": 10.086248865000016,
+          "pids": [
+            93819
+          ],
+          "processIdentities": [
+            [
+              93819,
+              811709
+            ]
+          ],
+          "pssKiB": 94021,
+          "cpuTicks": 44,
+          "cpuTicksByPid": {
+            "93819": 44
+          }
+        }
+      ],
+      "pssKibMedian": 94021,
+      "pssKibMax": 94021,
+      "cpuCoreShare": 0.000992126077699248,
+      "spanSeconds": 10.079364130000613,
+      "pids": [
+        93819
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/wide-table.md",
+      "bytes": 91722,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/wide-table.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007862765000027139,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108832,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 1.0150562129992977,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108832,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 2.0233035490000475,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 3.030507856999975,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 4.038755702999879,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 5.0459706909996385,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 6.054381983999519,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 7.061693031999312,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93869": 53
+          }
+        },
+        {
+          "seconds": 8.069289504999688,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93869": 54
+          }
+        },
+        {
+          "seconds": 9.07698883699959,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93869": 55
+          }
+        },
+        {
+          "seconds": 10.08468361999985,
+          "pids": [
+            93869
+          ],
+          "processIdentities": [
+            [
+              93869,
+              813230
+            ]
+          ],
+          "pssKiB": 108833,
+          "cpuTicks": 55,
+          "cpuTicksByPid": {
+            "93869": 55
+          }
+        }
+      ],
+      "pssKibMedian": 108833,
+      "pssKibMax": 108833,
+      "cpuCoreShare": 0.001984752958079689,
+      "spanSeconds": 10.076820854999823,
+      "pids": [
+        93869
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/medium.md",
+      "bytes": 1048581,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/medium.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.007577406000564224,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 1.0157102339999255,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 2.0229764519999662,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 3.030994649000604,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 4.038309997000397,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 5.04648118500063,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 6.053701693000221,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 7.061788751000677,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 8.069096688000172,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 9.076643252000395,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93909": 52
+          }
+        },
+        {
+          "seconds": 10.084538152000277,
+          "pids": [
+            93909
+          ],
+          "processIdentities": [
+            [
+              93909,
+              814751
+            ]
+          ],
+          "pssKiB": 119991,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93909": 54
+          }
+        }
+      ],
+      "pssKibMedian": 119991,
+      "pssKibMax": 119991,
+      "cpuCoreShare": 0.001984725405220961,
+      "spanSeconds": 10.076960745999713,
+      "pids": [
+        93909
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/long-line.md",
+      "bytes": 1000015,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/long-line.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.008012172000235296,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93960": 52
+          }
+        },
+        {
+          "seconds": 1.0150630610005464,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93960": 52
+          }
+        },
+        {
+          "seconds": 2.0241714690000663,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93960": 52
+          }
+        },
+        {
+          "seconds": 3.031867499999862,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 52,
+          "cpuTicksByPid": {
+            "93960": 52
+          }
+        },
+        {
+          "seconds": 4.039616480999939,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93960": 53
+          }
+        },
+        {
+          "seconds": 5.047335664000457,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93960": 53
+          }
+        },
+        {
+          "seconds": 6.055822616999649,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93960": 53
+          }
+        },
+        {
+          "seconds": 7.062874397000087,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 53,
+          "cpuTicksByPid": {
+            "93960": 53
+          }
+        },
+        {
+          "seconds": 8.071160923000207,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93960": 54
+          }
+        },
+        {
+          "seconds": 9.078863364999961,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93960": 54
+          }
+        },
+        {
+          "seconds": 10.086926693999885,
+          "pids": [
+            93960
+          ],
+          "processIdentities": [
+            [
+              93960,
+              816272
+            ]
+          ],
+          "pssKiB": 181092,
+          "cpuTicks": 54,
+          "cpuTicksByPid": {
+            "93960": 54
+          }
+        }
+      ],
+      "pssKibMedian": 181092,
+      "pssKibMax": 181092,
+      "cpuCoreShare": 0.0019843406704506917,
+      "spanSeconds": 10.07891452199965,
+      "pids": [
+        93960
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    },
+    {
+      "fixture": "benchmarks/generated/large.md",
+      "bytes": 10486101,
+      "renderer": "default",
+      "command": [
+        "/tmp/claude-1000/-home-big-linus-gitpp-markdown-view/b5ba56ac-e3c9-42ef-8d04-f7ff820d918f/scratchpad/hashline-before",
+        "benchmarks/generated/large.md"
+      ],
+      "samples": [
+        {
+          "seconds": 0.008627535999949032,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 109,
+          "cpuTicksByPid": {
+            "94000": 109
+          }
+        },
+        {
+          "seconds": 1.0176003050000872,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "94000": 110
+          }
+        },
+        {
+          "seconds": 2.0269672790000186,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "94000": 110
+          }
+        },
+        {
+          "seconds": 3.035678520000147,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 110,
+          "cpuTicksByPid": {
+            "94000": 110
+          }
+        },
+        {
+          "seconds": 4.0449233760000425,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 5.054147621999618,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 6.063364028000251,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 7.0721438489999855,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 8.081355254999835,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 9.090178304999426,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        },
+        {
+          "seconds": 10.09972951599957,
+          "pids": [
+            94000
+          ],
+          "processIdentities": [
+            [
+              94000,
+              817793
+            ]
+          ],
+          "pssKiB": 335426,
+          "cpuTicks": 111,
+          "cpuTicksByPid": {
+            "94000": 111
+          }
+        }
+      ],
+      "pssKibMedian": 335426,
+      "pssKibMax": 335426,
+      "cpuCoreShare": 0.0019819440968528146,
+      "spanSeconds": 10.091101979999621,
+      "pids": [
+        94000
+      ],
+      "busActivatedPids": [
+        93053
+      ],
+      "isolated": true,
+      "alive": true,
+      "pass": 2
+    }
+  ],
+  "completed": true,
+  "busAddress": "unix:path=/tmp/dbus-3BWwgnuqZ7,guid=0d7e5bf8ba4452c8b3bff70a6aa11e8d"
+}

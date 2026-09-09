@@ -10,11 +10,18 @@
 //!
 //! Usage: `cargo run --release -p hashline --example measure -- <file.md>…`
 //!
+//! With `--geometry` it sets every block of every fixture once instead of
+//! timing the first screen, and reports how far the plan's estimated height
+//! was from the measured one. That is the number a scrollbar and every jump to
+//! an unmeasured block depend on, and it is invisible to a timing run: a code
+//! block estimated as a single line was 28 000 times too short and cost
+//! nothing to estimate.
+//!
 //! RSS is this process's absolute resident size after the fixture, so give each
 //! fixture its own run when the number matters — an allocator does not return
 //! everything between them.
 
-use hashline::layout::{set_block, BlockPlan, Metrics, NoImages, Style};
+use hashline::layout::{set_block, BlockKind, BlockPlan, Metrics, NoImages, Style};
 use hashline::theme::{document as tokens, LIGHT};
 use pango::prelude::*;
 use std::time::Duration;
@@ -45,6 +52,8 @@ fn quantiles(samples: &mut [Duration]) -> (f64, f64) {
 
 fn main() {
     let mut arguments: Vec<String> = std::env::args().skip(1).collect();
+    let geometry = arguments.iter().any(|value| value == "--geometry");
+    arguments.retain(|value| value != "--geometry");
     let mut repetitions = 30usize;
     if let Some(index) = arguments.iter().position(|value| value == "--repetitions") {
         repetitions = arguments
@@ -63,6 +72,9 @@ fn main() {
     // One 900x700 window's worth, plus the buffer the view keeps.
     let viewport = 700.0;
 
+    if geometry {
+        return geometry_report(&context, &style, char_width, column, &files);
+    }
     println!("n={repetitions} per fixture; times are median / p95 in ms");
     println!(
         "{:<16} {:>9} {:>15} {:>15} {:>15} {:>8} {:>6} {:>7}",
@@ -140,6 +152,69 @@ fn main() {
             blocks,
             set_count,
             rss_kib() / 1024
+        );
+    }
+}
+
+/// Sets every block once and compares the plan's estimate with what it
+/// measured, for the whole document and for its code blocks alone.
+fn geometry_report(
+    context: &pango::Context,
+    style: &Style,
+    char_width: f64,
+    column: f64,
+    files: &[String],
+) {
+    println!(
+        "{:<16} {:>8} {:>12} {:>12} {:>8} {:>7} {:>8}",
+        "fixture", "blocks", "estimated", "measured", "error", "code", "error"
+    );
+    for path in files {
+        let Ok(source) = std::fs::read_to_string(path) else {
+            eprintln!("{path}: unreadable");
+            continue;
+        };
+        let document = hashline_markdown::parse(&source);
+        let mut plan = BlockPlan::new(
+            &document,
+            Metrics {
+                char_width,
+                body_px: tokens::BODY_PX,
+            },
+            column,
+        );
+        let estimated = plan.total_height();
+        let (mut code_estimated, mut code_measured, mut code_blocks) = (0.0, 0.0, 0usize);
+        for index in 0..plan.len() {
+            let block = *plan.block(index);
+            let height = set_block(context, &document, &block, style, column, &NoImages).height();
+            if block.kind == BlockKind::Code {
+                code_estimated += block.height;
+                code_measured += height;
+                code_blocks += 1;
+            }
+            plan.set_measured(index, height);
+        }
+        let measured = plan.total_height();
+        let error = |from: f64, to: f64| {
+            if to > 0.0 {
+                100.0 * (from - to) / to
+            } else {
+                0.0
+            }
+        };
+        println!(
+            "{:<16} {:>8} {:>12.0} {:>12.0} {:>7.1}% {:>7} {:>7.1}%",
+            std::path::Path::new(path)
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.clone()),
+            plan.len(),
+            estimated,
+            measured,
+            error(estimated, measured),
+            code_blocks,
+            error(code_estimated, code_measured),
         );
     }
 }

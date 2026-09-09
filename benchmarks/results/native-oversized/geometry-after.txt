@@ -1,0 +1,8 @@
+fixture            blocks    estimated     measured    error    code    error
+small.md             1446       107739       158332   -32.0%     289    -0.2%
+medium.md           14626      1088334      1600385   -32.0%    2925    -0.2%
+many-blocks.md      20001       952231       971231    -2.0%       0     0.0%
+deep-list.md            2          587        10419   -94.4%       0     0.0%
+wide-table.md           2        22341         4875   358.2%       0     0.0%
+long-line.md          246       370062       383800    -3.6%       0     0.0%
+large-code.md         275      1568138      1568205    -0.0%     274    -0.0%

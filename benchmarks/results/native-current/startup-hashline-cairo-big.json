@@ -1,0 +1,75 @@
+{
+ "binary": "./target/release/hashline",
+ "label": "hashline/cairo",
+ "method": "WAYLAND_DEBUG protocol stamps against CLOCK_REALTIME at exec. 'presented' is wp_presentation_feedback, i.e. the compositor reporting a shown frame. No proof of what the frame contained.",
+ "repetitions": 10,
+ "holdSeconds": 3.0,
+ "quietMs": 150.0,
+ "isolatedBus": true,
+ "fixtures": {
+  "medium.md": {
+   "bytes": 1048581,
+   "runsWithoutPresentation": 0,
+   "attach": {
+    "n": 10,
+    "median": 48.8,
+    "p95": 50.6,
+    "min": 47.9,
+    "max": 50.6
+   },
+   "frame": {
+    "n": 10,
+    "median": 75.8,
+    "p95": 76.6,
+    "min": 74.8,
+    "max": 76.6
+   },
+   "presented": {
+    "n": 10,
+    "median": 162.4,
+    "p95": 164.2,
+    "min": 75.1,
+    "max": 164.2
+   },
+   "quiet": {
+    "n": 10,
+    "median": 1096.5,
+    "p95": 1125.6,
+    "min": 1075.3,
+    "max": 1125.6
+   }
+  },
+  "large.md": {
+   "bytes": 10486101,
+   "runsWithoutPresentation": 0,
+   "attach": {
+    "n": 10,
+    "median": 49.0,
+    "p95": 50.6,
+    "min": 46.8,
+    "max": 50.6
+   },
+   "frame": {
+    "n": 10,
+    "median": 69.1,
+    "p95": 71.7,
+    "min": 61.3,
+    "max": 71.7
+   },
+   "presented": {
+    "n": 10,
+    "median": 79.7,
+    "p95": 96.1,
+    "min": 63.4,
+    "max": 96.1
+   },
+   "quiet": {
+    "n": 10,
+    "median": 113.8,
+    "p95": 115.2,
+    "min": 95.8,
+    "max": 115.2
+   }
+  }
+ }
+}
