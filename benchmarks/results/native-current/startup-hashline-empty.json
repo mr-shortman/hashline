@@ -1,0 +1,43 @@
+{
+ "binary": "./target/release/hashline",
+ "label": "hashline",
+ "method": "WAYLAND_DEBUG protocol stamps against CLOCK_REALTIME at exec. 'presented' is wp_presentation_feedback, i.e. the compositor reporting a shown frame. No proof of what the frame contained.",
+ "repetitions": 15,
+ "holdSeconds": 3.0,
+ "quietMs": 150.0,
+ "isolatedBus": true,
+ "fixtures": {
+  "none": {
+   "bytes": 0,
+   "runsWithoutPresentation": 3,
+   "attach": {
+    "n": 15,
+    "median": 192.3,
+    "p95": 219.1,
+    "min": 160.7,
+    "max": 219.1
+   },
+   "frame": {
+    "n": 15,
+    "median": 202.2,
+    "p95": 226.7,
+    "min": 181.0,
+    "max": 226.7
+   },
+   "presented": {
+    "n": 12,
+    "median": 210.9,
+    "p95": 1815.3,
+    "min": 184.3,
+    "max": 1815.3
+   },
+   "quiet": {
+    "n": 15,
+    "median": 330.8,
+    "p95": 1943.7,
+    "min": 186.9,
+    "max": 1943.7
+   }
+  }
+ }
+}

@@ -1,0 +1,61 @@
+{
+ "binary": "/usr/bin/viewmd",
+ "label": "viewmd",
+ "method": "WAYLAND_DEBUG protocol stamps against CLOCK_REALTIME at exec. 'presented' is wp_presentation_feedback, i.e. the compositor reporting a shown frame. No proof of what the frame contained.",
+ "repetitions": 15,
+ "holdSeconds": 3.0,
+ "quietMs": 150.0,
+ "isolatedBus": true,
+ "fixtures": {
+  "small.md": {
+   "bytes": 102465,
+   "runsWithoutPresentation": 15,
+   "attach": {
+    "n": 15,
+    "median": 90.2,
+    "p95": 91.9,
+    "min": 87.5,
+    "max": 91.9
+   },
+   "frame": {
+    "n": 15,
+    "median": 153.9,
+    "p95": 157.1,
+    "min": 151.2,
+    "max": 157.1
+   },
+   "quiet": {
+    "n": 15,
+    "median": 333.3,
+    "p95": 336.0,
+    "min": 329.7,
+    "max": 336.0
+   }
+  },
+  "medium.md": {
+   "bytes": 1048581,
+   "runsWithoutPresentation": 15,
+   "attach": {
+    "n": 15,
+    "median": 89.8,
+    "p95": 92.0,
+    "min": 88.9,
+    "max": 92.0
+   },
+   "frame": {
+    "n": 15,
+    "median": 1695.6,
+    "p95": 1718.8,
+    "min": 1663.0,
+    "max": 1718.8
+   },
+   "quiet": {
+    "n": 15,
+    "median": 1696.6,
+    "p95": 1719.9,
+    "min": 1664.0,
+    "max": 1719.9
+   }
+  }
+ }
+}
