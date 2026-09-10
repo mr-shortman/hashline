@@ -5,6 +5,8 @@
 //! at the point of use either: a colour or a spacing the view needs is added
 //! here first.
 
+pub mod chrome;
+
 /// A colour as GTK wants it: straight-alpha RGBA in the 0..=1 range.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Color {

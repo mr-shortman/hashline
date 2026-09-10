@@ -54,7 +54,9 @@ Standardzuordnung bleibt erhalten.
 
 Die Fensterleiste ist die native `GtkHeaderBar` mit den Fensterknöpfen des
 Systems und trägt Öffnen, Dateiname, Inhaltsverzeichnis, Suche und Menü. Das
-Menü enthält Darstellungsmodus, Textgröße, Nachladen und Inhaltsverzeichnis.
+Menü enthält Öffnen, Nachladen, den Darstellungsmodus als Schalter aus System,
+Hell und Dunkel sowie die Textgröße; Inhaltsverzeichnis und Suche stehen als
+eigene Knöpfe daneben und haben deshalb keine Menüzeile.
 Der vollständige Pfad steht als Tooltip.
 
 Jede geöffnete Datei bekommt einen eigenen Tab; eine bereits offene Datei wird

@@ -9,6 +9,7 @@ use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
 
+mod menu;
 mod outline_view;
 mod tab;
 
@@ -152,6 +153,7 @@ struct Ui {
     search_entry: gtk::SearchEntry,
     search_count: gtk::Label,
     menu_button: gtk::MenuButton,
+    menu: menu::Menu,
     notice: gtk::Revealer,
     notice_label: gtk::Label,
     notice_generation: Cell<u64>,
@@ -162,8 +164,6 @@ struct Ui {
     present_requested: Cell<bool>,
     outline_revealer: gtk::Revealer,
     outline_list: outline_view::OutlineList,
-    /// The document area, indented when the outline shows as a sidebar.
-    content: gtk::Box,
     banner: gtk::Revealer,
     banner_label: gtk::Label,
     preferences: Preferences,
@@ -299,11 +299,13 @@ impl Ui {
         notice_label.set_margin_bottom(8);
         let notice = gtk::Revealer::builder().child(&notice_label).build();
         content.append(&notice);
-        content.append(&stack);
-
+        // The outline covers the document and nothing above it. It used to
+        // overlay the whole content column, so an open outline sat over the
+        // search bar as well.
         let overlay = gtk::Overlay::new();
-        overlay.set_child(Some(&content));
+        overlay.set_child(Some(&stack));
         overlay.add_overlay(&outline_revealer);
+        content.append(&overlay);
 
         let outline_button = gtk::ToggleButton::new();
         outline_button.set_icon_name("view-list-symbolic");
@@ -311,27 +313,13 @@ impl Ui {
         let search_button = gtk::ToggleButton::new();
         search_button.set_icon_name("system-search-symbolic");
         search_button.set_tooltip_text(Some("Suchen (Ctrl+F)"));
-        let menu = gio::Menu::new();
-        menu.append(Some("Datei öffnen …"), Some("win.open"));
-        menu.append(Some("Neu laden"), Some("win.reload"));
-        let navigation = gio::Menu::new();
-        navigation.append(Some("Inhaltsverzeichnis"), Some("win.outline"));
-        navigation.append(Some("Suchen"), Some("win.find"));
-        menu.append_section(None, &navigation);
-        let appearance = gio::Menu::new();
-        appearance.append(Some("System"), Some("win.theme::system"));
-        appearance.append(Some("Hell"), Some("win.theme::light"));
-        appearance.append(Some("Dunkel"), Some("win.theme::dark"));
-        menu.append_section(Some("Darstellung"), &appearance);
-        let zoom = gio::Menu::new();
-        zoom.append(Some("Text vergrößern"), Some("win.zoom-in"));
-        zoom.append(Some("Text verkleinern"), Some("win.zoom-out"));
-        zoom.append(Some("Originalgröße"), Some("win.zoom-reset"));
-        menu.append_section(None, &zoom);
+        // Neither the outline nor the search has a row: both already have a
+        // button beside this one, and both say their key in its tooltip.
+        let menu = menu::build();
         let menu_button = gtk::MenuButton::builder()
             .icon_name("open-menu-symbolic")
             .tooltip_text("Menü")
-            .menu_model(&menu)
+            .popover(&menu.popover)
             // The window's primary menu, so F10 opens it as every GNOME
             // application's does.
             .primary(true)
@@ -341,7 +329,7 @@ impl Ui {
         header.pack_end(&outline_button);
 
         window.set_titlebar(Some(&header));
-        window.set_child(Some(&overlay));
+        window.set_child(Some(&content));
 
         let ui = Rc::new(Ui {
             window,
@@ -357,6 +345,7 @@ impl Ui {
             search_entry: search_entry.clone(),
             search_count,
             menu_button,
+            menu,
             notice,
             notice_label,
             notice_generation: Cell::new(0),
@@ -371,10 +360,11 @@ impl Ui {
             })),
             outline_revealer: outline_revealer.clone(),
             outline_list,
-            content,
             preferences,
         });
 
+        ui.menu.set_theme(&ui.theme_mode.borrow());
+        ui.menu.set_zoom(ui.zoom());
         ui.install_theme();
         ui.install_escape();
         ui.install_search(&previous_hit, &next_hit);
@@ -452,6 +442,7 @@ impl Ui {
         for tab in self.tabs.borrow().iter() {
             tab.view.set_zoom(percent);
         }
+        self.menu.set_zoom(self.zoom());
         self.preferences.set_zoom(self.zoom());
     }
 
@@ -702,7 +693,7 @@ impl Ui {
     fn update_outline_mode(&self) {
         let wide = self.window.width() >= OUTLINE_SIDEBAR_WIDTH;
         let showing = self.outline_revealer.reveals_child();
-        self.content
+        self.stack
             .set_margin_start(if wide && showing { 260 } else { 0 });
     }
 
@@ -1088,10 +1079,18 @@ impl Ui {
             "light" => false,
             _ => self.system_dark.get(),
         };
+        // Writing this reloads the whole GTK stylesheet, so it is written only
+        // on a real change. It is a hint for the parts of the toolkit the
+        // window does not draw itself — file dialogs above all; what the
+        // window shows comes from the palette below, because a system theme is
+        // free to ignore the hint and stay dark.
         if let Some(settings) = gtk::Settings::default() {
-            settings.set_gtk_application_prefer_dark_theme(dark);
+            if settings.is_gtk_application_prefer_dark_theme() != dark {
+                settings.set_gtk_application_prefer_dark_theme(dark);
+            }
         }
         let palette = if dark { DARK } else { LIGHT };
+        crate::theme::chrome::apply(palette);
         for tab in self.tabs.borrow().iter() {
             tab.view.set_palette(palette);
         }
@@ -1212,6 +1211,7 @@ impl Ui {
                 *ui.theme_mode.borrow_mut() = mode.to_string();
                 ui.preferences.set_theme(mode);
                 action.set_state(&mode.to_variant());
+                ui.menu.set_theme(mode);
                 ui.apply_theme();
             }
         });
@@ -1692,16 +1692,46 @@ mod tests {
         ui.fill_outline();
         assert!(ui.outline_list.model.n_items() > 0);
         assert_eq!(ui.outline_list.selected(), Some(0));
+        // The theme switch in the menu is the theme action seen from the
+        // other side: whichever way the mode is set, both agree.
         for mode in ["dark", "light", "system"] {
             let action = ui.window.lookup_action("theme").unwrap();
             action.activate(Some(&mode.to_variant()));
             assert_eq!(action.state().unwrap().str(), Some(mode));
             assert_eq!(ui.theme_mode.borrow().as_str(), mode);
+            assert_eq!(ui.menu.showing().0, Some(mode));
         }
-        assert!(ui.menu_button.menu_model().unwrap().n_items() >= 4);
+        // The menu carries no row for the outline or for the search: both have
+        // a button of their own in the header bar.
+        assert!(ui.menu_button.menu_model().is_none());
+        assert_eq!(ui.menu_button.popover().unwrap(), ui.menu.popover);
+        ui.window.lookup_action("zoom-in").unwrap().activate(None);
+        assert_eq!(ui.menu.showing().1, format!("{} %", ui.zoom()));
+        ui.window
+            .lookup_action("zoom-reset")
+            .unwrap()
+            .activate(None);
+        assert_eq!(ui.menu.showing().1, "100 %");
+        // From closed, whatever the stored preference opened: the order is
+        // the order they were opened in, and Escape closes the newest first.
+        ui.search_bar.set_search_mode(false);
+        ui.outline_revealer.set_reveal_child(false);
+        assert!(ui.overlay_order.borrow().is_empty());
         ui.search_bar.set_search_mode(true);
         ui.outline_revealer.set_reveal_child(true);
         assert_eq!(*ui.overlay_order.borrow(), vec!["search", "outline"]);
+        // The outline overlays the document and nothing else: the search bar
+        // is above the overlay, not underneath it.
+        let overlay = ui
+            .outline_revealer
+            .parent()
+            .and_downcast::<gtk::Overlay>()
+            .expect("the outline is an overlay");
+        assert_eq!(
+            overlay.child().unwrap(),
+            *ui.stack.upcast_ref::<gtk::Widget>()
+        );
+        assert!(!ui.search_bar.is_ancestor(&overlay));
         let keys = ui.window.observe_controllers();
         let escape = || {
             for i in 0..keys.n_items() {

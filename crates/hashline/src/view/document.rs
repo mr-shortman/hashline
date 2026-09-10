@@ -219,6 +219,12 @@ mod imp {
             let widget = self.obj();
             widget.set_focusable(true);
             widget.set_can_focus(true);
+            // A block that is half scrolled off the top is drawn from a
+            // negative y, and a widget may draw outside its allocation unless
+            // it says otherwise — so the top of a code block appeared over the
+            // search bar and the header. Nothing of the document belongs
+            // outside the viewport.
+            widget.set_overflow(gtk::Overflow::Hidden);
             widget.setup_gestures();
             widget.update_property(&[
                 gtk::accessible::Property::Label("Markdown-Dokument"),

@@ -481,7 +481,7 @@ Die folgenden Lücken der nativen Fassung sind umgesetzt. Auch die **M3-Ausliefe
 | --- | --- |
 | Eine aktive Datei in einem Fenster | `open` und `activate` verwenden denselben Fenstercontroller. Ein weiterer Aufruf ersetzt die Datei und aktiviert das vorhandene Fenster. |
 | Aktueller Abschnitt im Inhaltsverzeichnis | Überschriften werden beim Dokumentwechsel aufgebaut; die aktive Zeile folgt Scrollposition, Abschnittssprüngen und Layoutkorrekturen. |
-| Menü in der HeaderBar | Öffnen, Nachladen, Inhaltsverzeichnis, Suche, Darstellungsmodus und Zoom verwenden Fensteraktionen. |
+| Menü in der HeaderBar | Öffnen und Nachladen als Zeilen, Darstellungsmodus als waagerechter Schalter, Textgröße als waagerechte Reihe; alles über Fensteraktionen. Inhaltsverzeichnis und Suche haben eigene Knöpfe und keine Menüzeile. |
 | System-, Hell- und Dunkelmodus | Zustandsbehaftete Themenaktion mit GSettings-Präferenz; Systemmodus liest den Desktop-Settings-Portalwert mit GTK-Fallback. Das erste Fenster wartet auf die initiale Themenauflösung. |
 | Escape | Schließt zuerst ein geöffnetes Menü, sonst das zuletzt geöffnete Inhaltsverzeichnis oder die Suche; Fokus geht an die verbleibende Ansicht zurück. |
 | Mehrere Dateien | Erster Eintrag aus CLI/Dateimanager oder Drag-and-drop wird geöffnet; ein kurz sichtbarer Hinweis bleibt auch nach erfolgreichem Laden erhalten und ist als zugängliche Statusmeldung ausgezeichnet. |
