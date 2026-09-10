@@ -295,7 +295,7 @@ Schritt 6 ist der einzige Pfad, der Pango-Layouts erzeugt. Kein anderes Modul se
 - Remote-Bilder laden in v1 nicht. Der Platzhalter nennt die Quelle. Eine spätere Freigabe braucht eine eigene Entscheidung.
 - Dekodierte Bilder unterliegen einem Pixel- und Speicherbudget, das vor der Dekodierung anhand der Bildkopfdaten geprüft wird. Überschreitungen ergeben einen Platzhalter mit Begründung, keinen Dekodierversuch.
 
-Dateiänderungen werden ereignisbasiert beobachtet und ungefähr 150 ms gebündelt. Ein Inhaltsvergleich verhindert unnötiges Neurendern. Auch das Ersetzen der Datei muss die Beobachtung überleben; dafür bei Bedarf das Elternverzeichnis mit Filter auf die aktive Datei beobachten. Watcher-Fehler lassen manuelles Nachladen verfügbar.
+Dateiänderungen werden ereignisbasiert beobachtet und ungefähr 150 ms gebündelt: eine noch laufende Schreiboperation wird abgewartet, ein bereits vollständiger Stand — Umbenennen an die Stelle, Anlegen, Löschen, Schließen nach dem Schreiben — sofort übernommen, und die Bündelung liegt danach als Nachlauf. Ein Inhaltsvergleich verhindert unnötiges Neurendern. Auch das Ersetzen der Datei muss die Beobachtung überleben; dafür bei Bedarf das Elternverzeichnis mit Filter auf die aktive Datei beobachten. Watcher-Fehler lassen manuelles Nachladen verfügbar.
 
 Beim Nachladen wird die nächste geeignete Überschrift beziehungsweise ein stabiler Block mit relativem Viewport-Abstand als Leseanker verwendet. Falls dieser entfällt, dienen vorheriger Block und schließlich begrenzter Scrollfortschritt als Fallback. Bei späterem Bildlayout wird der Anker nur korrigiert, solange keine neue Benutzernavigation stattgefunden hat. Das Dokument springt nicht bei jedem Speichern nach oben.
 

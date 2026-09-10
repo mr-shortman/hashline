@@ -305,11 +305,17 @@ fn reading_the_file_is_not_a_change_to_it() {
 
 #[test]
 fn a_reload_is_asked_for_within_the_time_the_budget_allows() {
-    // The budget is p95 ≤ 250 ms from the write to *visible* text, of which
-    // 150 ms is the coalescing this measures the other side of
-    // (docs/decisions/014-competitive-targets.md, section 3.3). What is left
-    // over is what the parse, the layout and the frame have to fit into, so a
-    // watch that is slow here spends someone else's budget.
+    // The budget is p95 ≤ 250 ms from the save to *visible* text
+    // (docs/decisions/014-competitive-targets.md, section 3.3), and a rename
+    // into place puts a whole file there in one step: there is nothing to wait
+    // out, so what the watch spends here is what the parse, the layout and the
+    // frame do not get.
+    //
+    // The temporary file is written while the main loop runs, because that is
+    // what an editor saving into a watched directory looks like from inside a
+    // running application. Seeing that creation used to restart the coalescing
+    // period, and the rename then arrived just after a fresh one had begun:
+    // 280 ms of the budget went on waiting, measured against 1 ms now.
     with_pump(|pump| {
         let sandbox = Sandbox::new("latency");
         let file = sandbox.file("doc.md");
@@ -318,9 +324,13 @@ fn a_reload_is_asked_for_within_the_time_the_budget_allows() {
 
         let mut samples = Vec::new();
         for step in 1..=20 {
+            let temporary = file.with_extension("md.tmp");
+            std::fs::write(&temporary, format!("# Titel\n\nStand {step}.\n"))
+                .expect("write temporary");
+            pump.until(|| false, Duration::from_millis(20));
             let before = reloads.count();
             let started = Instant::now();
-            save_by_rename(&file, &format!("# Titel\n\nStand {step}.\n"));
+            std::fs::rename(&temporary, &file).expect("rename into place");
             assert!(
                 pump.until(|| reloads.count() > before, REACTION),
                 "write {step} produced no reload"
@@ -333,8 +343,8 @@ fn a_reload_is_asked_for_within_the_time_the_budget_allows() {
         let rank = ((samples.len() as f64) * 0.95).ceil() as usize;
         let p95 = samples[rank.saturating_sub(1).min(samples.len() - 1)];
         assert!(
-            p95 <= Duration::from_millis(200),
-            "p95 from write to reload request was {p95:?}; the whole budget to visible text is 250 ms"
+            p95 <= Duration::from_millis(50),
+            "p95 from the rename to the reload request was {p95:?}; the whole budget to visible text is 250 ms"
         );
     });
 }
