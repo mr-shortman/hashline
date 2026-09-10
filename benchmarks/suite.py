@@ -264,7 +264,14 @@ def interaction(command, fixture, renderer, options, artifact):
                 started = time.monotonic_ns()
                 keyboard(pointer, [65507, ord('f')])
                 return started
-            stimulus('searchOpenUpperMs', ['Im Dokument suchen'], open_search)
+            # Not the leading "Im": its capital I stands right against the
+            # magnifier in the entry, and OCR reads the pair as "}m", "[m" or
+            # "(.Q |m". While the bar still slid into place that cost nothing,
+            # because the clipped bar was unreadable anyway and both phrases
+            # first matched on the very same frame. On a bar that arrives whole
+            # it cost 250 ms of invented latency: the placeholder was legible
+            # at 19 ms and the phrase did not match until 285.
+            stimulus('searchOpenUpperMs', ['Dokument suchen'], open_search)
 
             def run_search():
                 for char in needle[:-1]:

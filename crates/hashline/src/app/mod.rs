@@ -250,6 +250,17 @@ impl Ui {
             .key_capture_widget(&window)
             .build();
         search_bar.connect_entry(&search_entry);
+        // GtkSearchBar wraps its child in a revealer of its own and gives it
+        // GTK's default 250 ms slide, twice this app's own motion constant and
+        // a number nothing here chose. Measured over 90 runs, the placeholder
+        // is not legible for the first 62-68 ms after Ctrl+F and the proof
+        // cannot read it before 89-92 ms, against a 25 ms budget for opening
+        // the search (docs/decisions/014-competitive-targets.md, section 1).
+        // The bar is the answer to a keystroke, so it arrives with the frame
+        // that answers it.
+        if let Some(revealer) = search_bar.first_child().and_downcast::<gtk::Revealer>() {
+            revealer.set_transition_type(gtk::RevealerTransitionType::None);
+        }
 
         // The outline: an overlay over the document, given room as a sidebar
         // once the window is wide enough (SPEC.md, section 3).
