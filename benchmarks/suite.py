@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 
-from content import Capture, failure
+from content import Capture, Heartbeat, failure
 from memory import ISOLATION, PrivateBus, measure as memory_measure
 
 ROOT = Path(__file__).resolve().parent
@@ -95,12 +95,19 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
         finally:
             pointer.close()
     capture = Capture(options.connector) if proof else None
+    # Started before the baseline: without it the stream falls silent whenever
+    # the window stops moving, and every interval spanning that silence is
+    # wider than the resolution limit no matter how fast the viewer answered.
+    beat = Heartbeat(capture.bus).start() if capture else None
     application = None
     trace = artifact / 'wayland.log'
     try:
         if capture and action is None:
             # The launch is the stimulus, so the screen must be free of the
             # document first — the previous row's window may still be painted.
+            # The heartbeat brings the stream to its full cadence within about
+            # 200 ms, so half a second is again enough; it was raised to three
+            # only to outwait a ramp that the starved consumer was causing.
             time.sleep(.5)  # Keep a real pre-launch baseline; recognize only after termination.
         with isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
             env = dict(os.environ, WAYLAND_DEBUG='1', HASHLINE_BENCH_METADATA='1')
@@ -128,6 +135,8 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             marks = startup.parse(trace_text, started_ms, 150)
             metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', trace_text)
         if capture:
+            beat.stop()
+            capture.heartbeat = beat.record(capture.bounds)
             capture.close()
             if exited is not None:
                 result = failure('program-exited', f'Viewer exited before termination: {exited}', len(capture.frames))
@@ -151,6 +160,8 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
         return result
     finally:
         stop(application)
+        if beat:
+            beat.stop()
         if capture:
             capture.close()
 
@@ -217,6 +228,7 @@ def interaction(command, fixture, renderer, options, artifact):
     pointer = module('scroll-native').Pointer(options.connector)
     application = None
     capture = Capture(options.connector)
+    beat = Heartbeat(capture.bus).start()
     readings, evidence, pending = {}, {}, []
     trace = artifact / 'wayland.log'
     try:
@@ -285,6 +297,10 @@ def interaction(command, fixture, renderer, options, artifact):
             stop(application); application = None
             sink.seek(0)
             log = sink.read()
+        beat.stop()
+        capture.heartbeat = beat.record(capture.bounds)
+        for _, _, _, snapshot in pending:
+            snapshot.heartbeat = capture.heartbeat
         capture.close()
         for name, started, expected, snapshot in pending:
             if snapshot.bounds is not None and not snapshot.error:
@@ -306,6 +322,7 @@ def interaction(command, fixture, renderer, options, artifact):
                           (f'Viewer exited before termination: {exited}' if exited is not None else None),
                 'proofFailure': next((p['proofFailure'] for p in evidence.values() if p.get('proofFailure')), None),
                 'proofResolutionValid': all(p.get('proofResolutionValid', False) for p in evidence.values()),
+                'heartbeat': capture.heartbeat,
                 'longestTask': longest[-1][1] if longest else None,
                 'mainThreadTasks': [{'ms': float(ms), 'task': task} for ms, task in longest],
                 'evidence': evidence,
@@ -314,6 +331,7 @@ def interaction(command, fixture, renderer, options, artifact):
                 'metrics': metrics}
     finally:
         stop(application)
+        beat.stop()
         capture.close()
         pointer.close()
 

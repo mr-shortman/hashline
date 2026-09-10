@@ -9,6 +9,7 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
+import queue
 import shutil
 import subprocess
 import threading
@@ -93,6 +94,22 @@ def crop_ppm(ppm, bounds):
     return f'P6\n{w} {h}\n255\n'.encode() + data
 
 
+def blank_rect(rows, width, rect=None):
+    """Paint out the capture heartbeat so identical desktops hash identically.
+
+    The heartbeat changes every frame by design. Left in, it would make every
+    frame distinct and defeat storing frames by content. It sits outside every
+    target window, so removing it removes nothing the proof reads.
+    """
+    rect = rect or Heartbeat.RECT
+    x, w = rect['x'] * 3, rect['width'] * 3
+    if rect['x'] + rect['width'] > width:
+        return b''.join(rows)
+    for y in range(rect['y'], min(rect['y'] + rect['height'], len(rows))):
+        rows[y] = rows[y][:x] + b'\x00' * w + rows[y][x + w:]
+    return b''.join(rows)
+
+
 def failure(kind, reason, frames=0, status='missing'):
     return {'status': status, 'reason': reason, 'contentVerified': False,
             'proofFailure': {'kind': kind, 'capturedFrames': frames}, 'metrics': {}}
@@ -107,6 +124,108 @@ def failure(kind, reason, frames=0, status='missing'):
 # headroom is one further 60-Hz interval, not a relaxation of the target.
 MAX_PROOF_GAP_MS = 1000 / 30 + 1000 / 150
 PROTECTED_NS = 500_000_000
+
+# Frame work runs off the streaming thread: a mapped PipeWire buffer is one the
+# compositor cannot refill, so compressing while holding it starved the producer
+# and cost roughly two of every five frames. The callback now copies and
+# releases; these bound how far behind the compressors may fall before the
+# capture fails loudly rather than thinning out.
+COMPRESSORS = 2
+MAX_PENDING_FRAMES = 16
+
+# Sixty frames a second of an unchanging desktop is the same picture sixty
+# times. Frames are stored by content digest, so a still monitor costs one
+# copy however long it stands still, and only real change costs memory.
+CAPTURE_BUDGET_BYTES = 512 * 1024 * 1024
+
+
+class Heartbeat:
+    """A small actor outside the target window, repainted on every frame.
+
+    Mutter's ScreenCast stream is damage driven. A monitor on which nothing
+    moves delivers no frames at all — measured here as zero frames in four
+    idle seconds while the stage went on painting sixty times a second — so a
+    proof that waits for a still window cannot tell "the text was not there
+    yet" from "nothing was received". Every interval then reads as wide as the
+    stillness before it, however fast the viewer was.
+
+    The heartbeat keeps the stream at the compositor's capture rate. It is
+    deduplicated away by the window crop, so it never appears in the evidence,
+    and it must therefore stay outside the target window rectangle.
+    """
+    RECT = {'x': 4, 'y': 4, 'width': 16, 'height': 16}
+    START = """(() => {
+      const St = imports.gi.St, GLib = imports.gi.GLib;
+      if (global.__hashlineHeartbeat) return 'already-running';
+      const a = new St.Widget({x: RX, y: RY, width: RW, height: RH,
+                               style: 'background-color: #ff0000;'});
+      Main.layoutManager.uiGroup.add_child(a);
+      a.show();
+      global.__hashlineHeartbeat = a;
+      global.__hashlineHeartbeatTicks = 0;
+      // Faster than the frame clock, so every composited frame carries damage.
+      global.__hashlineHeartbeatSource = GLib.timeout_add(GLib.PRIORITY_HIGH, 8, () => {
+        global.__hashlineHeartbeatTicks++;
+        a.opacity = a.opacity === 255 ? 200 : 255;
+        return true;
+      });
+      return 'started';
+    })()"""
+    STOP = """(() => {
+      if (!global.__hashlineHeartbeat) return 0;
+      imports.gi.GLib.source_remove(global.__hashlineHeartbeatSource);
+      global.__hashlineHeartbeat.destroy();
+      global.__hashlineHeartbeat = null;
+      return global.__hashlineHeartbeatTicks;
+    })()"""
+
+    def __init__(self, bus=None):
+        self.bus = bus
+        self.state = 'not-started'
+        self.ticks = None
+        self.reason = None
+
+    def overlaps(self, bounds):
+        if not bounds:
+            return False
+        scale = bounds.get('scale', 1)
+        a, b = self.RECT, {k: bounds[k] * scale for k in ('x', 'y', 'width', 'height')}
+        return (a['x'] < b['x'] + b['width'] and b['x'] < a['x'] + a['width'] and
+                a['y'] < b['y'] + b['height'] and b['y'] < a['y'] + a['height'])
+
+    def start(self):
+        """Absence is recorded, never fatal: a run without Shell.Eval still measures."""
+        from session import shell_eval
+        code = self.START
+        for key, value in self.RECT.items():
+            code = code.replace('R' + key[0].upper(), str(value))
+        try:
+            self.state = shell_eval(code, self.bus)
+        except Exception as error:
+            self.state, self.reason = 'unavailable', str(error)
+        return self
+
+    def stop(self):
+        if self.state not in ('started', 'already-running'):
+            return
+        from session import shell_eval
+        try:
+            self.ticks = shell_eval(self.STOP, self.bus)
+        except Exception as error:
+            self.reason = str(error)
+        self.state = 'stopped'
+
+    def record(self, bounds=None):
+        return {'state': self.state, 'ticks': self.ticks, 'reason': self.reason, 'rect': self.RECT,
+                'overlapsWindow': self.overlaps(bounds),
+                'method': 'Shell actor outside the target window, repainted every frame, so the '
+                          'damage-driven ScreenCast stream keeps delivering while the window is still'}
+
+    def __enter__(self):
+        return self.start()
+
+    def __exit__(self, *exc):
+        self.stop()
 
 
 class Capture:
@@ -128,6 +247,13 @@ class Capture:
         self.last_hash = None
         self.bounds = None
         self.closed = False
+        self.pending = 0
+        self.store = {}
+        self.queue = queue.Queue()
+        self.compressors = [threading.Thread(target=self.compress, daemon=True)
+                            for _ in range(COMPRESSORS)]
+        for compressor in self.compressors:
+            compressor.start()
         self.loop = GLib.MainLoop()
         self.thread = threading.Thread(target=self.loop.run, daemon=True)
         self.thread.start()
@@ -165,6 +291,7 @@ class Capture:
             self.error = str(error)
 
     def new_frame(self, sink):
+        """Copy the buffer out and hand it on; never work while it is mapped."""
         sample = sink.emit('pull-sample')
         received = time.monotonic_ns()
         buffer = sample.get_buffer()
@@ -175,27 +302,84 @@ class Capture:
             self.error = 'Unreadable PipeWire buffer'
             return self.Gst.FlowReturn.ERROR
         try:
-            # RGB rows are padded to four-byte boundaries by GStreamer.
-            stride = (width * 3 + 3) & ~3
             data = bytes(mapped.data)
-            if len(data) != stride * height:
-                self.error = 'Unexpected RGB stride'
-                return self.Gst.FlowReturn.ERROR
-            # Keep incoming timestamps, including identical frames. Geometry is
-            # only known after mapping; window-only deduplication runs offline.
-            pixels = b''.join(data[y * stride:y * stride + width * 3] for y in range(height))
-            ppm = f'P6\n{width} {height}\n255\n'.encode() + pixels
-            packed = zlib.compress(ppm, 1)
-            with self.lock:
-                self.total_bytes += len(packed)
-                if self.total_bytes > 512 * 1024 * 1024:
-                    self.error = 'Capture exceeds 512 MiB; no frames silently dropped'
-                    return self.Gst.FlowReturn.ERROR
-                self.frames.append({'receivedMonotonicNs': received, 'ptsNs': buffer.pts,
-                                    'sha256': hashlib.sha256(ppm).hexdigest(), 'packed': packed})
         finally:
             buffer.unmap(mapped)
+        # Keep incoming timestamps, including identical frames. Geometry is
+        # only known after mapping; window-only deduplication runs offline.
+        record = {'receivedMonotonicNs': received, 'ptsNs': buffer.pts}
+        with self.lock:
+            if self.pending >= MAX_PENDING_FRAMES:
+                self.error = (f'Frame compression is more than {MAX_PENDING_FRAMES} frames behind; '
+                              'no frames silently dropped')
+                return self.Gst.FlowReturn.ERROR
+            self.pending += 1
+            self.frames.append(record)
+        self.queue.put((record, data, width, height))
         return self.Gst.FlowReturn.OK
+
+    def compress(self):
+        """Turn a copied buffer into a PPM the proof can read, off the hot path."""
+        while True:
+            item = self.queue.get()
+            try:
+                if item is None:
+                    return
+                record, data, width, height = item
+                try:
+                    # RGB rows are padded to four-byte boundaries by GStreamer.
+                    stride = (width * 3 + 3) & ~3
+                    if len(data) != stride * height:
+                        self.error = 'Unexpected RGB stride'
+                        continue
+                    rows = [data[y * stride:y * stride + width * 3] for y in range(height)]
+                    ppm = f'P6\n{width} {height}\n255\n'.encode() + blank_rect(rows, width)
+                    digest = hashlib.sha256(ppm).hexdigest()
+                except Exception as error:
+                    self.error = f'Frame compression failed: {error}'
+                    continue
+                with self.lock:
+                    packed = self.store.get(digest)
+                if packed is None:
+                    try:
+                        packed = zlib.compress(ppm, 1)
+                    except Exception as error:
+                        self.error = f'Frame compression failed: {error}'
+                        continue
+                with self.lock:
+                    if digest not in self.store:
+                        self.store[digest] = packed
+                        self.total_bytes += len(packed)
+                    if self.total_bytes > CAPTURE_BUDGET_BYTES:
+                        self.error = (f'Capture exceeds {CAPTURE_BUDGET_BYTES // (1024 * 1024)} MiB '
+                                      'of distinct frames; no frames silently dropped')
+                        continue
+                    record['sha256'] = digest
+                    record['packed'] = self.store[digest]
+            finally:
+                if item is not None:
+                    with self.lock:
+                        self.pending -= 1
+                self.queue.task_done()
+
+    def drain(self):
+        """Every accepted frame carries its pixels before anyone reads them.
+
+        Replays and unit fixtures build a capture without a live pipeline;
+        their frames arrive complete and there is nothing to wait for.
+        """
+        if not hasattr(self, 'queue'):
+            return
+        self.queue.join()
+        with self.lock:
+            # Frames still in flight arrived after the wait and will complete;
+            # incomplete ones with nothing in flight lost their pixels, which
+            # is an error about the capture, never a quietly shorter record.
+            unfinished = [f for f in self.frames if 'packed' not in f]
+            if unfinished and not self.pending:
+                self.frames = [f for f in self.frames if 'packed' in f]
+                if not self.error:
+                    self.error = f'{len(unfinished)} frames never reached the compressor'
 
     def close(self):
         if self.closed:
@@ -203,6 +387,11 @@ class Capture:
         self.closed = True
         if self.pipeline:
             self.pipeline.set_state(self.Gst.State.NULL)
+        self.drain()
+        for _ in self.compressors:
+            self.queue.put(None)
+        for compressor in self.compressors:
+            compressor.join(timeout=5)
         if self.session:
             try:
                 self.call(self.session, SCREENCAST + '.Session', 'Stop')
@@ -222,10 +411,12 @@ class Capture:
         """
         deadline = time.monotonic() + timeout
         while True:
+            self.drain()
             if self.error:
                 raise RuntimeError(self.error)
             with self.lock:
-                index, frame = len(self.frames) - 1, self.frames[-1]
+                complete = [f for f in self.frames if 'packed' in f]
+                index, frame = self.frames.index(complete[-1]), complete[-1]
             if not contains(ocr(zlib.decompress(frame['packed'])), expected):
                 with self.lock:
                     self.frames = self.frames[index:]
@@ -236,11 +427,13 @@ class Capture:
             time.sleep(.5)
 
     def snapshot(self):
+        self.drain()
         with self.lock:
             result = object.__new__(Capture)
-            result.frames = list(self.frames)
+            result.frames = [f for f in self.frames if 'packed' in f]
             result.error = self.error
             result.bounds = self.bounds
+            result.heartbeat = getattr(self, 'heartbeat', None)
             return result
 
     def archive(self, started_ns, expected, directory, persist=True):
@@ -285,6 +478,12 @@ class Capture:
         # unit tests and already-cropped replay captures carry no bounds member.
         if hasattr(self, 'bounds') and self.bounds is None:
             return failure('window-geometry-unavailable', 'Target window rectangle could not be verified', len(self.frames))
+        # The heartbeat is drawn above the windows. Over the target window it
+        # would be evidence instead of a metronome, so that capture is void.
+        if (getattr(self, 'heartbeat', None) or {}).get('overlapsWindow'):
+            return failure('heartbeat-over-window',
+                           'Capture heartbeat overlaps the target window; its frames are not evidence',
+                           len(self.frames))
         frames = self.archive(started_ns, expected, directory, persist)
         baseline = [record for record, _ in frames if record['delayMs'] < 0]
         if not baseline:
@@ -312,17 +511,30 @@ class Capture:
                   # Interaction archives first and recognizes later, so the
                   # manifest may exist even here; a replay writes none at all.
                   'captureManifest': str(directory / 'capture.json') if (directory / 'capture.json').is_file() else None,
+                  'heartbeat': getattr(self, 'heartbeat', None),
                   'method': 'Mutter ScreenCast receipt timestamps; target-window crop; offline OCR psm 6 then 11. Receipt bounds include capture latency and are not presentation timestamps.',
                   'evidence': str(directory / 'first-readable.ppm') if first else str(directory / 'last-frame.ppm')}
         if first:
-            lower = (last_negative.get('lastReceivedMonotonicNs', last_negative['receivedMonotonicNs']) - started_ns) / 1e6
+            observed = (last_negative.get('lastReceivedMonotonicNs', last_negative['receivedMonotonicNs']) - started_ns) / 1e6
+            # An effect cannot precede its stimulus: the document text is on
+            # screen because the file changed or the viewer started, so the
+            # earliest moment it can be readable is the stimulus itself. A
+            # baseline frame older than that bounds nothing further, and the
+            # stream falls silent before every stimulus that follows an
+            # animation, because a still monitor produces no frames at all.
+            lower = max(observed, 0.0)
             gap = first['delayMs'] - lower
             result.update(readableLowerMs=lower, readableUpperMs=first['delayMs'], proofGapMs=gap,
+                          lastNegativeFrameMs=observed,
                           lastWithoutText=last_negative, firstWithText=first, ocrPsm=first['ocrPsm'],
                           proofResolutionValid=gap <= MAX_PROOF_GAP_MS,
                           maximumProofGapMs=MAX_PROOF_GAP_MS)
             if gap > MAX_PROOF_GAP_MS:
-                result.update(status='diagnostic', reason=f'Proof interval is {gap:.2f} ms; exceeds {MAX_PROOF_GAP_MS:.2f} ms resolution limit')
+                beat = getattr(self, 'heartbeat', None)
+                blind = '' if beat and beat.get('state') == 'stopped' else \
+                    '; no capture heartbeat ran, so a still window delivered no frames'
+                result.update(status='diagnostic',
+                              reason=f'Proof interval is {gap:.2f} ms; exceeds {MAX_PROOF_GAP_MS:.2f} ms resolution limit' + blind)
         else:
             (directory / 'last-frame.ppm').write_bytes(pixels)
             (directory / 'last-frame.txt').write_text(text)

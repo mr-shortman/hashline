@@ -226,6 +226,30 @@ Bild vor dem Reiz den gesuchten Text, ist der Lauf ungültig statt schnell. Die
 Erkennung läuft vor dem Start und nach dem Beenden der Anwendung, nie
 währenddessen, und kann die Messung deshalb nicht ausbremsen.
 
+Der Bildstrom ist schadensgesteuert: ein Monitor, auf dem sich nichts bewegt,
+liefert überhaupt keine Bilder — gemessen null Bilder in vier ruhigen Sekunden,
+während die Bühne weiter sechzigmal je Sekunde zeichnete. Ein Nachweis, dessen
+Reiz auf ein stillstehendes Fenster trifft, könnte deshalb nicht unterscheiden,
+ob der Text noch fehlte oder ob nur nichts ankam, und jedes Intervall wäre so
+breit wie die Stille davor. Während einer Aufnahme läuft darum ein Herzschlag:
+ein 16 × 16 Pixel großes Feld außerhalb des Zielfensters, das jedes Bild neu
+gezeichnet wird. Es hält den Strom auf voller Aufnahmerate, wird vom
+Fensterausschnitt weggeschnitten und aus dem gespeicherten Bild entfernt, damit
+gleiche Schreibtische gleich bleiben. Ohne `Shell.Eval` — also außerhalb der
+eigenen Sitzung — läuft er nicht; die Aufnahme hält das im Nachweis fest, statt
+das Fehlen zu verschweigen.
+
+Die Untergrenze des Intervalls ist nie älter als der Reiz. Der Text steht auf
+dem Schirm, **weil** die Datei sich geändert hat oder der Betrachter gestartet
+wurde; früher als sein Auslöser kann er nicht sichtbar sein. Ein älteres
+Grundbild begrenzt darum nichts weiter.
+
+Die Einzelbilder werden außerhalb des Aufnahmefadens verarbeitet. Ein
+eingeblendeter PipeWire-Puffer ist einer, den der Compositor nicht nachfüllen
+kann; wer darin komprimiert, hungert den Erzeuger aus und verliert etwa zwei von
+fünf Bildern. Der Rückruf kopiert und gibt frei, das Packen läuft nebenläufig,
+und gleiche Bilder werden über ihre Prüfsumme nur einmal abgelegt.
+
 Die OCR ist auf einen genauen Paketstand festgelegt und wird nicht ins System
 installiert:
 

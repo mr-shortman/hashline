@@ -222,7 +222,26 @@ class Proof(unittest.TestCase):
             result = capture.proof(0, ['expected'], Path(temp))
             self.assertEqual(result['status'], 'diagnostic')
             self.assertFalse(result['proofResolutionValid'])
-            self.assertEqual(result['proofGapMs'], 400)
+            # The interval starts at the stimulus, never at an older baseline.
+            self.assertEqual(result['proofGapMs'], 390)
+            self.assertEqual(result['readableLowerMs'], 0)
+            self.assertEqual(result['lastNegativeFrameMs'], -10)
+
+    def test_baseline_older_than_the_stimulus_does_not_widen_the_interval(self):
+        """A still window sends no frames, so the last one can be long past."""
+        capture = self.capture([(-500, b'blank'), (17, b'expected')])
+        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda p, psm=6: p.decode()):
+            result = capture.proof(0, ['expected'], Path(temp))
+            self.assertEqual(result['status'], 'ok')
+            self.assertTrue(result['proofResolutionValid'])
+            self.assertEqual(result['proofGapMs'], 17)
+
+    def test_baseline_after_the_stimulus_still_bounds_the_interval(self):
+        capture = self.capture([(-500, b'blank'), (200, b'blank'), (217, b'expected')])
+        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda p, psm=6: p.decode()):
+            result = capture.proof(0, ['expected'], Path(temp))
+            self.assertEqual(result['readableLowerMs'], 200)
+            self.assertEqual(result['proofGapMs'], 17)
 
     def test_dedup_and_ocr_use_only_window_pixels(self):
         # Outside-window changes cannot generate extra OCR or accepted words.
