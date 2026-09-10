@@ -8,12 +8,17 @@
 //! reader times the work it does on the main thread itself and reports the
 //! longest of it.
 //!
-//! Timed are the five places where the application does work on that thread:
+//! Timed are the six places where the application does work on that thread:
 //! laying out the blocks that came into view, filling the buffer around them,
-//! drawing, being given a new size, and taking on a parsed document. The parse
-//! and the file read are not here because they are not on this thread. Reading
-//! the clock twice costs tens of nanoseconds against work measured in
-//! milliseconds, so it is not conditional; only the reporting is.
+//! loading one of the style's faces before a document needs it, drawing, being
+//! given a new size, and taking on a parsed document. The parse and the file
+//! read are not here because they are not on this thread. Reading the clock
+//! twice costs tens of nanoseconds against work measured in milliseconds, so
+//! it is not conditional; only the reporting is.
+//!
+//! Six places, not five, because every one of them has to be here for the
+//! longest of them to mean anything: work moved out of a timed block into an
+//! untimed one would lower the number without making a frame arrive sooner.
 //!
 //! With `HASHLINE_BENCH_MAIN_THREAD` set, the report goes to stderr as it
 //! happens rather than at exit, because the measurement harness stops the

@@ -16,7 +16,8 @@ mod textmap;
 
 pub use offsets::Offsets;
 pub use text::{
-    code_language, set_block, BlockLayout, Decoration, ImageSource, Link, NoImages, Piece, Style,
+    code_language, faces, load_face, set_block, BlockLayout, Decoration, Face, ImageSource, Link,
+    NoImages, Piece, Style,
 };
 pub use textmap::TextMap;
 

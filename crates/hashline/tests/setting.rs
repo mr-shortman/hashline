@@ -492,3 +492,65 @@ fn setting_one_part_of_a_huge_code_block_is_not_setting_the_block() {
     // orders of magnitude below the freeze this replaces.
     assert!(elapsed.as_millis() < 500, "three parts took {elapsed:?}");
 }
+
+/// Every face a set block asks Pango for is one the warm-up asks for too.
+///
+/// This is the drift the startup budget depends on: a type style added to
+/// `set_block` and not to `faces` is a face the frame that shows the first
+/// screen has to instantiate itself, and one face is 1.4 to 2.6 ms of a 16 ms
+/// frame (docs/decisions/014-competitive-targets.md, section 3.3).
+///
+/// Both sides are collected the same way — the faces Pango reports having
+/// used, not the descriptions it was handed — because a description names one
+/// face and shaping can reach several: the list markers alone pull in a
+/// fallback that the body font does not cover.
+///
+/// The source is Latin so that no fallback for another script appears; those
+/// are deliberately not warmed.
+#[test]
+fn the_warm_list_covers_every_face_a_block_is_set_in() {
+    let source = "# Titel\n\n## Abschnitt\n\n### Unterabschnitt\n\n#### Vierte\n\n\
+##### Fuenfte\n\n###### Sechste\n\n\
+Ein *kursiver* und ein **fetter** Absatz mit `code` und einem [Link](a.md).\n\n\
+> Ein Zitat mit **Nachdruck**.\n\n\
+- eins\n- zwei\n  - drei\n\n\
+1. erstens\n2. zweitens\n\n\
+- [ ] offen\n- [x] erledigt\n\n\
+| Name | Wert |\n| --- | --- |\n| Beispiel | 1 |\n\n\
+```rust\nfn main() {}\n```\n\n---\n";
+    let (document, plan) = parse_plan(source);
+    let context = context();
+    let style = style();
+
+    fn used_in(layout: &pango::Layout, into: &mut std::collections::BTreeSet<String>) {
+        for line in layout.lines() {
+            for run in line.runs() {
+                into.insert(run.item().analysis().font().describe().to_string());
+            }
+        }
+    }
+
+    let mut warmed = std::collections::BTreeSet::new();
+    for face in hashline::layout::faces(&style) {
+        let layout = pango::Layout::new(&context);
+        layout.set_text(face.sample);
+        layout.set_font_description(Some(&face.font));
+        used_in(&layout, &mut warmed);
+    }
+
+    let mut used = std::collections::BTreeSet::new();
+    for index in 0..plan.len() {
+        let block = *plan.block(index);
+        let set = set_block(&context, &document, &block, &style, 640.0, &NoImages);
+        for piece in &set.pieces {
+            used_in(&piece.layout, &mut used);
+        }
+    }
+
+    assert!(!used.is_empty(), "no block was set in any face");
+    let missing: Vec<&String> = used.difference(&warmed).collect();
+    assert!(
+        missing.is_empty(),
+        "set in faces the warm-up does not reach: {missing:?}\nwarmed: {warmed:?}"
+    );
+}

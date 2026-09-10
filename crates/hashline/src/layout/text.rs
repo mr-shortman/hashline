@@ -598,6 +598,102 @@ pub fn code_language(document: &OpDocument, block: &Block) -> String {
     String::new()
 }
 
+/// A face of the type scale and the sample that instantiates it. The sample
+/// matters because a face is only half of what setting text needs: the
+/// characters decide which fallback faces are loaded with it.
+pub struct Face {
+    pub font: pango::FontDescription,
+    pub sample: &'static str,
+}
+
+/// Latin, and nothing else. A document in another script pays for its own
+/// fallback face when its first block is set; warming every script a fallback
+/// chain could reach is not bounded.
+const SAMPLE: &str = "Handgloves";
+
+/// The same, plus the characters the set puts on screen itself and no document
+/// contains: the three list markers and the two task boxes, exactly as
+/// `marker_for` writes them. A body font that covers none of the boxes — most
+/// do not — needs a fallback face for them, and without them in the sample it
+/// would be loaded inside the frame that draws the first list.
+const MARKER_SAMPLE: &str = "Handgloves \u{2022}\u{25e6}\u{25aa}\u{2610}\u{2611}";
+
+/// Every face the document set can ask for, in the order a document is most
+/// likely to want them: body text before headings, headings before the table
+/// and caption sizes that many documents never reach.
+///
+/// The list is the type scale read back as font descriptions, so it cannot
+/// drift from what `set_block` asks for without the scale itself changing.
+/// That it does not drift is checked in `tests/setting.rs`, against the faces
+/// Pango reports having actually used.
+pub fn faces(style: &Style) -> Vec<Face> {
+    let weighted = |em: f64, weight: pango::Weight| {
+        let mut font = style.sized(em, false);
+        font.set_weight(weight);
+        font
+    };
+    let at_px = |px: f64| {
+        let mut font = style.body.clone();
+        font.set_absolute_size(px * pango::SCALE as f64);
+        font
+    };
+    let italic = {
+        let mut font = style.sized(1.0, false);
+        font.set_style(pango::Style::Italic);
+        font
+    };
+
+    // Body text, its emphasis and the code faces first — what the first
+    // screen of almost every document is set in — then the headings, then the
+    // sizes many documents never reach. Body text is also what a list marker
+    // is set in, so it is the one face whose sample carries them.
+    let mut latin = vec![
+        weighted(1.0, pango::Weight::Bold),
+        style.sized(document::INLINE_CODE_EM, true),
+        // The copy control on a code block, at a fixed 11 px like the
+        // reference.
+        at_px(11.0),
+        italic,
+    ];
+    let heading = pango::Weight::__Unknown(document::HEADING_WEIGHT);
+    latin.extend(document::HEADING_SCALE.map(|em| weighted(em, heading)));
+    latin.push(style.sized(document::TABLE_EM, false));
+    latin.push(weighted(document::TABLE_EM, pango::Weight::Semibold));
+    // An image's caption.
+    latin.push(at_px(style.body_px * 0.8));
+
+    let mut wanted = vec![(style.sized(1.0, false), MARKER_SAMPLE)];
+    wanted.extend(latin.into_iter().map(|font| (font, SAMPLE)));
+
+    // The scale repeats itself — the fifth and sixth heading levels are the
+    // same — and a face loaded twice is a slice spent on nothing.
+    let mut faces: Vec<Face> = Vec::with_capacity(wanted.len());
+    for (font, sample) in wanted {
+        if !faces.iter().any(|face| face.font == font) {
+            faces.push(Face { font, sample });
+        }
+    }
+    faces
+}
+
+/// Instantiates one face, which is what the first block set in it would
+/// otherwise pay for: the fontconfig match, the font file, and the scaled font
+/// at this exact size. Measured at 1.4 to 2.6 ms per face against 2181
+/// installed font files, and spent once per process
+/// (docs/decisions/014-competitive-targets.md, section 3.3).
+///
+/// A document in another script still pays for its own fallback face when its
+/// first block is set: the fixtures' first paragraph ends in Japanese, and
+/// loading a face for that is most of the 6 ms the frame still costs.
+pub fn load_face(context: &pango::Context, face: &Face) {
+    let layout = pango::Layout::new(context);
+    layout.set_text(face.sample);
+    layout.set_font_description(Some(&face.font));
+    // The extents are what forces the shaper, and with it the scaled font,
+    // into existence. Setting the text alone would leave the cost unpaid.
+    let _ = layout.pixel_extents();
+}
+
 /// Sets one block. `width` is the reading column in logical pixels.
 pub fn set_block(
     context: &pango::Context,

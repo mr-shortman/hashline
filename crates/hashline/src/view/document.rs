@@ -63,6 +63,12 @@ pub(crate) struct State {
     adjusting: bool,
     /// Whether a pass over the buffer around the viewport is already pending.
     buffering: bool,
+    /// Faces of the current style that nothing has been set in yet, in the
+    /// order a document is most likely to need them. Drained between the
+    /// document arriving and the frame that shows it; see `schedule_warm`.
+    warm: std::collections::VecDeque<crate::layout::Face>,
+    /// Whether a warming slice is already pending.
+    warming: bool,
 }
 
 /// The handler a clicked link is passed to.
@@ -111,6 +117,8 @@ impl State {
             on_link: None,
             adjusting: false,
             buffering: false,
+            warm: std::collections::VecDeque::new(),
+            warming: false,
         }
     }
     fn body_px(&self) -> f64 {
@@ -254,6 +262,15 @@ mod imp {
     }
 
     impl WidgetImpl for DocumentView {
+        fn realize(&self) {
+            self.parent_realize();
+            // Only now is the style settled: the family comes from GTK's
+            // settings and the context's resolution from the display. This
+            // fills the list of faces to load; nothing is loaded until there
+            // is a document to show.
+            self.obj().rebuild_style();
+        }
+
         fn measure(&self, orientation: gtk::Orientation, _for_size: i32) -> (i32, i32, i32, i32) {
             // The widget is the viewport, never the document: it asks for a
             // readable minimum and takes whatever it is given.
@@ -421,6 +438,9 @@ impl DocumentView {
         if let Some(adjustment) = self.vadjustment() {
             adjustment.set_value(0.0);
         }
+        // There is something to show now, so the faces it will be shown in
+        // are worth loading before the frame that shows it.
+        self.schedule_warm();
         self.queue_draw();
     }
 
@@ -482,12 +502,19 @@ impl DocumentView {
     }
 
     fn rebuild_style(&self) {
-        let mut state = self.imp().state.borrow_mut();
-        let (body, mono) = font_families();
-        let body_px = state.body_px();
-        state.style = Style::new(&body, &mono, body_px, state.palette);
-        state.cache.clear();
-        state.recent.clear();
+        {
+            let mut state = self.imp().state.borrow_mut();
+            let (body, mono) = font_families();
+            let body_px = state.body_px();
+            state.style = Style::new(&body, &mono, body_px, state.palette);
+            state.cache.clear();
+            state.recent.clear();
+            // A new family or a new zoom means new faces at new sizes, and
+            // every cached block has just been dropped, so the whole screen is
+            // about to be set again.
+            state.warm = crate::layout::faces(&state.style).into();
+        }
+        self.schedule_warm();
     }
 
     /// The reading column: 76 characters of the body font, centred, never a
@@ -564,6 +591,11 @@ impl DocumentView {
     /// in the frame that jumped there cost 22 ms on the 10 MiB fixture against
     /// a 16 ms budget, so only the screen that is actually shown is set here
     /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    ///
+    /// One screen still cost 21 ms at startup, and almost none of it was the
+    /// document: it was the faces the screen's first block in each type style
+    /// had to instantiate. `schedule_warm` has them loaded by the time this
+    /// runs, which leaves 6 ms.
     fn measure_visible(&self, height: f64) {
         let top = self.scroll_top();
         let onscreen = {
@@ -601,6 +633,78 @@ impl DocumentView {
                 }
             }
         ));
+    }
+
+    /// Loads the faces of the current style, one per slice, in the gap between
+    /// a document arriving and the frame that shows it.
+    ///
+    /// Setting the first block in a face costs the fontconfig match, the font
+    /// file and the scaled font at that size, and on the startup screen of
+    /// every fixture that came to 21 ms in one task: five faces, and the same
+    /// five whether the document is 100 KiB or 10 MiB, because a screen holds
+    /// about the same handful of type styles either way. Once the faces exist,
+    /// setting a block costs 0.03 ms
+    /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    ///
+    /// The gap is real time, not a rearrangement of the metric: a parsed
+    /// document reaches the main thread ten to eighty milliseconds before the
+    /// compositor asks for the frame that shows it, and until now the reader
+    /// spent that gap idle and then did all the font work inside the frame.
+    /// The frame that shows the first text arrives sooner for it, which is the
+    /// only reason moving the work is worth anything. The longest task of a
+    /// startup fell from 22 to 7 ms for it, and the whole screen is still set
+    /// in one pass.
+    ///
+    /// The chain stops when the list is empty rather than rescheduling, so a
+    /// reader at rest has no idle source of its own (SPEC.md, section 10).
+    fn schedule_warm(&self) {
+        {
+            let state = self.imp().state.borrow();
+            if state.warming || state.warm.is_empty() {
+                return;
+            }
+            // Not before the widget is realized: a face matched against a
+            // context whose resolution is not settled would have to be
+            // matched again. And not before there is a document, which is the
+            // later of the two and the one that matters — GTK loads the font
+            // configuration on a thread of its own at startup, and a face
+            // asked for while that is still running costs up to 14 ms of
+            // waiting for that thread rather than any work of the reader's.
+            // By the time a parsed document arrives it has long finished.
+            if !self.is_realized() || state.plan.is_empty() {
+                return;
+            }
+        }
+        self.imp().state.borrow_mut().warming = true;
+        // Above the frame clock, which is the whole point: an idle at the
+        // default priority is not dispatched at all while a frame is pending,
+        // and a face loaded after the frame that needed it has saved nothing.
+        // Still below the default priority, so a parsed document, an input
+        // event or a Wayland message is never held up by more than the one
+        // face being loaded.
+        glib::idle_add_local_full(
+            glib::Priority::HIGH_IDLE,
+            glib::clone!(
+                #[weak(rename_to = view)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    view.imp().state.borrow_mut().warming = false;
+                    super::mainthread::timed("warm-type", || view.warm_type());
+                    view.schedule_warm();
+                    glib::ControlFlow::Break
+                }
+            ),
+        );
+    }
+
+    /// Loads the next face.
+    fn warm_type(&self) {
+        let Some(face) = self.imp().state.borrow_mut().warm.pop_front() else {
+            return;
+        };
+        crate::layout::load_face(&self.pango_context(), &face);
     }
 
     /// Sets every block of `range` that is not set yet, stopping after `budget`
