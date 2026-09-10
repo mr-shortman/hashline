@@ -24,6 +24,12 @@ def main():
     parser.add_argument('--seconds', type=float, default=12.0)
     parser.add_argument('--output-prefix', type=Path, required=True)
     args = parser.parse_args()
+    from storage import require_local_output
+    if args.output_prefix is not None:
+        try:
+            require_local_output(args.output_prefix)
+        except ValueError as error:
+            parser.error(str(error))
     prefix = args.output_prefix
     state_file = Path(str(prefix) + '-display.json')
     capture_file = Path(str(prefix) + '.syscap')

@@ -3,7 +3,8 @@
 
 def current_mode(connector=None):
     from gi.repository import Gio
-    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    from session import connection
+    bus = connection()
     state = bus.call_sync('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig',
                          'org.gnome.Mutter.DisplayConfig', 'GetCurrentState', None, None,
                          Gio.DBusCallFlags.NONE, 10000, None).unpack()

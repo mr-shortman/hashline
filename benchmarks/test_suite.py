@@ -142,19 +142,19 @@ class ContentProof(unittest.TestCase):
 
     def test_leftover_window_is_dropped_from_the_baseline(self):
         capture = self.capture([(1, 'Lesbarer Text mit'), (2, 'wallpaper')])
-        with patch('content.ocr', side_effect=lambda data: data.decode()):
+        with patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             self.assertEqual(capture.clear(['Lesbarer Text mit'])['receivedMonotonicNs'], 2)
             self.assertEqual(len(capture.frames), 1)
 
     def test_screen_that_never_clears_is_an_error(self):
         capture = self.capture([(1, 'Lesbarer Text mit')])
-        with patch('content.ocr', side_effect=lambda data: data.decode()):
+        with patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             with self.assertRaisesRegex(RuntimeError, 'still on screen'):
                 capture.clear(['Lesbarer Text mit'], timeout=.01)
 
     def test_empty_frame_never_counts(self):
         capture = self.capture([(1, 'wallpaper'), (20, 'window title'), (30, 'Lesbarer Text mit Hervorhebung')])
-        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data: data.decode()):
+        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             result = capture.proof(10, ['Lesbarer Text mit'], Path(temp))
             self.assertTrue(result['contentVerified'])
             self.assertEqual(result['readableUpperMs'], 20 / 1e6)
@@ -162,13 +162,13 @@ class ContentProof(unittest.TestCase):
 
     def test_preexisting_text_invalidates(self):
         capture = self.capture([(1, 'Lesbarer Text mit'), (30, 'Lesbarer Text mit')])
-        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data: data.decode()):
+        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             with self.assertRaisesRegex(RuntimeError, 'already visible'):
                 capture.proof(10, ['Lesbarer Text mit'], Path(temp))
 
     def test_timeout_is_missing(self):
         capture = self.capture([(1, 'wallpaper'), (20, 'empty window')])
-        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data: data.decode()):
+        with tempfile.TemporaryDirectory() as temp, patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             result = capture.proof(10, ['document body'], Path(temp))
             self.assertEqual(result['status'], 'missing')
             self.assertNotIn('readableUpperMs', result)

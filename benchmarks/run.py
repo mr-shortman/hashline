@@ -10,16 +10,21 @@ from pathlib import Path
 import statistics
 import subprocess
 import sys
+import time
+import signal
+
+from timing import Estimates, duration, human, identity, row_identity, utcnow, watchdog
+from storage import RUNS, RESULTS, locked, resolve_run
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from content import engine
 from fixtures import MANIFEST, ensure
 from provision import LOCAL, catalog, locate, provision, tool
-from suite import measure
 
-GROUPS = ('stages', 'startup', 'content', 'memory', 'idle', 'scroll', 'interaction', 'tabs', 'reload', 'stability')
-INTERNAL = {'stages', 'interaction', 'stability'}
+GROUPS = ('stages', 'startup', 'content', 'memory', 'idle', 'scroll', 'interaction', 'tabs', 'reload', 'stability', 'mainthread')
+INTERNAL = {'stages', 'interaction', 'stability', 'mainthread'}
+SCREEN_GROUPS = {'content', 'interaction', 'tabs', 'reload', 'scroll'}
 SIZE = {'small': 0, 'medium': 1, 'large': 2}
 # Repetitions an acceptance needs. A p95 needs a long series; the idle target is
 # a single continuous 30-second window, and repeating it thirty times only
@@ -39,7 +44,7 @@ BUDGETS = {
     'idleCpuPercent': ('idle', '<', .3, 'max'),
     'scrollWithinPercent': ('scroll', '>=', 99, 'min'),
     'scrollMaxGapMs': ('scroll', '<=', 33, 'max'),
-    'mainThreadMaxMs': ('interaction', '<=', 16, 'max'),
+    'mainThreadMaxMs': ('interaction/mainthread', '<=', 16, 'max'),
     'searchLargeMs': ('interaction', '<=', 120, 'p95'),
     'searchOpenUpperMs': ('interaction', '<=', 25, 'p95'),
     'menuOpenMs': ('interaction', '<=', 25, 'p95'),
@@ -158,6 +163,10 @@ def summarize(rows, repetitions):
                 limit = 3 * (ROOT / 'generated' / (fixture + '.md')).stat().st_size / 1048576
             value = metrics.get(name, {}).get(statistic)
             known = value is not None and limit is not None and complete and metrics[name]['n'] == expected
+            if any(r.get('sessionKind') == 'nested-headless' for r in samples) and name in ('scrollWithinPercent', 'scrollMaxGapMs', 'presentedMs'):
+                known = False
+            if group in SCREEN_GROUPS and any(r.get('proofResolutionValid') is False for r in samples):
+                known = False
             passed = known and {'<=': lambda: value <= limit, '<': lambda: value < limit,
                                '>=': lambda: value >= limit, '==': lambda: value == limit}[operator]()
             budgets.append({'metric': name, 'operator': operator, 'limit': limit,
@@ -199,6 +208,9 @@ def report(output):
     counted = '; '.join(f'{group} n={n}' for group, n in sorted(output['repetitions'].items()))
     lines = ['# Hashline benchmark report', '', f"Mode: {output['mode']}; {counted}; acceptance: **{str(output['acceptance']).lower()}**.",
              '', 'Times with content proof are conservative ScreenCast receipt bounds. Missing, unsupported and diagnostic results never pass budgets.', '']
+    if output.get('progress'):
+        progress = output['progress']
+        lines += [f"Progress: {progress['done']}/{progress['total']}; remaining ~{human(progress['estimatedRemainingSeconds'])}; session: {output.get('conditions', {}).get('sessionKind', 'unknown')}; stoppedBy: {output.get('stoppedBy', '—')}.", '']
     for role, title in [('self', 'Hashline'), ('peer', 'Competitors'), ('reference', 'Okular — separate reference')]:
         cells = [cell for cell in output['summary'] if output['viewers'][cell['viewer']]['role'] == role]
         if not cells:
@@ -218,8 +230,17 @@ def report(output):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ('promote', 'list', 'prune', 'check-results'):
+        from storage import cli
+        return cli(sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['bench', 'compare'])
+    parser.add_argument('mode', choices=['bench', 'compare'], nargs='?', default='bench')
+    parser.add_argument('--resume', help='Resume a local run by name or path, keeping its matrix and conditions')
+    parser.add_argument('--time-budget', type=duration, help='Stop at a complete pass boundary, e.g. 60m')
+    parser.add_argument('--watchdog-factor', type=float, default=6, help='Maximum measurement duration as a multiple of its estimate')
+    parser.add_argument('--session', choices=['bare-metal', 'nested-headless'], default='bare-metal')
+    parser.add_argument('--resolution', default='1920x1080', help='Fixed nested display resolution')
+    parser.add_argument('--quiet-seconds', type=float, default=5, help='Preflight idle interval for physical desktop evidence')
     parser.add_argument('--only')
     parser.add_argument('--fixtures')
     parser.add_argument('--viewers')
@@ -239,6 +260,42 @@ def main():
     parser.add_argument('--idle-repetitions', type=int, help='Repetitions of the idle window (default 5)')
     parser.add_argument('--plan', action='store_true', help='Write the selected matrix without opening viewers')
     args = parser.parse_args()
+    previous = None
+    if args.resume:
+        if args.plan or args.out or args.provision:
+            parser.error('--resume cannot be combined with --plan, --out or --provision')
+        # Selection and measurement options must not silently alter an old matrix.
+        immutable = {'--only', '--fixtures', '--viewers', '--renderers', '--repetitions', '--quick',
+                     '--binary', '--connector', '--refresh-hz', '--hold', '--settle', '--sample-seconds',
+                     '--idle-seconds', '--idle-repetitions', '--session', '--resolution', '--quiet-seconds'}
+        if any(arg.split('=')[0] in immutable for arg in sys.argv[1:]):
+            parser.error('--resume preserves selection, binaries and conditions; omit matrix overrides')
+        try:
+            args.out = resolve_run(args.resume)
+            previous = json.loads((args.out / 'report.json').read_text())
+            if previous.get('plan'):
+                parser.error('A plan is not a measured run; start a new run')
+            saved = previous.get('invocation')
+            if saved:
+                for key, value in saved.items():
+                    setattr(args, key, Path(value) if key == 'binary' else value)
+            else:
+                args.mode = previous['mode']
+                if previous['viewers'].get('hashline', {}).get('binary'):
+                    args.binary = Path(previous['viewers']['hashline']['binary'])
+                args.only = ','.join(previous['repetitions'])
+                args.fixtures = ','.join(dict.fromkeys(r['fixture'] for r in previous['rows']))
+                args.viewers = ','.join(previous['viewers'])
+                args.renderers = ','.join(dict.fromkeys(r['renderer'] for r in previous['rows'] if r['viewer'] == 'hashline')) or 'cairo'
+                args.repetitions = ','.join(f'{g}={n}' for g, n in previous['repetitions'].items())
+                args.quick = previous.get('quick', False)
+                conditions = previous['conditions']
+                for option, field in [('hold', 'holdSeconds'), ('settle', 'settleSeconds'), ('sample_seconds', 'sampleSeconds'),
+                                      ('idle_seconds', 'idleSeconds'), ('connector', 'connector'), ('refresh_hz', 'requestedRefreshHz')]:
+                    if field in conditions:
+                        setattr(args, option, conditions[field])
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
     configuration = catalog()
     catalog_viewers = configuration['viewers']
     catalog_viewers['hashline'] = {'name': 'Hashline', 'role': 'self', 'version': 'workspace',
@@ -264,12 +321,16 @@ def main():
         parser.error(str(error))
     if args.refresh_hz is not None and (not math.isfinite(args.refresh_hz) or args.refresh_hz <= 0):
         parser.error('--refresh-hz must be a finite positive number')
-    if min(args.hold, args.settle, args.sample_seconds, args.idle_seconds) <= 0:
+    if any(not math.isfinite(v) or v <= 0 for v in (args.hold, args.settle, args.sample_seconds, args.idle_seconds, args.watchdog_factor, args.quiet_seconds)):
         parser.error('Durations must be positive')
-    out = (args.out or ROOT / 'results' / ('local-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))).resolve()
+    out = (args.out or RUNS / datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')).resolve()
+    if out.is_relative_to(RESULTS.resolve()):
+        parser.error('Measurements are local; only promote writes benchmarks/results')
     out.mkdir(parents=True, exist_ok=True)
-    if (out / 'report.json').exists():
+    if (out / 'report.json').exists() and not previous:
         parser.error('Output exists; choose a new directory')
+    if args.idle_repetitions < 1:
+        parser.error('--idle-repetitions must be positive')
     if args.plan and args.provision:
         parser.error('--plan cannot provision programs')
     ensure(ROOT / 'generated')
@@ -301,7 +362,7 @@ def main():
                 spec['versionVerified'] = installed(spec)
         specs[name] = spec
         matrix_viewers.extend((name, renderer) for renderer in (renderers if name == 'hashline' else ['native']))
-    output = {'schemaVersion': 1, 'mode': args.mode, 'repetitions': repetitions, 'quick': args.quick,
+    output = {'schemaVersion': 2, 'mode': args.mode, 'repetitions': repetitions, 'quick': args.quick,
               'acceptance': False, 'completed': False, 'viewers': specs, 'provisioning': provisioning,
               'fixtureManifestSha256': hashlib.sha256(MANIFEST.read_bytes()).hexdigest(),
               'budgetDefinitions': BUDGETS, 'rows': [], 'summary': [],
@@ -315,80 +376,202 @@ def main():
               'git': subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT.parent, capture_output=True, text=True).stdout.strip(),
               'workingTree': subprocess.run(['git', 'status', '--porcelain'], cwd=ROOT.parent, capture_output=True, text=True).stdout,
               'plan': args.plan}
+    matrix = list(schedule(matrix_viewers, groups, names, repetitions, refresh_hz=args.refresh_hz))
+    output['matrix'] = matrix
+    output['invocation'] = {key: str(value) if isinstance(value, Path) else value
+                            for key, value in vars(args).items()
+                            if key not in ('resume', 'out', 'time_budget', 'watchdog_factor', 'plan', 'provision')}
+    output['createdAt'] = utcnow()
     if not args.plan and args.binary.is_file():
         from environment import environment
         output['environment'] = environment(args.binary)
-    def save():
+    if previous:
+        if previous['fixtureManifestSha256'] != output['fixtureManifestSha256']:
+            parser.error('Fixture manifest changed since original run')
+        for name, spec in specs.items():
+            if spec['binarySha256'] != previous['viewers'][name]['binarySha256']:
+                parser.error(f'Executable changed since original run: {name}')
+        if previous.get('matrix') and previous['matrix'] != json.loads(json.dumps(matrix)):
+            parser.error('Resume matrix differs from original run')
+        output.update(previous)
+        output.update(matrix=matrix, completed=False, schemaVersion=2)
+        output.pop('stoppedBy', None)
+        output.pop('interrupted', None)
+    estimates = Estimates()
+    done = {row_identity(row) for row in output['rows']}
+    if len(done) != len(output['rows']) or not done <= {identity(item) for item in matrix}:
+        parser.error('Existing rows are duplicated or outside the matrix')
+    initial_estimate = sum(estimates.seconds(item) for item in matrix if identity(item) not in done)
+    output['estimatedTotalSeconds'] = sum(estimates.seconds(item) for item in matrix)
+    output['estimateSource'] = 'Local cell means after two measurements; otherwise decision 014 section 5.2 priors (see timing.py)'
+    output.setdefault('segments', []).append({'startedAt': utcnow(), 'timeBudgetSeconds': args.time_budget})
+    segment = output['segments'][-1]
+    started = time.monotonic()
+    last_save = 0
+    active = None
+
+    def save(force=True):
+        nonlocal last_save
+        now = time.monotonic()
+        if not force and now - last_save < 1:
+            return
+        last_save = now
+        remaining = sum(estimates.seconds(item) for item in matrix if args.plan or identity(item) not in done)
+        active_elapsed = now - active['clock'] if active else 0
+        remaining = max(0, remaining - min(active_elapsed, active['estimatedSeconds'] if active else 0))
+        progress_done = 0 if args.plan else len(done)
+        progress = {'done': progress_done, 'total': len(matrix), 'remaining': len(matrix) - progress_done,
+                    'elapsedSeconds': now - started, 'estimatedRemainingSeconds': remaining,
+                    'measuredSeconds': sum(r.get('durationSeconds', 0) for r in output['rows']),
+                    'estimatedTotalSeconds': now - started + remaining,
+                    'updatedAt': utcnow(), 'active': {k: v for k, v in active.items() if k != 'clock'} if active else None}
+        output['progress'] = progress
         output['summary'] = summarize(output['rows'], repetitions)
         output['acceptanceEligible'] = (not args.quick and not args.plan and output['completed']
-                                        and all(cell['complete'] for cell in output['summary']))
+                                       and bool(output['summary']) and all(cell['complete'] for cell in output['summary'])
+                                       and all(r.get('proofResolutionValid') is True for r in output['rows']
+                                               if not r['warmup'] and r['group'] in SCREEN_GROUPS - {'scroll'}))
         output['acceptance'] = accepted(output['summary'], output['acceptanceEligible'])
         temporary = out / 'report.tmp'
-        temporary.write_text(json.dumps(output, indent=2) + '\n'); temporary.replace(out / 'report.json')
+        temporary.write_text(json.dumps(output, indent=2) + '\n')
+        temporary.replace(out / 'report.json')
         (out / 'report.md').write_text(report(output))
-    save()
-    blocked = {}
-    display_failure = None
-    if args.refresh_hz is not None and not args.plan:
-        try:
-            from display import verify_rate
-            output['conditions']['display'] = verify_rate(args.refresh_hz, args.connector)
-        except Exception as error:
-            display_failure = str(error)
-            output['conditions']['displayError'] = display_failure
+        line = (f"{progress['done']}/{progress['total']} | elapsed {human(progress['elapsedSeconds'])}"
+                f" | remaining ~{human(remaining)} | total ~{human(progress['estimatedTotalSeconds'])}")
+        if active:
+            line += ' | ' + active['identity']
+        print(('\r\033[K' if sys.stdout.isatty() else '') + line,
+              end='' if sys.stdout.isatty() else '\n', flush=True)
+
+    def terminated(signum, frame):
+        raise KeyboardInterrupt
+
+    run_lock = locked(out)
     try:
-        for iteration, group, fixture, hz, (name, renderer) in schedule(matrix_viewers, groups, names, repetitions, refresh_hz=args.refresh_hz):
-            identity = f'{iteration + 1:03}-{name}-{renderer}-{group}-{fixture}' + (f'-{hz}' if hz else '')
-            artifact = out / 'raw' / identity
-            row = {'iteration': iteration, 'warmup': iteration < 0, 'viewer': name, 'renderer': renderer,
-                   'rendererDeclared': renderer if name == 'hashline' else specs[name]['renderer'],
-                   'rendererObserved': 'unknown', 'backendRequested': 'Wayland',
-                   'group': group, 'fixture': fixture, 'fixtureSha256': fixture_records[fixture]['sha256'],
-                   'refreshHz': hz, 'artifact': str(artifact), 'metrics': {}}
-            command = [specs[name]['binary'], *specs[name].get('args', [])]
-            key = name, renderer, group, fixture, hz
-            try:
-                if args.plan:
-                    result = {'status': 'planned', 'reason': 'Plan only; no measurement'}
-                elif display_failure:
-                    result = {'status': 'missing', 'reason': display_failure}
-                elif key in blocked:
-                    result = {'status': 'missing', 'reason': 'Preflight failed: ' + blocked[key]}
-                elif name != 'hashline' and group in INTERNAL:
-                    result = {'status': 'unsupported', 'reason': 'Requires Hashline instrumentation'}
-                elif not specs[name]['binarySha256']:
-                    result = {'status': 'missing', 'reason': 'Pinned executable unavailable; use --provision'}
-                elif name != 'hashline' and not specs[name].get('versionVerified'):
-                    result = {'status': 'missing', 'reason': 'Source/package version differs from competitors.toml'}
-                else:
-                    if args.refresh_hz is not None:
-                        from display import verify_rate
-                        row['display'] = verify_rate(args.refresh_hz, args.connector)
-                    print(identity, flush=True)
-                    result = measure(group, command, ROOT / 'generated' / (fixture + '.md'),
-                                     renderer if name == 'hashline' else 'default', specs[name], args, artifact, hz)
-                row.update(result)
-                expected_renderer = {'cairo': 'GskCairoRenderer', 'vulkan': 'GskVulkanRenderer'}.get(renderer)
-                observed_renderer = row.get('rendererObserved', 'unknown')
-                if name == 'hashline' and expected_renderer and observed_renderer != 'unknown' and observed_renderer != expected_renderer:
-                    row.update(status='missing', reason=f'Renderer fallback: requested {renderer}, observed {observed_renderer}')
-            except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, ImportError) as error:
-                row.update(status='missing', reason=str(error))
-                # Only unchanging setup failures are cached. Timeouts/crashes get a fresh attempt.
-                if isinstance(error, (FileNotFoundError, ImportError)):
-                    blocked[key] = str(error)
-            row['command'] = [*command, str(ROOT / 'generated' / (fixture + '.md'))]
-            row['acceptance'] = False  # A single sample is never an acceptance.
-            output['rows'].append(row)
+        run_lock.__enter__()
+    except ValueError as error:
+        parser.error(str(error))
+    previous_signal = signal.signal(signal.SIGTERM, terminated)
+    from session import Session
+    try:
+        with Session(args.session, args.resolution, out, enabled=not args.plan) as session:
+            if session.connector:
+                args.connector = session.connector
+            output['conditions']['sessionKind'] = args.session
+            output['conditions']['resolution'] = args.resolution if args.session == 'nested-headless' else None
             if not args.plan:
-                save()  # A crash mid-run must still leave every finished measurement.
-        output['completed'] = True
+                from session import quiet_check
+                quiet = quiet_check(args.quiet_seconds) if args.session == 'bare-metal' and set(groups) & SCREEN_GROUPS else {
+                    'verified': args.session == 'nested-headless', 'reason': 'Isolated headless display' if args.session == 'nested-headless' else 'No monitor evidence requested'}
+                output['conditions']['desktopQuietCheck'] = quiet
+                output['conditions']['desktopUnattendedVerified'] = quiet['verified']
+                if 'environment' in output:
+                    output['environment']['desktopUnattendedVerified'] = quiet['verified']
+                    output['environment']['desktopCheckSessionKind'] = args.session
+            save()
+            if args.plan:
+                print(f'Estimated selected matrix: {human(initial_estimate)}')
+            current_pass = None
+            for item in matrix:
+                iteration, group, fixture, hz, (name, renderer) = item
+                if identity(item) in done:
+                    continue
+                # A budget only stops at a pass boundary. If a resumed pass was
+                # partial, finish it before applying a budget decision.
+                partial = any(r['iteration'] == iteration for r in output['rows'])
+                if current_pass != iteration and not partial and args.time_budget and not args.plan:
+                    pass_estimate = sum(estimates.seconds(m) for m in matrix if m[0] == iteration and identity(m) not in done)
+                    if time.monotonic() - started + pass_estimate > args.time_budget:
+                        output['stoppedBy'] = 'time-budget'
+                        break
+                current_pass = iteration
+                label = f'{iteration + 1:03}-{name}-{renderer}-{group}-{fixture}' + (f'-{hz}' if hz else '')
+                artifact = out / 'raw' / label
+                row = {'iteration': iteration, 'warmup': iteration < 0, 'viewer': name, 'renderer': renderer,
+                       'rendererDeclared': renderer if name == 'hashline' else specs[name]['renderer'],
+                       'rendererObserved': 'unknown', 'backendRequested': 'Wayland',
+                       'group': group, 'fixture': fixture, 'fixtureSha256': fixture_records[fixture]['sha256'],
+                       'refreshHz': hz, 'artifact': str(artifact), 'metrics': {},
+                       'startedAt': utcnow(), 'sessionKind': args.session,
+                       'desktopUnattendedVerified': output['conditions']['desktopUnattendedVerified']}
+                command = [specs[name]['binary'], *specs[name].get('args', [])]
+                row_start = time.monotonic()
+                active = {'identity': label, 'startedAt': row['startedAt'], 'estimatedSeconds': estimates.seconds(item), 'clock': row_start}
+                if not args.plan:
+                    save()
+                try:
+                    if args.plan:
+                        result = {'status': 'planned', 'reason': 'Plan only; no measurement'}
+                    elif args.session == 'nested-headless' and group in ('scroll', 'startup'):
+                        result = {'status': 'unsupported', 'reason': 'Physical presentation requires a bare-metal monitor'}
+                    elif group in SCREEN_GROUPS and not row['desktopUnattendedVerified']:
+                        result = {'status': 'missing', 'reason': 'Desktop idle preflight failed; use --session nested-headless or leave the desktop idle'}
+                    elif name != 'hashline' and group in INTERNAL:
+                        result = {'status': 'unsupported', 'reason': 'Requires Hashline instrumentation'}
+                    elif not specs[name]['binarySha256']:
+                        result = {'status': 'missing', 'reason': 'Pinned executable unavailable; use --provision'}
+                    elif name != 'hashline' and not specs[name].get('versionVerified'):
+                        result = {'status': 'missing', 'reason': 'Source/package version differs from competitors.toml'}
+                    else:
+                        row['attempts'] = []
+                        for attempt in range(3):
+                            attempt_path = artifact / f'attempt-{attempt + 1}'
+                            attempt_start = time.monotonic()
+                            attempt_utc = utcnow()
+                            options = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
+                            request = {'group': group, 'command': command, 'fixture': str(ROOT / 'generated' / (fixture + '.md')),
+                                       'renderer': renderer if name == 'hashline' else 'default', 'spec': specs[name],
+                                       'options': options, 'artifact': str(attempt_path), 'hz': hz}
+                            # This bound covers all retries, not a fresh allowance per retry.
+                            limit = max(30, estimates.seconds(item) * args.watchdog_factor) - (time.monotonic() - row_start)
+                            result = watchdog(request, attempt_path, max(.01, limit), lambda: save(False))
+                            row['attempts'].append({'attempt': attempt + 1, 'startedAt': attempt_utc,
+                                                    'durationSeconds': time.monotonic() - attempt_start,
+                                                    'artifact': str(attempt_path), 'status': result['status'],
+                                                    'reason': result.get('reason'), 'proofFailure': result.get('proofFailure')})
+                            failure = result.get('proofFailure') or {}
+                            if not (result['status'] == 'missing' and failure.get('kind') == 'text-not-recognized'
+                                    and failure.get('capturedFrames', 0) > 0):
+                                break
+                    row.update(result)
+                    expected_renderer = {'cairo': 'GskCairoRenderer', 'vulkan': 'GskVulkanRenderer'}.get(renderer)
+                    observed = row.get('rendererObserved', 'unknown')
+                    if name == 'hashline' and expected_renderer and observed != 'unknown' and observed != expected_renderer:
+                        row.update(status='missing', reason=f'Renderer fallback: requested {renderer}, observed {observed}')
+                except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, ImportError) as error:
+                    row.update(status='missing', reason=str(error))
+                row['durationSeconds'] = time.monotonic() - row_start
+                if row['status'] not in ('ok', 'planned') and not row.get('reason'):
+                    row['reason'] = 'Measurement adapter supplied no usable evidence; see local artifacts'
+                row['command'] = [*command, str(ROOT / 'generated' / (fixture + '.md'))]
+                row['acceptance'] = False
+                output['rows'].append(row)
+                done.add(identity(item))
+                estimates.record(row)
+                active = None
+                if not args.plan:
+                    save()
+            output['completed'] = len(done) == len(matrix) and not args.plan
     except KeyboardInterrupt:
-        output['interrupted'] = True
+        output['stoppedBy'] = 'interrupted'
+        if active:
+            output.setdefault('interruptedMeasurements', []).append({k: v for k, v in active.items() if k != 'clock'} |
+                                                                   {'durationSeconds': time.monotonic() - active['clock']})
+    except Exception as error:
+        output['stoppedBy'] = 'error'
+        output['error'] = f'{type(error).__name__}: {error}'
     finally:
+        signal.signal(signal.SIGTERM, previous_signal)
+        segment['durationSeconds'] = time.monotonic() - started
+        segment['stoppedBy'] = output.get('stoppedBy', 'completed' if output['completed'] else 'plan')
+        active = None
         save()
+        if sys.stdout.isatty():
+            print()
+        run_lock.__exit__(None, None, None)
     print(out / 'report.md')
-    return 0 if output['completed'] and all(r['status'] in ('ok', 'unsupported', 'planned', 'diagnostic') for r in output['rows']) else 1
+    return 0 if args.plan or output.get('stoppedBy') == 'time-budget' or (output['completed'] and all(
+        r['status'] in ('ok', 'unsupported', 'diagnostic') for r in output['rows'])) else 1
 
 
 if __name__ == '__main__':

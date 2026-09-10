@@ -6,4 +6,4 @@ __pycache__/
 *.local
 .scratch/
 benchmarks/.provision/
-benchmarks/results/local-*/
+benchmarks/.local/

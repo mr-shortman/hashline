@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 
-from content import Capture
+from content import Capture, failure
 from memory import ISOLATION, PrivateBus, measure as memory_measure
 
 ROOT = Path(__file__).resolve().parent
@@ -36,6 +36,7 @@ def isolated(renderer, connector):
     bus = PrivateBus()
     with tempfile.TemporaryDirectory(prefix='hashline-bench-') as home:
         try:
+            os.environ['HASHLINE_COMPOSITOR_BUS_ADDRESS'] = old.get('DBUS_SESSION_BUS_ADDRESS', '')
             os.environ.update(ISOLATION)
             os.environ.update(DBUS_SESSION_BUS_ADDRESS=bus.address, GDK_BACKEND='wayland',
                               QT_QPA_PLATFORM='wayland', WINIT_UNIX_BACKEND='wayland', HASHLINE_MONITOR=connector)
@@ -100,10 +101,10 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
         if capture and action is None:
             # The launch is the stimulus, so the screen must be free of the
             # document first — the previous row's window may still be painted.
-            capture.clear(EXPECTED.get(fixture.stem, ['Benchmark document text']))
+            time.sleep(.5)  # Keep a real pre-launch baseline; recognize only after termination.
         with isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
             env = dict(os.environ, WAYLAND_DEBUG='1', HASHLINE_BENCH_METADATA='1')
-            if action:
+            if proof:
                 env.pop('NO_AT_BRIDGE', None)
                 env['GTK_A11Y'] = 'atspi'
             started_ns = time.monotonic_ns()
@@ -114,10 +115,13 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             if action:
                 time.sleep(options.settle)
                 if application.poll() is not None:
-                    raise RuntimeError('Viewer exited before stimulus')
+                    return failure('program-exited', 'Viewer exited before stimulus', len(capture.frames))
                 started_ns, expected = action(application, capture, fixture)
             time.sleep(options.hold)
             exited = application.poll()
+            if capture and exited is None:
+                from session import window_bounds
+                capture.bounds = window_bounds(application.pid, capture.bus)
             stop(application); application = None
             sink.seek(0)
             trace_text = sink.read()
@@ -125,8 +129,14 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', trace_text)
         if capture:
             capture.close()
-            result = capture.proof(started_ns, expected, artifact)
-            result['metrics'] = {'readableUpperMs': result['readableUpperMs']} if result['contentVerified'] else {}
+            if exited is not None:
+                result = failure('program-exited', f'Viewer exited before termination: {exited}', len(capture.frames))
+            elif marks.get('frame') is None and marks.get('presented') is None:
+                result = failure('window-never-mapped', 'No application frame callback or presentation during observation', len(capture.frames), 'unrenderable')
+                result['observationSeconds'] = options.hold
+            else:
+                result = capture.proof(started_ns, expected, artifact)
+            result['metrics'] = {key: result[key] for key in ('readableLowerMs', 'readableUpperMs', 'proofGapMs')} if result['contentVerified'] else {}
         elif marks.get('presented') is None:
             result = {'status': 'missing', 'reason': 'No wp_presentation_feedback.presented in the trace', 'metrics': {}}
         else:
@@ -135,7 +145,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
         result['protocol'] = marks
         result['exitBeforeTermination'] = exited
         if exited is not None:
-            result.update(status='missing', reason=f'Viewer exited before termination: {exited}')
+            result.update(failure('program-exited', f'Viewer exited before termination: {exited}', len(capture.frames) if capture else 0))
         result['backendObserved'] = metadata[2] if metadata else ('Wayland' if marks else 'unknown')
         result['rendererObserved'] = metadata[1] if metadata else 'unknown'
         return result
@@ -155,6 +165,14 @@ def keyboard(pointer, keys):
 
 
 def require_focus(pid):
+    # The private compositor can identify the focused surface directly, even
+    # for clients that do not publish accessibility state.
+    if os.environ.get('HASHLINE_SESSION_KIND') == 'nested-headless':
+        from session import connection, shell_eval
+        bus = connection(os.environ['HASHLINE_COMPOSITOR_BUS_ADDRESS'])
+        if shell_eval(f'global.display.focus_window?.get_pid() === {int(pid)}', bus):
+            return
+        raise RuntimeError('Nested compositor focus does not belong to benchmark process; no keys sent')
     # A fresh helper avoids caching AT-SPI addresses across private buses.
     code = """
 import gi, sys, time
@@ -199,7 +217,7 @@ def interaction(command, fixture, renderer, options, artifact):
     pointer = module('scroll-native').Pointer(options.connector)
     application = None
     capture = Capture(options.connector)
-    readings, evidence = {}, {}
+    readings, evidence, pending = {}, {}, []
     trace = artifact / 'wayland.log'
     try:
         width, height = module('scroll-native').monitor_geometry(options.connector)
@@ -221,15 +239,15 @@ def interaction(command, fixture, renderer, options, artifact):
             if application.poll() is not None:
                 raise RuntimeError('Viewer exited before the first stimulus')
             require_focus(application.pid)
+            from session import window_bounds
+            capture.bounds = window_bounds(application.pid, capture.bus)
 
             def stimulus(name, expected, act):
                 with capture.lock:
-                    capture.frames = capture.frames[-1:]
+                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
                 started = act()
                 time.sleep(options.hold)
-                proof = capture.proof(started, expected, artifact / name)
-                evidence[name] = proof
-                readings[name] = proof.get('readableUpperMs')
+                pending.append((name, started, expected, capture.snapshot()))
 
             def open_search():
                 started = time.monotonic_ns()
@@ -242,7 +260,7 @@ def interaction(command, fixture, renderer, options, artifact):
                     keyboard(pointer, [ord(char)])
                     time.sleep(.05)
                 with capture.lock:
-                    capture.frames = capture.frames[-1:]
+                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
                 started = time.monotonic_ns()
                 keyboard(pointer, [ord(needle[-1])])
                 return started
@@ -251,7 +269,7 @@ def interaction(command, fixture, renderer, options, artifact):
 
             def open_menu():
                 started = time.monotonic_ns()
-                keyboard(pointer, [65471])  # F10 opens the primary menu.
+                keyboard(pointer, [65479])  # F10 opens the primary menu.
                 return started
             stimulus('menuOpenMs', ['Neu laden'], open_menu)
             keyboard(pointer, [65307]); time.sleep(.4)
@@ -268,6 +286,13 @@ def interaction(command, fixture, renderer, options, artifact):
             sink.seek(0)
             log = sink.read()
         capture.close()
+        for name, started, expected, snapshot in pending:
+            if snapshot.bounds is not None and not snapshot.error:
+                snapshot.archive(started, expected, artifact / name)
+        for name, started, expected, snapshot in pending:
+            proof = snapshot.proof(started, expected, artifact / name, persist=False)
+            evidence[name] = proof
+            readings[name] = proof.get('readableUpperMs')
         longest = re.findall(r'HASHLINE_BENCH mainThreadMaxMs=([\d.]+) task=(\S+)', log)
         metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', log)
         metrics = {name: value for name, value in readings.items() if value is not None}
@@ -279,10 +304,11 @@ def interaction(command, fixture, renderer, options, artifact):
         return {'status': 'ok' if not missing and exited is None else 'missing',
                 'reason': ('No frame showed: ' + ', '.join(missing)) if missing else
                           (f'Viewer exited before termination: {exited}' if exited is not None else None),
+                'proofFailure': next((p['proofFailure'] for p in evidence.values() if p.get('proofFailure')), None),
+                'proofResolutionValid': all(p.get('proofResolutionValid', False) for p in evidence.values()),
                 'longestTask': longest[-1][1] if longest else None,
                 'mainThreadTasks': [{'ms': float(ms), 'task': task} for ms, task in longest],
-                'evidence': {name: {k: v for k, v in proof.items() if k != 'frames'}
-                             for name, proof in evidence.items()},
+                'evidence': evidence,
                 'rendererObserved': metadata[1] if metadata else 'unknown',
                 'backendObserved': metadata[2] if metadata else 'unknown',
                 'metrics': metrics}
@@ -327,6 +353,11 @@ def tab_memory(command, fixture, renderer, options, artifact):
 
 def measure(group, command, fixture, renderer, spec, options, artifact, hz=None):
     artifact.mkdir(parents=True, exist_ok=True)
+    if hz is not None:
+        from display import verify_rate
+        verify_rate(hz, options.connector)
+    if group == 'mainthread':
+        return mainthread(command, fixture, renderer, options, artifact)
     if group in ('startup', 'content'):
         return readable(command, fixture, renderer, options, artifact, proof=group == 'content')
     if group == 'stages':
@@ -357,6 +388,9 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
                  else {'pssMiB': pss / 1024 if pss is not None else None})
         measured = cpu is not None if group == 'idle' else pss is not None
         return {'status': 'ok' if result.get('alive') and result.get('isolated') and measured else 'missing',
+                'reason': (result.get('error') or ('Reader exited during observation' if not result.get('alive') else
+                           'Isolation failed' if not result.get('isolated') else 'Process samples are unreadable or incomplete'))
+                          if not (result.get('alive') and result.get('isolated') and measured) else None,
                 'raw': result, 'observationSeconds': seconds,
                 'rendererObserved': result.get('rendererObserved', 'unknown'),
                 'backendObserved': result.get('backendObserved', 'unknown'), 'metrics': value}
@@ -390,7 +424,7 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
                     keyboard(pointer, [65307]); time.sleep(.4)
                     # Exclude the setup frames, keeping one pre-stimulus baseline.
                     with capture.lock:
-                        capture.frames = capture.frames[-1:]
+                        capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
                     replacement = document.with_suffix('.new')
                     replacement.write_text('Neuer Absatz oben.\n\n'
                                            + fixture.read_text() + changed)
@@ -418,23 +452,29 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
         try:
             def action(application, capture, document):
                 require_focus(application.pid)
-                # Open another document through the viewer's real file chooser.
-                # Ctrl+Tab then must restore original *document body*, not tab title.
-                keyboard(pointer, [65507, ord('o')]); time.sleep(.5)
-                keyboard(pointer, [65507, ord('l')]); time.sleep(.2)
                 other = artifact / 'second-tab.md'
                 other.write_text('# Second tab\n\nDifferent benchmark document body.\n')
-                for char in str(other):
-                    keyboard(pointer, [ord(char)])
-                keyboard(pointer, [65293]); time.sleep(options.settle)
+                if spec.get('role') == 'self':
+                    # Hashline's public file handoff avoids a separately owned
+                    # portal dialog while exercising the actual tab-opening path.
+                    subprocess.run([*command, str(other)], env=dict(os.environ), timeout=30,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+                    time.sleep(options.settle)
+                else:
+                    keyboard(pointer, [65507, ord('o')]); time.sleep(.5)
+                    keyboard(pointer, [65507, ord('l')]); time.sleep(.2)
+                    for char in str(other):
+                        keyboard(pointer, [ord(char)])
+                    keyboard(pointer, [65293]); time.sleep(options.settle)
                 require_focus(application.pid)
                 # Exclude setup frames, retaining an actual pre-switch baseline.
                 with capture.lock:
-                    capture.frames = capture.frames[-1:]
+                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
                 started = time.monotonic_ns()
                 keyboard(pointer, spec.get('tab_keys', [65507, 65289]))
                 return started, EXPECTED[document.stem]
             result = readable(command, fixture, renderer, options, artifact, action)
+            result['tabSetup'] = 'application-command' if spec.get('role') == 'self' else 'keyboard-file-chooser'
             result['metrics'] = {'tabSwitchUpperMs': result.get('readableUpperMs')}
             if result.get('contentVerified'):
                 # What a tab that is not showing costs, and what ten of them
@@ -491,6 +531,40 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
             external(['/usr/bin/python3', str(ROOT / 'stability.py'), str(wrapper), '--first', str(fixture),
                       '--output', str(output)], artifact / 'driver.log', env=dict(os.environ))
         raw = json.loads(output.read_text())
-        return {'status': 'ok' if raw.get('completed') else 'missing', 'raw': raw,
+        return {'status': 'ok' if raw.get('completed') else 'missing',
+                'reason': None if raw.get('completed') else raw.get('error', 'Stability switches or final samples incomplete'), 'raw': raw,
                 'metrics': {'stabilityGrowthPercent': raw.get('growthPercent')}}
     raise ValueError(group)
+
+
+def mainthread(command, fixture, renderer, options, artifact):
+    """Read self-reported main-thread tasks for startup and real file handoff.
+
+    No monitor pixels or input injection are needed. The scope is recorded;
+    this cannot certify unobserved keyboard/menu tasks.
+    """
+    application = None
+    with isolated(renderer, options.connector), (artifact / 'mainthread.log').open('w+') as log:
+        try:
+            env = dict(os.environ, HASHLINE_BENCH_MAIN_THREAD='1', HASHLINE_BENCH_METADATA='1')
+            application = subprocess.Popen([*command, str(fixture)], env=env, stdout=subprocess.DEVNULL,
+                                           stderr=log, start_new_session=True)
+            time.sleep(options.settle)
+            if application.poll() is not None:
+                return {'status': 'missing', 'reason': 'Reader exited before main-thread observation', 'metrics': {}}
+            subprocess.run([*command, str(fixture)], env=env, stdout=subprocess.DEVNULL, stderr=log, timeout=30)
+            time.sleep(options.hold)
+            exited = application.poll()
+        finally:
+            stop(application)
+        log.seek(0)
+        text = log.read()
+    tasks = re.findall(r'HASHLINE_BENCH mainThreadMaxMs=([\d.]+) task=(\S+)', text)
+    metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', text)
+    return {'status': 'ok' if tasks and exited is None else 'missing',
+            'reason': None if tasks and exited is None else 'Reader exited or emitted no main-thread task measurements',
+            'scope': 'Startup and file handoff; keyboard and menu tasks are recorded separately by interaction',
+            'rendererObserved': metadata[1] if metadata else 'unknown',
+            'backendObserved': metadata[2] if metadata else 'unknown',
+            'mainThreadTasks': [{'ms': float(ms), 'task': task} for ms, task in tasks],
+            'metrics': {'mainThreadMaxMs': max(float(ms) for ms, _ in tasks)} if tasks else {}}

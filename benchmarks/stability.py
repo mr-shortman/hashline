@@ -59,8 +59,14 @@ def main():
     parser.add_argument('--settle', type=float, default=0.35)
     parser.add_argument('--sample-seconds', type=int, default=15)
     parser.add_argument('--output', type=Path,
-                        default=Path('benchmarks/results/native-stability.json'))
+                        default=Path('benchmarks/.local/runs/native-stability/report.json'))
     args = parser.parse_args()
+    from storage import require_local_output
+    if args.output is not None:
+        try:
+            require_local_output(args.output)
+        except ValueError as error:
+            parser.error(str(error))
     if args.output.exists():
         parser.error('Output exists; use a new path')
     args.output.parent.mkdir(parents=True, exist_ok=True)

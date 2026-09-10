@@ -21,6 +21,12 @@ def main():
     parser.add_argument('--capture', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    from storage import require_local_output
+    if args.output is not None:
+        try:
+            require_local_output(args.output)
+        except ValueError as error:
+            parser.error(str(error))
     if args.output.exists():
         parser.error('Output exists')
     display = json.loads(args.display.read_text())

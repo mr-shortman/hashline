@@ -45,7 +45,8 @@ class Pointer:
     """A pointer on one monitor, addressed absolutely."""
 
     def __init__(self, connector):
-        self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        from session import connection
+        self.bus = connection()
         self.path = self._call_object('CreateSession')
         session_id = self.bus.call_sync(
             REMOTE, self.path, 'org.freedesktop.DBus.Properties', 'Get',
@@ -62,6 +63,13 @@ class Pointer:
             GLib.Variant('(sa{sv})', (connector, {'cursor-mode': GLib.Variant('u', 0)})),
             None, Gio.DBusCallFlags.NONE, -1, None).unpack()[0]
         self.call('Start')
+        if os.environ.get('HASHLINE_SESSION_KIND') == 'nested-headless':
+            # Headless seats initially have no keyboard. Create it before the
+            # stimulus; otherwise the first chord arrives before the client
+            # receives wl_seat.capabilities and binds wl_keyboard.
+            self.call('NotifyKeyboardKeysym', '(ub)', (65505, True))
+            self.call('NotifyKeyboardKeysym', '(ub)', (65505, False))
+            time.sleep(.05)
 
     def _call_object(self, method):
         return self.bus.call_sync(REMOTE, '/org/gnome/Mutter/RemoteDesktop', REMOTE,
@@ -89,7 +97,8 @@ class Pointer:
 
 
 def monitor_geometry(connector):
-    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    from session import connection
+    bus = connection()
     state = bus.call_sync('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig',
                           'org.gnome.Mutter.DisplayConfig', 'GetCurrentState', None, None,
                           Gio.DBusCallFlags.NONE, -1, None).unpack()
@@ -117,6 +126,12 @@ def main():
     parser.add_argument('--content-proof', action='store_true')
     parser.add_argument('--schema-dir', type=Path, default=Path('target/schemas'))
     args = parser.parse_args()
+    from storage import require_local_output
+    if args.output is not None:
+        try:
+            require_local_output(args.output)
+        except ValueError as error:
+            parser.error(str(error))
     if args.output.exists():
         parser.error('Output exists; use a new path')
 
@@ -177,6 +192,16 @@ def main():
             args.output.write_text(json.dumps(record, indent=2) + '\n')
             return 1
         if capture:
+            from session import window_bounds
+            old_bus = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
+            os.environ['DBUS_SESSION_BUS_ADDRESS'] = bus.address
+            try:
+                capture.bounds = window_bounds(application.pid, capture.bus)
+            finally:
+                if old_bus is not None:
+                    os.environ['DBUS_SESSION_BUS_ADDRESS'] = old_bus
+                else:
+                    os.environ.pop('DBUS_SESSION_BUS_ADDRESS', None)
             capture.close()
             record['contentProof'] = capture.proof(launched, EXPECTED[Path(args.fixture).stem], args.output.parent / 'content')
             if not record['contentProof']['contentVerified']:

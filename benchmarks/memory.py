@@ -25,7 +25,7 @@ Usage::
     python3 benchmarks/memory.py target/release/hashline \\
         --fixture benchmarks/generated/small.md \\
         --fixture benchmarks/generated/large.md \\
-        --renderer cairo --output benchmarks/results/native-memory-cairo.json
+        --renderer cairo --output benchmarks/.local/runs/native-memory-cairo.json
 
 A fixture named ``-`` starts the reader with no file at all, which is what the
 renderer's own floor costs.
@@ -74,6 +74,7 @@ class PrivateBus:
         with os.fdopen(read) as pipe:
             self.address = pipe.readline().strip()
         if not self.address:
+            self.process.wait(timeout=5)
             raise RuntimeError('the private bus printed no address')
 
     def activated(self):
@@ -188,8 +189,14 @@ def main():
                         help='seconds between the launch and the first sample')
     parser.add_argument('--sample-seconds', type=float, default=20.0)
     parser.add_argument('--output', type=Path,
-                        default=Path('benchmarks/results/native-memory.json'))
+                        default=Path('benchmarks/.local/runs/native-memory/report.json'))
     args = parser.parse_args()
+    from storage import require_local_output
+    if args.output is not None:
+        try:
+            require_local_output(args.output)
+        except ValueError as error:
+            parser.error(str(error))
     if args.output.exists():
         parser.error('Output exists; use a new path')
     args.output.parent.mkdir(parents=True, exist_ok=True)

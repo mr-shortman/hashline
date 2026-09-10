@@ -146,6 +146,12 @@ def main() -> None:
     parser.add_argument("--label", default="")
     parser.add_argument("--output", type=Path)
     options = parser.parse_args()
+    from storage import require_local_output
+    if options.output:
+        try:
+            require_local_output(options.output)
+        except ValueError as error:
+            parser.error(str(error))
 
     moments = ("attach", "frame", "presented", "quiet")
     result = {
