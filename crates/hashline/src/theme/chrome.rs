@@ -242,12 +242,30 @@ separator {{ background-color: {border}; }}
 .menu-row {{ padding: 7px 10px; }}
 .menu-shortcut {{ color: {muted}; }}
 .settings-label {{ color: {muted}; }}
+/* The theme switch is one control, not three buttons: a recessed track holds
+   the segments, and the one in force is the only filled thing in it. The
+   segments carry the menu's own type size rather than the button default, which
+   is what made three words fill a panel-wide block. */
 .theme-options {{
+  background-color: {bg};
   border: 1px solid {border};
   border-radius: {radius}px;
   padding: 3px;
 }}
-.theme-options button {{ border-radius: 4px; padding: 5px 8px; }}
+.theme-options button {{
+  border-radius: 5px;
+  padding: 5px 8px;
+  min-height: 0;
+  font-size: 0.92em;
+  font-weight: 500;
+  color: {muted};
+}}
+.theme-options button:hover {{ background-color: {subtle}; color: {text}; }}
+.theme-options button:checked {{
+  background-color: {accent_soft};
+  color: {accent};
+  font-weight: 600;
+}}
 .zoom-options button {{ padding: 5px 9px; min-width: 26px; }}
 .zoom-options label {{ font-size: 1.05em; }}
 

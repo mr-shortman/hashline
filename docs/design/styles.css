@@ -511,7 +511,7 @@ kbd {
 .settings {
   position: absolute;
   right: 12px;
-  top: calc(var(--toolbar-height) - 4px);
+  top: calc(var(--toolbar-height) + 6px);
   z-index: 30;
   width: min(300px, calc(100vw - 24px));
   border: 1px solid var(--border);
@@ -527,14 +527,25 @@ kbd {
 }
 .theme-options {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   padding: 3px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--bg);
 }
 .theme-options button {
   flex: 1;
   font-size: 12px;
+  font-weight: 500;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.theme-options button:hover {
+  color: var(--text);
+}
+.theme-options button[aria-pressed='true'] {
+  font-weight: 600;
 }
 .zoom-options {
   display: flex;

@@ -88,11 +88,39 @@ pub fn build() -> Menu {
         .child(&content)
         .has_arrow(false)
         .build();
+    // Without an arrow the panel hangs straight off the button, so its top edge
+    // lands inside the header bar, on the header's own bottom rule. It should
+    // begin just below the title bar instead, and how far below the button that
+    // is depends on the padding the system theme gives the header — so it is
+    // measured when the panel is shown rather than guessed here.
+    popover.connect_show(drop_below_titlebar);
     Menu {
         popover,
         themes,
         zoom,
     }
+}
+
+/// Air between the title bar and the panel under it.
+const PANEL_GAP: i32 = 6;
+
+/// Moves the panel down to clear the header bar.
+///
+/// The offset is whatever is left of the header below the button the panel
+/// hangs from, plus the gap. Measured at every showing, so it survives a theme
+/// with different header padding and a header that changes height.
+fn drop_below_titlebar(popover: &gtk::Popover) {
+    let Some(button) = popover.parent() else {
+        return;
+    };
+    let Some(header) = button.ancestor(gtk::HeaderBar::static_type()) else {
+        return;
+    };
+    let Some(bounds) = button.compute_bounds(&header) else {
+        return;
+    };
+    let below = header.height() as f32 - (bounds.y() + bounds.height());
+    popover.set_offset(0, below.max(0.0).round() as i32 + PANEL_GAP);
 }
 
 /// A row that reads as one line: what it does on the left, its key on the
@@ -131,7 +159,9 @@ fn separator() -> gtk::Separator {
 /// window's theme action with its own mode as the target. Pressing one is
 /// therefore the same event as choosing that mode from the keyboard.
 fn theme_switch() -> (gtk::Box, Vec<gtk::ToggleButton>) {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    // Two pixels between the segments, not four: the track around them is what
+    // groups the three, so wide gaps only cut it into three separate buttons.
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     row.add_css_class("theme-options");
     row.set_homogeneous(true);
     row.update_property(&[gtk::accessible::Property::Label("Darstellung")]);
