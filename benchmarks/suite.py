@@ -222,9 +222,19 @@ def interaction(command, fixture, renderer, options, artifact):
     cannot come from outside: a compositor sees late frames, not what made them
     late. The reader reports its own under HASHLINE_BENCH_MAIN_THREAD.
     """
-    # A needle that occurs once, at the end, and whose prefixes match nothing:
-    # the search must actually have to move the document to satisfy it.
+    # A needle that occurs once, at the end, so the search must actually move
+    # the document to satisfy it. Its prefixes all match that same line, which
+    # is why the decoy exists: the reader types at 50 ms and the viewer bundles
+    # queries for 60, so a keystroke gap that slips past the bundling window
+    # runs a search on a prefix. Without somewhere else for such a search to
+    # land it would show the target before the stimulus that is supposed to
+    # reveal it, and the proof would rightly refuse to time it. That cost one
+    # cell of 93. The decoy carries every prefix and not the needle, and sits
+    # at the top where the reading position already is, so an early search
+    # moves nothing and the last keystroke is still what makes the jump.
     needle = 'Kaninchenbau'
+    decoy = 'Kaninchenbahn'
+    assert decoy.startswith(needle[:-1]) and needle not in decoy
     pointer = module('scroll-native').Pointer(options.connector)
     application = None
     capture = Capture(options.connector)
@@ -237,7 +247,8 @@ def interaction(command, fixture, renderer, options, artifact):
         with tempfile.TemporaryDirectory(prefix='hashline-interaction-') as temp, \
                 isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
             document = Path(temp) / fixture.name
-            document.write_text(fixture.read_text() + f'\n\nSuchziel {needle} Ende.\n')
+            document.write_text(f'Ablenkung {decoy} oben.\n\n' + fixture.read_text()
+                                + f'\n\nSuchziel {needle} Ende.\n')
             second = Path(temp) / ('zweites-' + fixture.name)
             second.write_text('Zweites Dokument beginnt hier.\n\n' + fixture.read_text())
             for image in fixture.parent.glob('*.png'):

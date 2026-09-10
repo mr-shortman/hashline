@@ -75,10 +75,26 @@ sys.exit(1)
         state = bus.call_sync('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig',
             'org.gnome.Mutter.DisplayConfig', 'GetCurrentState', None, None, Gio.DBusCallFlags.NONE, 3000, None).unpack()
         connector = os.environ.get('HASHLINE_MONITOR')
-        logical = next(r for r in state[2] if any(m[0] == connector for m in r[5]))
+        logical = next((r for r in state[2] if any(m[0] == connector for m in r[5])), None)
+        if logical is None:
+            raise RuntimeError(f'No logical monitor carries connector {connector!r}; the window '
+                               'rectangle has no monitor to be placed on')
         value['x'] -= logical[0]
         value['y'] -= logical[1]
         value['scale'] = logical[2]
+        # Only if it lands on the monitor being captured. Wayland tells a
+        # client nothing about where its window is, so on a desktop whose
+        # Shell will not answer an Eval, AT-SPI answers with the window's own
+        # origin instead of the desktop's: a maximized window on a three
+        # monitor desktop came back as (0, 0), which after the shift is a
+        # rectangle 1080 pixels above the captured monitor. Cropping to that
+        # is worse than not cropping, and the proof already reads the whole
+        # monitor when it is given no rectangle.
+        physical = next((m for m in state[1] if m[0][0] == connector), None)
+        mode = next((m for m in physical[1] if m[6].get('is-current')), None) if physical else None
+        if mode is None or value['x'] < 0 or value['y'] < 0 \
+                or value['x'] + value['width'] > mode[1] or value['y'] + value['height'] > mode[2]:
+            return None
         return value
     return None
 

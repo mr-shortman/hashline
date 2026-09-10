@@ -145,10 +145,15 @@ def main():
                      'a second launch would hand off instead of being measured')
 
     width, height = monitor_geometry(args.connector)
-    environment = {
-        **os.environ,
-        'HASHLINE_MONITOR': args.connector,
-    }
+    # Into this process's environment, not only the child's. The window
+    # rectangle comes from the Shell when it will answer an Eval and from
+    # AT-SPI when it will not, which is every desktop except the private
+    # nested one, and the AT-SPI path resolves the monitor from the
+    # environment of whoever asks. Handing the connector only to the viewer
+    # left it unresolvable, and the bare-metal scroll group died in the lookup
+    # instead of measuring anything.
+    os.environ['HASHLINE_MONITOR'] = args.connector
+    environment = {**os.environ}
     if args.schema_dir.exists():
         environment['GSETTINGS_SCHEMA_DIR'] = str(args.schema_dir.resolve())
     record = {
