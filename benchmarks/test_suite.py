@@ -137,7 +137,7 @@ class ContentProof(unittest.TestCase):
         capture = object.__new__(content.Capture)
         capture.error = None
         capture.lock = threading.Lock()
-        capture.frames = [dict(receivedMonotonicNs=t, ptsNs=t, sha256='test', packed=zlib.compress(text.encode())) for t, text in payloads]
+        capture.frames = [dict(receivedMonotonicNs=t, ptsNs=t, sha256=f'sha-{t}', packed=zlib.compress(text.encode())) for t, text in payloads]
         return capture
 
     def test_leftover_window_is_dropped_from_the_baseline(self):
@@ -151,6 +151,29 @@ class ContentProof(unittest.TestCase):
         with patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):
             with self.assertRaisesRegex(RuntimeError, 'still on screen'):
                 capture.clear(['Lesbarer Text mit'], timeout=.01)
+
+    def test_dropping_frames_releases_the_pixels_only_they_held(self):
+        """Four stimuli share one capture, and each drops what came before it.
+
+        The store outlived those frames, so the budget charged the last
+        stimulus of a launch for every distinct desktop of the whole run and
+        failed it for memory rather than for anything it saw.
+        """
+        capture = self.capture([(1, 'wallpaper'), (2, 'search bar'), (3, 'menu')])
+        capture.store = {frame['sha256']: frame['packed'] for frame in capture.frames}
+        capture.total_bytes = sum(len(packed) for packed in capture.store.values())
+        capture.drop_before(3)
+        self.assertEqual([frame['receivedMonotonicNs'] for frame in capture.frames], [3])
+        self.assertEqual(set(capture.store), {'sha-3'})
+        self.assertEqual(capture.total_bytes, len(capture.store['sha-3']))
+
+    def test_dropping_every_frame_keeps_the_newest_as_a_baseline(self):
+        capture = self.capture([(1, 'wallpaper'), (2, 'search bar')])
+        capture.store = {frame['sha256']: frame['packed'] for frame in capture.frames}
+        capture.total_bytes = sum(len(packed) for packed in capture.store.values())
+        capture.drop_before(99)
+        self.assertEqual([frame['receivedMonotonicNs'] for frame in capture.frames], [2])
+        self.assertEqual(set(capture.store), {'sha-2'})
 
     def test_empty_frame_never_counts(self):
         capture = self.capture([(1, 'wallpaper'), (20, 'window title'), (30, 'Lesbarer Text mit Hervorhebung')])

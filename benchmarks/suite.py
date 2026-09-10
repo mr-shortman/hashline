@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 
-from content import Capture, Heartbeat, failure
+from content import PROTECTED_NS, Capture, Heartbeat, failure
 from memory import ISOLATION, PrivateBus, measure as memory_measure
 
 ROOT = Path(__file__).resolve().parent
@@ -255,8 +255,7 @@ def interaction(command, fixture, renderer, options, artifact):
             capture.bounds = window_bounds(application.pid, capture.bus)
 
             def stimulus(name, expected, act):
-                with capture.lock:
-                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
+                capture.drop_before(time.monotonic_ns() - PROTECTED_NS)
                 started = act()
                 time.sleep(options.hold)
                 pending.append((name, started, expected, capture.snapshot()))
@@ -271,12 +270,19 @@ def interaction(command, fixture, renderer, options, artifact):
                 for char in needle[:-1]:
                     keyboard(pointer, [ord(char)])
                     time.sleep(.05)
-                with capture.lock:
-                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
+                capture.drop_before(time.monotonic_ns() - PROTECTED_NS)
                 started = time.monotonic_ns()
                 keyboard(pointer, [ord(needle[-1])])
                 return started
-            stimulus('searchLargeMs', [f'Suchziel {needle} Ende'], run_search)
+            # The words that flank the needle, never the needle itself: the
+            # hit is painted under the search wash, and OCR reads the marked
+            # word wrong often enough to lose a sound proof. On a frame that
+            # plainly showed the line, both segmentation modes returned
+            # "Suchziel Kaninehenbau Ende." and the phrase with the needle in
+            # it did not match. Neither flanking word occurs in any fixture,
+            # so the pair still proves only one thing: the view moved to the
+            # target line.
+            stimulus('searchLargeMs', ['Suchziel', 'Ende.'], run_search)
             keyboard(pointer, [65307]); time.sleep(.4)
 
             def open_menu():
@@ -441,8 +447,7 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
                     keyboard(pointer, [65293]); time.sleep(.4)
                     keyboard(pointer, [65307]); time.sleep(.4)
                     # Exclude the setup frames, keeping one pre-stimulus baseline.
-                    with capture.lock:
-                        capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
+                    capture.drop_before(time.monotonic_ns() - PROTECTED_NS)
                     replacement = document.with_suffix('.new')
                     replacement.write_text('Neuer Absatz oben.\n\n'
                                            + fixture.read_text() + changed)
@@ -486,8 +491,7 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
                     keyboard(pointer, [65293]); time.sleep(options.settle)
                 require_focus(application.pid)
                 # Exclude setup frames, retaining an actual pre-switch baseline.
-                with capture.lock:
-                    capture.frames = [f for f in capture.frames if f['receivedMonotonicNs'] >= time.monotonic_ns() - 500_000_000] or capture.frames[-1:]
+                capture.drop_before(time.monotonic_ns() - PROTECTED_NS)
                 started = time.monotonic_ns()
                 keyboard(pointer, spec.get('tab_keys', [65507, 65289]))
                 return started, EXPECTED[document.stem]

@@ -402,6 +402,36 @@ class Capture:
         self.loop.quit()
         self.thread.join(timeout=5)
 
+    def retain(self, keep):
+        """Keep these frames and only the pixels they still name. Lock held.
+
+        A frame carries its own compressed copy, so dropping a record is only
+        half of forgetting it: the store keeps one entry per distinct desktop,
+        and until now nothing ever removed one. The budget below therefore
+        counted every distinct frame of a whole launch, including the ones a
+        stimulus had explicitly thrown away before it started.
+        """
+        self.frames = keep
+        if not hasattr(self, 'store'):
+            # Replays and unit fixtures carry their pixels on the frame record
+            # itself and never fill a store, so there is nothing to shed.
+            return
+        live = {frame['sha256'] for frame in keep if 'sha256' in frame}
+        self.store = {digest: packed for digest, packed in self.store.items() if digest in live}
+        self.total_bytes = sum(len(packed) for packed in self.store.values())
+
+    def drop_before(self, monotonic_ns):
+        """Forget everything received before a cutoff, pixels included.
+
+        Stimuli that share one capture call this to make the frame before
+        their own stimulus the baseline. Keeping the newest frame when the
+        cutoff would leave none is deliberate: a proof needs a lower bound,
+        and the last thing on screen is the honest one.
+        """
+        with self.lock:
+            keep = [f for f in self.frames if f['receivedMonotonicNs'] >= monotonic_ns]
+            self.retain(keep or self.frames[-1:])
+
     def clear(self, expected, timeout=15):
         """Wait until the document is *not* on screen, then start from there.
 
@@ -419,7 +449,7 @@ class Capture:
                 index, frame = self.frames.index(complete[-1]), complete[-1]
             if not contains(ocr(zlib.decompress(frame['packed'])), expected):
                 with self.lock:
-                    self.frames = self.frames[index:]
+                    self.retain(self.frames[index:])
                 return frame
             if time.monotonic() >= deadline:
                 raise RuntimeError(f'Expected document text still on screen after {timeout:g} s; '

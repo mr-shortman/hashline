@@ -58,6 +58,9 @@ pub(crate) struct State {
     /// Called when a link is clicked. The view resolves nothing itself: what a
     /// relative path or a fragment means is the document controller's business.
     on_link: Option<LinkHandler>,
+    /// The search hit the view is still working its way onto, and how many
+    /// more passes it may take. See `settle_aim`.
+    aim: Option<(usize, u8)>,
     /// Set while the widget itself is moving the adjustment, so that the
     /// resulting notification is not mistaken for the user scrolling.
     adjusting: bool,
@@ -81,6 +84,12 @@ const CACHE_LIMIT: usize = 240;
 /// How long one idle pass over the viewport's buffer may take. Well inside the
 /// 16 ms a frame has, so a frame that lands on top of one still fits.
 const BUFFER_SLICE: f64 = 6.0;
+
+/// How many frames a jump to a search hit may spend closing in on it. One pass
+/// was enough for the jump measured on the 100 KiB fixture; the rest is
+/// headroom for a plan whose estimates are further out than that, and a bound
+/// so that a target it never agrees with ends rather than loops.
+const AIM_PASSES: u8 = 8;
 
 /// How many code blocks keep their syntax colours. Twice the layout cache,
 /// because a span is 12 bytes where a set block is a Pango layout: scrolling
@@ -115,6 +124,7 @@ impl State {
             highlights: std::collections::HashMap::new(),
             coloured: std::collections::VecDeque::new(),
             on_link: None,
+            aim: None,
             adjusting: false,
             buffering: false,
             warm: std::collections::VecDeque::new(),
@@ -250,6 +260,11 @@ mod imp {
                     widget,
                     move |_| {
                         if widget.imp().state.try_borrow().is_ok_and(|s| !s.adjusting) {
+                            // A reader who scrolls during a search jump has
+                            // said where they want to be, and outranks it.
+                            if let Ok(mut state) = widget.imp().state.try_borrow_mut() {
+                                state.aim = None;
+                            }
                             widget.queue_draw();
                             widget.emit_by_name::<()>("active-section-changed", &[]);
                         }
@@ -848,6 +863,12 @@ impl DocumentView {
             return;
         }
         self.measure_visible(height);
+        // Setting the viewport is what makes the plan's answer for where the
+        // hit sits better than the estimate the jump used, so the aim is worth
+        // repeating here and nowhere else.
+        if self.settle_aim() {
+            self.measure_visible(height);
+        }
         self.update_adjustment(width, height);
 
         let state = self.imp().state.borrow();
@@ -1479,17 +1500,55 @@ impl DocumentView {
     }
 
     fn scroll_to_block_centred(&self, index: usize) {
-        let (y, height) = {
-            let state = self.imp().state.borrow();
-            if index >= state.plan.len() {
-                return;
-            }
-            (state.plan.y_of(index), self.view_height())
-        };
-        if let Some(adjustment) = self.vadjustment() {
-            let value = (y - height / 3.0).max(0.0);
-            adjustment.set_value(value);
+        if index >= self.imp().state.borrow().plan.len() {
+            return;
         }
+        self.imp().state.borrow_mut().aim = Some((index, AIM_PASSES));
+        self.settle_aim();
+    }
+
+    /// Brings the aimed-at hit a third of the way down the viewport, and says
+    /// whether that moved the view.
+    ///
+    /// `y_of` is exact for blocks that have been set and an estimate for the
+    /// rest, so one aim at a block far below the reading position lands
+    /// wherever the estimates happened to put it. On the 100 KiB fixture that
+    /// was a whole screen short: the search reported "1 von 1" and the line it
+    /// had found stayed below the bottom edge, at three seconds and at eight,
+    /// and only a second `Enter` brought it into view. The draw pass sets what
+    /// the first aim landed on, which replaces the estimates that were most of
+    /// the error, and this then aims again at the better answer. Each pass
+    /// costs one viewport of setting and one frame, and the counter bounds a
+    /// target the plan never agrees with to a handful of them rather than a
+    /// livelock.
+    fn settle_aim(&self) -> bool {
+        let Some((index, left)) = self.imp().state.borrow().aim else {
+            return false;
+        };
+        let height = self.view_height();
+        let y = {
+            let state = self.imp().state.borrow();
+            (index < state.plan.len()).then(|| state.plan.y_of(index))
+        };
+        let (Some(y), Some(adjustment)) = (y, self.vadjustment()) else {
+            self.imp().state.borrow_mut().aim = None;
+            return false;
+        };
+        let value = (y - height / 3.0).max(0.0);
+        let moved = (adjustment.value() - value).abs() >= 1.0;
+        self.imp().state.borrow_mut().aim = match moved && left > 0 {
+            true => Some((index, left - 1)),
+            false => None,
+        };
+        if moved {
+            // The move is the view's own, so the reader-scrolled path above
+            // must not see it and cancel the aim it is part of.
+            self.imp().state.borrow_mut().adjusting = true;
+            adjustment.set_value(value);
+            self.imp().state.borrow_mut().adjusting = false;
+            self.queue_draw();
+        }
+        moved
     }
 
     /// Selects the whole document.
