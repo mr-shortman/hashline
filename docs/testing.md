@@ -153,12 +153,51 @@ python3 benchmarks/run.py compare --provision --out benchmarks/results/<lauf>
   (`--idle-seconds`), und läuft dafür nur fünfmal (`--idle-repetitions`). Beide
   Fenster dreißigmal zu wiederholen wäre über anderthalb Stunden reines Warten
   für einen einzigen Zielwert.
+- `--repetitions` nimmt eine Zahl für alle Gruppen oder ein Budget je Gruppe:
+  `--repetitions content=30,memory=8`. Eine nackte Zahl verschiebt dabei die
+  Voreinstellung (`--repetitions 20,content=30`). Damit lässt sich eine feste
+  Zeit dorthin lenken, wo die Streuung ist: ein p95 braucht eine lange Reihe,
+  ein eingeschwungener PSS liegt beim achten Durchgang so wie beim dreißigsten.
+  Unterhalb von n=30 meldet die betroffene Zelle `sufficient: false`, und der
+  Lauf ist keine Abnahme — er bleibt aber eine gültige Messung.
 - `--plan` schreibt die geplante Matrix, ohne ein Fenster zu öffnen.
 - `--provision` beschafft Konkurrenzprogramme und Messwerkzeuge auf ihren
   festgeschriebenen Ständen nach `benchmarks/.provision/`; ins System wird nichts
   installiert.
 - `--refresh-hz` gilt für den **gesamten** Lauf und prüft nur die bereits
   eingestellte Rate. 60 gegen 120 Hz sind zwei Läufe, keine Umschaltung im Lauf.
+
+#### Eine Stunde, mit Konkurrenz
+
+Der vollständige Vergleich dauert rund sechzehn Stunden. Die Ziele aus
+[014](decisions/014-competitive-targets.md), die den Wettbewerb tragen, hängen
+aber an zwei Gruppen: `content` für „Start bis lesbarer Text" und `memory` für
+den PSS über die Dokumentgröße. Beides ist von außen messbar und für jedes
+Programm gleich. Der folgende Lauf misst genau das, in ungefähr einer Stunde:
+
+```sh
+python3 benchmarks/run.py compare \
+    --only content,memory --fixtures small,medium,large \
+    --viewers hashline,viewmd,mdview,md-viewer --renderers cairo \
+    --repetitions content=30,memory=8 --sample-seconds 3 \
+    --out benchmarks/results/<lauf>
+```
+
+480 Messungen: `content` mit n=30 auf drei Größen gegen drei Konkurrenten,
+`memory` mit n=8. Okular bleibt draußen, weil es als Referenz ausgewiesen ist
+und kein Peer; Vulkan bleibt draußen, weil [015](decisions/015-renderer-choice.md)
+den Renderer bereits entschieden hat.
+
+Zwei Stellschrauben sind **keine**: `--hold` und `--quick`. ViewMD braucht bei
+1 MiB 1,7 s bis zum ersten lesbaren Frame; ein kürzeres `--hold` macht daraus
+„kein Ergebnis" und schmeichelt Hashline. `--quick` senkt die Fixtures auf
+`small` und wirft damit genau die Achse weg, um die es geht.
+
+Die Reihenfolge der Matrix läuft durchgangsweise, nicht programmweise. Nach
+jedem vollen Durchgang haben alle Programme und Fixtures dieselbe Anzahl
+Messungen, und `report.json` wird nach jeder einzelnen Messung geschrieben. Ein
+Lauf, der nach einer Stunde mit Strg+C endet, ist deshalb kein verlorener Lauf,
+sondern ein kürzerer.
 
 Die Programme werden abwechselnd gemessen, ein Aufwärmdurchgang zählt nicht mit.
 Jeder Lauf schreibt fortlaufend `report.json` — Fixture-Hashes, Programmversion

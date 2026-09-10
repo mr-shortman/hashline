@@ -71,6 +71,39 @@ def counts(groups, repetitions):
     return {group: min(repetitions, REQUIRED.get(group, repetitions)) for group in groups}
 
 
+def plan_repetitions(value, groups, default, idle_default):
+    """`30`, `content=30,memory=8`, or a mix — a bare number moves the default.
+
+    An hour is a fixed budget, and the groups do not deserve equal shares of it.
+    A p95 needs a long series; a settled PSS is flat within a second and reads
+    the same on the eighth pass as on the thirtieth. Spending the budget where
+    the variance is beats one number for everything.
+    """
+    overrides = {}
+    for item in (value.split(',') if value else []):
+        name, separator, count = item.partition('=')
+        if not separator:
+            name, count = None, item
+        try:
+            number = int(count)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f'Not a repetition count: {item!r}')
+        if number < 1:
+            raise argparse.ArgumentTypeError(f'Repetitions must be positive: {item!r}')
+        if name is None:
+            default = number
+        elif name not in GROUPS:
+            raise argparse.ArgumentTypeError(f'Unknown group {name!r}; choose from: {", ".join(GROUPS)}')
+        else:
+            overrides[name] = number
+    planned = {group: overrides.get(group, default) for group in groups}
+    # The idle window is 30 s of waiting; without an explicit budget it keeps
+    # the small series the target asks for rather than the run-wide default.
+    if 'idle' in planned and 'idle' not in overrides:
+        planned['idle'] = min(planned['idle'], idle_default)
+    return planned
+
+
 def schedule(viewers, groups, fixtures, repetitions, warmup=True, refresh_hz=None):
     planned = counts(groups, repetitions)
     for iteration in range(-1 if warmup else 0, max(planned.values())):
@@ -192,7 +225,8 @@ def main():
     parser.add_argument('--viewers')
     parser.add_argument('--renderers', default='cairo,vulkan')
     parser.add_argument('--quick', action='store_true')
-    parser.add_argument('--repetitions', type=int)
+    parser.add_argument('--repetitions', help='A count for every group, or per-group budgets: '
+                        '"30", "content=30,memory=8", or "20,content=30"')
     parser.add_argument('--out', type=Path)
     parser.add_argument('--binary', type=Path, default=ROOT.parent / 'target/release/hashline')
     parser.add_argument('--provision', action='store_true')
@@ -220,16 +254,18 @@ def main():
         parser.error(str(error))
     if args.mode == 'bench' and viewers != ['hashline']:
         parser.error('bench measures hashline; use compare for other viewers')
-    args.repetitions = args.repetitions if args.repetitions is not None else (5 if args.quick else SERIES)
     args.sample_seconds = args.sample_seconds if args.sample_seconds is not None else (2 if args.quick else 5)
     args.idle_seconds = args.idle_seconds if args.idle_seconds is not None else (2 if args.quick else 30)
     args.idle_repetitions = args.idle_repetitions if args.idle_repetitions is not None else REQUIRED['idle']
-    repetitions = {group: min(args.repetitions, args.idle_repetitions) if group == 'idle' else args.repetitions
-                   for group in groups}
+    try:
+        repetitions = plan_repetitions(args.repetitions, groups, 5 if args.quick else SERIES,
+                                       args.idle_repetitions)
+    except argparse.ArgumentTypeError as error:
+        parser.error(str(error))
     if args.refresh_hz is not None and (not math.isfinite(args.refresh_hz) or args.refresh_hz <= 0):
         parser.error('--refresh-hz must be a finite positive number')
-    if min(repetitions.values()) < 1 or min(args.hold, args.settle, args.sample_seconds, args.idle_seconds) <= 0:
-        parser.error('Repetitions and durations must be positive')
+    if min(args.hold, args.settle, args.sample_seconds, args.idle_seconds) <= 0:
+        parser.error('Durations must be positive')
     out = (args.out or ROOT / 'results' / ('local-' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))).resolve()
     out.mkdir(parents=True, exist_ok=True)
     if (out / 'report.json').exists():

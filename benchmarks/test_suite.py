@@ -8,7 +8,7 @@ import zlib
 
 import content
 from presentation import analyze, presentations
-from run import accepted, counts, quantiles, schedule, summarize
+from run import accepted, counts, plan_repetitions, quantiles, schedule, summarize
 from fixtures import verify
 
 
@@ -56,6 +56,41 @@ class Reports(unittest.TestCase):
         self.assertEqual(counts(['memory', 'idle'], 30), {'memory': 30, 'idle': 5})
         self.assertEqual(sum(item[1] == 'memory' for item in items), 31)  # warmup and 30
         self.assertEqual(sum(item[1] == 'idle' for item in items), 6)     # warmup and 5
+
+    def test_per_group_repetition_budgets(self):
+        groups = ['content', 'memory', 'idle']
+        # A bare count is the old behaviour, and idle keeps its short series.
+        self.assertEqual(plan_repetitions('30', groups, 30, 5),
+                         {'content': 30, 'memory': 30, 'idle': 5})
+        self.assertEqual(plan_repetitions(None, groups, 30, 5),
+                         plan_repetitions('30', groups, 30, 5))
+        # An hour's budget: the p95 series stays long, the flat one gets short.
+        self.assertEqual(plan_repetitions('content=30,memory=8', ['content', 'memory'], 30, 5),
+                         {'content': 30, 'memory': 8})
+        # A bare number moves the default; named groups still win over it.
+        self.assertEqual(plan_repetitions('20,content=30', groups, 30, 5),
+                         {'content': 30, 'memory': 20, 'idle': 5})
+        # An explicit idle budget is not capped by the default short series.
+        self.assertEqual(plan_repetitions('idle=12', ['idle'], 30, 5), {'idle': 12})
+        for bad in ('content=0', 'bogus=3', 'content=x', '0'):
+            with self.subTest(bad), self.assertRaises(Exception):
+                plan_repetitions(bad, groups, 30, 5)
+
+    def test_short_group_budget_is_never_an_acceptance(self):
+        def row(group, iteration):
+            return {'viewer': 'hashline', 'renderer': 'cairo', 'group': group, 'fixture': 'small',
+                    'refreshHz': None, 'iteration': iteration, 'warmup': iteration < 0,
+                    'status': 'ok', 'metrics': {'readableUpperMs': 100, 'pssMiB': 20}}
+        planned = {'content': 30, 'memory': 8}
+        summary = summarize([row('content', i) for i in range(30)]
+                            + [row('memory', i) for i in range(8)], planned)
+        content_cell = next(cell for cell in summary if cell['group'] == 'content')
+        memory_cell = next(cell for cell in summary if cell['group'] == 'memory')
+        self.assertTrue(content_cell['complete'] and content_cell['sufficient'])
+        # Eight settled readings are a measurement, not an acceptance.
+        self.assertTrue(memory_cell['complete'])
+        self.assertFalse(memory_cell['sufficient'])
+        self.assertFalse(accepted(summary, True))
 
     def test_idle_cell_accepts_at_five_but_memory_does_not(self):
         def row(group, iteration, metric, value):
