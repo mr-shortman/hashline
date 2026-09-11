@@ -164,3 +164,28 @@ gemessen zu werden:
    Aufruf; ein Abschnitt mit rohem HTML wird einzeln gerendert und beginnt
    deshalb wieder bei 1. Dokumente mit rohem HTML _und_ Fußnoten sind der
    einzige betroffene Fall.
+
+## Nachtrag: Anker wie bei GitHub (11. September 2026)
+
+Die Slugregel aus Abschnitt 4 ist nicht mehr bitgenau die von `parser.ts`. Sie
+faltete Unterstriche und Leerzeichenfolgen zu einem einzigen `-`, sodass aus
+„Kopf_zeile“ `doc-kopf-zeile` wurde und ein für GitHub geschriebener Link
+`#kopf_zeile` ins Leere ging. Seitdem gilt, was GitHub mit dem Text einer
+Überschrift macht: `\p{L}\p{M}\p{N}\p{Pc}`, `-` und Leerraum bleiben, jedes
+Leerraumzeichen wird zu einem eigenen `-`. NFKC, Kleinschreibung, Trimmen, der
+Fallback `section`, das Präfix `doc-` und die Deduplizierung bleiben. Einen
+Fragmentlink löst der Leser in dieser Reihenfolge auf: die ID wie geschrieben,
+mit `doc-` davor, und zuletzt der Slug des Fragments selbst, damit auch
+`#Kopf_Zeile` trifft (`crates/hashline/src/outline/mod.rs`).
+
+Fußnoten tragen seitdem die ID `fn-<label>`, Verweis und Definition mit derselben
+Schreibweise, auch wenn das Label im Dokument in unterschiedlicher Groß- und
+Kleinschreibung steht — `pulldown-cmark` ordnet sie ohne Rücksicht darauf zu. Der
+Parser liefert die Definitionen als eigene Tabelle `anchors` aus, damit ein
+Klick auf eine Fußnote ihren Block findet, ohne dass die Überschriften dafür
+herhalten müssen.
+
+Eine gespeicherte Leseposition unter einer Überschrift, deren ID sich dadurch
+geändert hat — sie enthält `_` oder doppelten Leerraum —, findet diese nicht
+wieder. Gespeichert sind nur Überschrift und Abstand, kein Blockindex, also
+öffnet die Datei dann nahe ihrem Anfang.

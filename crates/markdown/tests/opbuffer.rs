@@ -22,6 +22,25 @@ fn carries_characters_outside_the_bmp_through_the_offsets() {
 }
 
 #[test]
+fn a_footnote_reference_links_to_the_id_its_definition_carries() {
+    // The labels differ in case and still name one footnote.
+    let doc = support::parse("Text[^Note].\n\nMehr Text.\n\n[^note]: Die Fußnote.\n");
+    let html = canonical(&doc.render());
+    assert!(html.contains("<a href=\"#fn-note\">1</a>"), "{html}");
+    assert!(html.contains("id=\"fn-note\""), "{html}");
+    // The anchor table names the id and an operation inside the definition,
+    // which is the last block of this document.
+    let anchors = &doc.document.anchors;
+    assert_eq!(anchors.len(), hashline_markdown::ANCHOR_WORDS);
+    assert_eq!(doc.strings.slice(anchors[0], anchors[1]), "fn-note");
+    let last = doc.block(doc.block_count() - 1);
+    assert!(
+        (last[1]..last[1] + last[2]).contains(&anchors[2]),
+        "{anchors:?} against {last:?}"
+    );
+}
+
+#[test]
 fn encodes_an_empty_document_without_operations_or_sections() {
     let doc = support::parse("");
     assert_eq!(doc.section_count(), 0);

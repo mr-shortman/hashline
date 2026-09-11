@@ -14,7 +14,7 @@
 
 use std::rc::Rc;
 
-use hashline_markdown::{OpDocument, HEADING_WORDS};
+use hashline_markdown::{slug_base, OpDocument, ANCHOR_WORDS, HEADING_WORDS};
 
 use crate::layout::{BlockKind, BlockPlan};
 
@@ -30,10 +30,20 @@ pub struct Entry {
     text: (u32, u32),
 }
 
+/// Something other than a heading that a `#fragment` can point at: a
+/// footnote's definition. It is not part of the outline the reader sees.
+#[derive(Clone, Copy, Debug)]
+pub struct Target {
+    /// The element's id, as a range into the document's string blob.
+    id: (u32, u32),
+    block: u32,
+}
+
 #[derive(Clone, Default)]
 pub struct Outline {
     document: Rc<OpDocument>,
     entries: Vec<Entry>,
+    targets: Vec<Target>,
 }
 
 impl Outline {
@@ -64,13 +74,36 @@ impl Outline {
         entries
     }
 
-    pub fn new(document: Rc<OpDocument>, entries: Vec<Entry>) -> Self {
-        Outline { document, entries }
+    /// The other link targets, from the parser's anchor table. Released by
+    /// the caller along with the heading table.
+    pub fn targets_of(document: &OpDocument, plan: &BlockPlan) -> Vec<Target> {
+        document
+            .anchors
+            .as_chunks::<ANCHOR_WORDS>()
+            .0
+            .iter()
+            .filter_map(|words| {
+                let block = plan.block_for_op(words[2])?;
+                Some(Target {
+                    id: (words[0], words[1]),
+                    block: block as u32,
+                })
+            })
+            .collect()
+    }
+
+    pub fn new(document: Rc<OpDocument>, entries: Vec<Entry>, targets: Vec<Target>) -> Self {
+        Outline {
+            document,
+            entries,
+            targets,
+        }
     }
 
     pub fn build(document: &Rc<OpDocument>, plan: &BlockPlan) -> Self {
         let entries = Self::entries_of(document, plan);
-        Outline::new(document.clone(), entries)
+        let targets = Self::targets_of(document, plan);
+        Outline::new(document.clone(), entries, targets)
     }
 
     pub fn entries(&self) -> &[Entry] {
@@ -103,12 +136,37 @@ impl Outline {
             .map_or("", |entry| Self::slice(&self.document.strings, entry.id))
     }
 
-    /// The block a `#fragment` link points at.
+    /// The block carrying exactly this id: a heading's, or a footnote's.
     pub fn block_for_id(&self, id: &str) -> Option<usize> {
+        let strings = &self.document.strings;
         self.entries
             .iter()
-            .position(|entry| Self::slice(&self.document.strings, entry.id) == id)
-            .map(|index| self.entries[index].block as usize)
+            .find(|entry| Self::slice(strings, entry.id) == id)
+            .map(|entry| entry.block as usize)
+            .or_else(|| {
+                self.targets
+                    .iter()
+                    .find(|target| Self::slice(strings, target.id) == id)
+                    .map(|target| target.block as usize)
+            })
+    }
+
+    /// The block a link's `#fragment` points at.
+    ///
+    /// The id is tried as written first, which is what a footnote reference
+    /// and a link copied from the outline carry. Then with the `doc-` prefix
+    /// every generated heading id has, because Markdown written for GitHub
+    /// links `#kapitel`. Last as the anchor the fragment's own text would get,
+    /// so that `#Foo_Bar` and `#FOO-BAR` still find their heading.
+    pub fn block_for_fragment(&self, fragment: &str) -> Option<usize> {
+        // An empty fragment would slug to `section` and find a heading of
+        // that name.
+        if fragment.is_empty() {
+            return None;
+        }
+        self.block_for_id(fragment)
+            .or_else(|| self.block_for_id(&format!("doc-{fragment}")))
+            .or_else(|| self.block_for_id(&format!("doc-{}", slug_base(fragment))))
     }
 
     /// The heading a reader is currently under, from the scroll position alone
@@ -181,6 +239,40 @@ mod tests {
         assert_eq!(outline.active_for_block(0), Some(0));
         assert_eq!(outline.active_for_block(second), Some(1));
         assert_eq!(outline.active_for_block(second + 1), Some(1));
+    }
+
+    #[test]
+    fn a_footnote_reference_finds_its_definition() {
+        let source = "# Text\n\nEin Satz[^quelle].\n\n## Quelle\n\nMehr.\n\n\
+                      > [^quelle]: In einem Zitat.\n";
+        let (outline, plan) = built(source);
+        // The reference names the footnote, not the heading of the same name.
+        let block = outline
+            .block_for_fragment("fn-quelle")
+            .expect("the definition");
+        assert!(matches!(
+            plan.block(block).kind,
+            crate::layout::BlockKind::Quote
+        ));
+        assert_eq!(
+            outline.block_for_fragment("quelle"),
+            outline.block_for_id("doc-quelle")
+        );
+        // Footnotes are link targets, not rows of the outline.
+        assert_eq!(outline.len(), 2);
+    }
+
+    #[test]
+    fn a_fragment_finds_its_heading_the_way_github_links_it() {
+        let (outline, _) = built("# Einleitung\n\n## Kopf_zeile\n\n## Schritt 1:  Los\n");
+        let heading = |index: usize| Some(outline.entries()[index].block as usize);
+        assert_eq!(outline.block_for_fragment("doc-einleitung"), heading(0));
+        assert_eq!(outline.block_for_fragment("einleitung"), heading(0));
+        assert_eq!(outline.block_for_fragment("kopf_zeile"), heading(1));
+        assert_eq!(outline.block_for_fragment("Kopf_Zeile"), heading(1));
+        assert_eq!(outline.block_for_fragment("schritt-1--los"), heading(2));
+        assert_eq!(outline.block_for_fragment("kopf-zeile"), None);
+        assert_eq!(outline.block_for_fragment(""), None);
     }
 
     #[test]

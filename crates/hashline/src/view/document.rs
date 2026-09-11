@@ -58,9 +58,8 @@ pub(crate) struct State {
     /// Called when a link is clicked. The view resolves nothing itself: what a
     /// relative path or a fragment means is the document controller's business.
     on_link: Option<LinkHandler>,
-    /// The search hit the view is still working its way onto, and how many
-    /// more passes it may take. See `settle_aim`.
-    aim: Option<(usize, u8)>,
+    /// The point the view is still working its way onto. See `settle_aim`.
+    aim: Option<Aim>,
     /// Set while the widget itself is moving the adjustment, so that the
     /// resulting notification is not mistaken for the user scrolling.
     adjusting: bool,
@@ -77,6 +76,21 @@ pub(crate) struct State {
 /// The handler a clicked link is passed to.
 type LinkHandler = Rc<dyn Fn(&str)>;
 
+/// A point of the document and where on screen it belongs: a search hit, the
+/// target of a jump, the line the reader was on before the plan was estimated
+/// again. The plan's answer for where the point is gets better as the blocks
+/// around it are set, so the view aims at it again after each set.
+#[derive(Clone, Copy, Debug)]
+struct Aim {
+    block: usize,
+    /// How far into the block the point lies, as a share of its height.
+    fraction: f64,
+    /// How far below the viewport's top edge it belongs.
+    from_top: f64,
+    /// How many more passes it may take.
+    left: u8,
+}
+
 /// How many set blocks to keep. A block that is evicted keeps its measured
 /// height in the plan, so eviction costs re-setting, never a jump.
 const CACHE_LIMIT: usize = 240;
@@ -85,11 +99,18 @@ const CACHE_LIMIT: usize = 240;
 /// 16 ms a frame has, so a frame that lands on top of one still fits.
 const BUFFER_SLICE: f64 = 6.0;
 
-/// How many frames a jump to a search hit may spend closing in on it. One pass
-/// was enough for the jump measured on the 100 KiB fixture; the rest is
-/// headroom for a plan whose estimates are further out than that, and a bound
-/// so that a target it never agrees with ends rather than loops.
+/// How many times an aim — a search hit, a jump, a restored position — may
+/// move the view while closing in on it. One pass was enough for the search
+/// jump measured on the 100 KiB fixture; the rest is headroom for a plan whose
+/// estimates are further out than that, and a bound so that a target it never
+/// agrees with ends rather than loops.
 const AIM_PASSES: u8 = 8;
+
+/// How far below the top padding the line lies that decides which section the
+/// reader is in. A jump settles within a pixel of its target (`settle_aim`),
+/// and a heading jumped to must be the one the outline marks, not whichever
+/// side of its edge the last fraction of a pixel fell on.
+const SECTION_LINE_SLACK: f64 = 1.5;
 
 /// How many code blocks keep their syntax colours. Twice the layout cache,
 /// because a span is 12 bytes where a set block is a Pango layout: scrolling
@@ -420,12 +441,14 @@ impl DocumentView {
             column,
         );
         let entries = Outline::entries_of(&document, &plan);
-        // Both tables have been copied out now: the plan holds the blocks and
-        // the outline holds the headings it needs.
+        let targets = Outline::targets_of(&document, &plan);
+        // The tables have been copied out now: the plan holds the blocks and
+        // the outline holds the headings and link targets it needs.
         document.blocks = Vec::new();
         document.headings = Vec::new();
+        document.anchors = Vec::new();
         let document = Rc::new(document);
-        let outline = Rc::new(Outline::new(document.clone(), entries));
+        let outline = Rc::new(Outline::new(document.clone(), entries, targets));
         {
             let mut state = self.imp().state.borrow_mut();
             state.accessible = None;
@@ -437,6 +460,8 @@ impl DocumentView {
             state.selection = None;
             state.hits.clear();
             state.current_hit = None;
+            // A point of the old document means nothing in the new one.
+            state.aim = None;
             state.highlights.clear();
             state.coloured.clear();
         }
@@ -554,21 +579,86 @@ impl DocumentView {
     /// block was made of do not depend on either, so the plan is re-estimated
     /// in place rather than rebuilt — which is also what lets the document's
     /// own block table be released once the plan exists.
+    ///
+    /// Every measured height goes with it, and so does the meaning of the
+    /// scroll offset: the same number now points at other text. The line the
+    /// reader is on is therefore taken before and aimed at after — the block
+    /// under the top padding, and how far into it, in proportion, because
+    /// that block changes height too.
+    ///
+    /// Nothing happens unless the column or the type actually changed. A tab
+    /// coming back into view has an empty layout cache but the same plan, and
+    /// treating the empty cache as a reason to re-estimate threw away every
+    /// measurement whenever such a tab was allocated — back at a height one
+    /// pixel different, say — and moved the reader by 34 pixels on the test.
     fn reflow_for(&self, width: f64) {
         let column = self.column_width(width);
-        let char_width = self.char_width();
-        let mut state = self.imp().state.borrow_mut();
-        let body_px = state.body_px();
-        if (state.plan.width() - column).abs() < 0.5 && !state.cache.is_empty() {
-            return;
-        }
         let metrics = Metrics {
-            char_width,
-            body_px,
+            char_width: self.char_width(),
+            body_px: self.imp().state.borrow().body_px(),
         };
-        state.plan.reflow(metrics, column);
-        state.cache.clear();
-        state.recent.clear();
+        let line = self.scroll_top() + tokens::PAD_TOP;
+        let aim = {
+            let mut state = self.imp().state.borrow_mut();
+            if (state.plan.width() - column).abs() < 0.5 && state.plan.metrics() == metrics {
+                return;
+            }
+            // An aim still being worked towards is the better answer: a
+            // window dragged wider reflows once per frame, and taking the line
+            // afresh from a view that has not settled let it drift.
+            let aim = state.aim.or_else(|| {
+                (!state.plan.is_empty()).then(|| {
+                    let block = state.plan.block_at(line);
+                    let height = state.plan.block(block).height();
+                    let into = line - state.plan.y_of(block);
+                    Aim {
+                        block,
+                        fraction: if height > 0.0 {
+                            (into / height).clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        },
+                        from_top: tokens::PAD_TOP,
+                        left: AIM_PASSES,
+                    }
+                })
+            });
+            state.plan.reflow(metrics, column);
+            state.cache.clear();
+            state.recent.clear();
+            aim
+        };
+        // Quietly: this is not the reader scrolling, and it can run inside an
+        // allocation, where the outline must not be told anything.
+        if let Some(aim) = aim {
+            self.aim_at(Aim {
+                left: AIM_PASSES,
+                ..aim
+            });
+        }
+    }
+
+    /// Tells the adjustment how tall the document is now, before anything
+    /// moves it. A value is clamped to the height the adjustment last heard
+    /// of, and right after a document arrives or the plan is re-estimated
+    /// that is the height of something else: a stored reading position or a
+    /// link's target in a freshly opened file landed at the top for that
+    /// reason alone.
+    fn fit_adjustment(&self) {
+        let Some(adjustment) = self.vadjustment() else {
+            return;
+        };
+        let upper = self
+            .imp()
+            .state
+            .borrow()
+            .plan
+            .total_height()
+            .max(self.view_height());
+        let mut state = self.imp().state.borrow_mut();
+        state.adjusting = true;
+        adjustment.set_upper(upper);
+        state.adjusting = false;
     }
 
     fn update_adjustment(&self, _width: f64, height: f64) {
@@ -1290,9 +1380,8 @@ impl DocumentView {
         if state.plan.is_empty() {
             return None;
         }
-        state
-            .outline
-            .active_for_block(state.plan.block_at(self.scroll_top() + tokens::PAD_TOP))
+        let line = self.scroll_top() + tokens::PAD_TOP + SECTION_LINE_SLACK;
+        state.outline.active_for_block(state.plan.block_at(line))
     }
 
     pub fn outline(&self) -> Rc<Outline> {
@@ -1304,9 +1393,19 @@ impl DocumentView {
         self.imp().state.borrow_mut().on_link = Some(Rc::new(handler));
     }
 
-    /// Jumps to a heading by its generated id, for a `#fragment` link.
-    pub fn scroll_to_anchor(&self, id: &str) -> bool {
-        let target = self.imp().state.borrow().outline.block_for_id(id);
+    /// Jumps to what a link's `#fragment` names — a heading or a footnote —
+    /// and says whether there was anything there. An empty fragment is the top
+    /// of the document, as it is in a browser.
+    pub fn scroll_to_anchor(&self, fragment: &str) -> bool {
+        let target = if fragment.is_empty() {
+            Some(0)
+        } else {
+            self.imp()
+                .state
+                .borrow()
+                .outline
+                .block_for_fragment(fragment)
+        };
         match target {
             Some(block) => {
                 self.scroll_to_block(block);
@@ -1356,7 +1455,7 @@ impl DocumentView {
 
     /// Puts the reader back where the anchor says, after a reload.
     pub fn restore_anchor(&self, anchor: &Anchor) {
-        let target = {
+        let (block, target) = {
             let state = self.imp().state.borrow();
             if state.plan.is_empty() {
                 return;
@@ -1366,11 +1465,18 @@ impl DocumentView {
                 .as_deref()
                 .and_then(|id| state.outline.block_for_id(id))
                 .unwrap_or_else(|| anchor.block.min(state.plan.len() - 1));
-            state.plan.y_of(block) + anchor.distance
+            (block, state.plan.y_of(block) + anchor.distance)
         };
+        self.fit_adjustment();
         if let Some(adjustment) = self.vadjustment() {
             adjustment.set_value(target.max(0.0));
         }
+        self.imp().state.borrow_mut().aim = Some(Aim {
+            block,
+            fraction: 0.0,
+            from_top: -anchor.distance,
+            left: AIM_PASSES,
+        });
         self.queue_draw();
     }
 
@@ -1499,15 +1605,57 @@ impl DocumentView {
         self.queue_draw();
     }
 
+    /// A search hit goes a third of the way down the viewport.
     fn scroll_to_block_centred(&self, index: usize) {
         if index >= self.imp().state.borrow().plan.len() {
             return;
         }
-        self.imp().state.borrow_mut().aim = Some((index, AIM_PASSES));
-        self.settle_aim();
+        self.aim_at(Aim {
+            block: index,
+            fraction: 0.0,
+            from_top: self.view_height() / 3.0,
+            left: AIM_PASSES,
+        });
     }
 
-    /// Brings the aimed-at hit a third of the way down the viewport, and says
+    /// Aims at a point and goes there at once. The aim stays for the draw
+    /// passes to refine: that the view already sits where the estimates put
+    /// the point says nothing yet about where the measurements will.
+    fn aim_at(&self, aim: Aim) {
+        self.imp().state.borrow_mut().aim = Some(aim);
+        self.move_to_aim();
+    }
+
+    /// Moves the viewport onto the aim, quietly, and says whether it had to.
+    fn move_to_aim(&self) -> bool {
+        let Some(aim) = self.imp().state.borrow().aim else {
+            return false;
+        };
+        let point = {
+            let state = self.imp().state.borrow();
+            (aim.block < state.plan.len()).then(|| {
+                state.plan.y_of(aim.block) + aim.fraction * state.plan.block(aim.block).height()
+            })
+        };
+        let (Some(point), Some(adjustment)) = (point, self.vadjustment()) else {
+            self.imp().state.borrow_mut().aim = None;
+            return false;
+        };
+        let value = (point - aim.from_top).max(0.0);
+        let moved = (adjustment.value() - value).abs() >= 1.0;
+        if moved {
+            self.fit_adjustment();
+            // The move is the view's own, so the reader-scrolled path above
+            // must not see it and cancel the aim it is part of.
+            self.imp().state.borrow_mut().adjusting = true;
+            adjustment.set_value(value);
+            self.imp().state.borrow_mut().adjusting = false;
+            self.queue_draw();
+        }
+        moved
+    }
+
+    /// Brings the aimed-at point to its place in the viewport, and says
     /// whether that moved the view.
     ///
     /// `y_of` is exact for blocks that have been set and an estimate for the
@@ -1521,32 +1669,28 @@ impl DocumentView {
     /// costs one viewport of setting and one frame, and the counter bounds a
     /// target the plan never agrees with to a handful of them rather than a
     /// livelock.
+    ///
+    /// The draw pass alone does not keep a point still: it holds the text
+    /// still against blocks wholly above the viewport, and the block cut by
+    /// the top edge — the one just above a heading that was jumped to — grows
+    /// or shrinks when it is set and moves everything beneath it.
+    ///
+    /// A pass that needed no move does not end the aim. The blocks above the
+    /// viewport are set later, in idle slices, and a restored reading position
+    /// is measured from a heading up there: each of those blocks that differs
+    /// from its estimate moves the point again, by ten pixels on the reader
+    /// test. The aim ends when the reader scrolls, when another document
+    /// arrives, or once it has moved the view `AIM_PASSES` times.
     fn settle_aim(&self) -> bool {
-        let Some((index, left)) = self.imp().state.borrow().aim else {
-            return false;
-        };
-        let height = self.view_height();
-        let y = {
-            let state = self.imp().state.borrow();
-            (index < state.plan.len()).then(|| state.plan.y_of(index))
-        };
-        let (Some(y), Some(adjustment)) = (y, self.vadjustment()) else {
-            self.imp().state.borrow_mut().aim = None;
-            return false;
-        };
-        let value = (y - height / 3.0).max(0.0);
-        let moved = (adjustment.value() - value).abs() >= 1.0;
-        self.imp().state.borrow_mut().aim = match moved && left > 0 {
-            true => Some((index, left - 1)),
-            false => None,
-        };
+        let moved = self.move_to_aim();
         if moved {
-            // The move is the view's own, so the reader-scrolled path above
-            // must not see it and cancel the aim it is part of.
-            self.imp().state.borrow_mut().adjusting = true;
-            adjustment.set_value(value);
-            self.imp().state.borrow_mut().adjusting = false;
-            self.queue_draw();
+            let mut state = self.imp().state.borrow_mut();
+            state.aim = state.aim.and_then(|aim| {
+                Some(Aim {
+                    left: aim.left.checked_sub(1)?,
+                    ..aim
+                })
+            });
         }
         moved
     }
@@ -1592,9 +1736,17 @@ impl DocumentView {
             }
             state.plan.y_of(index)
         };
+        self.fit_adjustment();
         if let Some(adjustment) = self.vadjustment() {
             adjustment.set_value(y - tokens::PAD_TOP);
         }
+        // After the move, which as the reader's own cancels any older aim.
+        self.imp().state.borrow_mut().aim = Some(Aim {
+            block: index,
+            fraction: 0.0,
+            from_top: tokens::PAD_TOP,
+            left: AIM_PASSES,
+        });
         self.queue_draw();
     }
 }
@@ -1712,6 +1864,13 @@ impl DocumentView {
     }
     pub(crate) fn block_top(&self, index: usize) -> f64 {
         self.imp().state.borrow().plan.y_of(index)
+    }
+    /// What a click on a link with this target does.
+    pub(crate) fn follow_link(&self, href: &str) {
+        let handler = self.imp().state.borrow().on_link.clone();
+        if let Some(handler) = handler {
+            handler(href);
+        }
     }
 
     pub(crate) fn verify_accessibility_and_selection(&self) {

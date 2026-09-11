@@ -42,6 +42,7 @@ const SECTION_BUDGET: usize = 16_384;
 /// Words per section: opStart, opCount, hashLow, hashHigh, textStart, textLen.
 pub const SECTION_WORDS: usize = 6;
 pub const HEADING_WORDS: usize = 4;
+pub const ANCHOR_WORDS: usize = 3;
 
 #[derive(Default)]
 pub struct OpDocument {
@@ -64,6 +65,11 @@ pub struct OpDocument {
     /// The heading's text is not repeated here — it is the text of the heading
     /// block, and the outline reads it from there.
     pub headings: Vec<u32>,
+    /// `ANCHOR_WORDS` words per element other than a heading that a
+    /// `#fragment` can point at — today a footnote definition: idOffset,
+    /// idLen, and the offset of an operation inside the element, which is
+    /// what finds its block even where the plan has cut that block up.
+    pub anchors: Vec<u32>,
     /// Whether the document contained raw HTML shown as source text. The view
     /// uses it for the single quiet notice SPEC.md, section 6 asks for.
     pub raw_html: bool,
@@ -86,7 +92,9 @@ struct Builder {
     slugs: slug::Slugs,
     sections: Vec<u32>,
     headings: Vec<Heading>,
+    /// Footnote numbers, keyed by the folded label.
     footnotes: HashMap<String, usize>,
+    anchors: Vec<u32>,
     aligns: Vec<Alignment>,
     cell: usize,
     in_head: bool,
@@ -99,6 +107,16 @@ struct Builder {
 
 fn tag_id(name: &str) -> u32 {
     ALLOWED_TAGS.iter().position(|&t| t == name).unwrap() as u32
+}
+
+/// The id of a footnote's definition, which its references link to.
+///
+/// Labels match without regard to case — `[^Note]` refers to `[^note]:` —
+/// so reference and definition may spell one label two ways, and both have to
+/// arrive at the same id and the same number. The `fn-` prefix is GitHub's,
+/// and it keeps a footnote apart from a heading: those are all `doc-…`.
+fn footnote_id(label: &str) -> String {
+    format!("fn-{}", label.to_lowercase())
 }
 
 // The character set CommonMark's reference implementation leaves unescaped in
@@ -133,6 +151,7 @@ impl Builder {
             sections: Vec::new(),
             headings: Vec::new(),
             footnotes: HashMap::new(),
+            anchors: Vec::new(),
             aligns: Vec::new(),
             cell: 0,
             in_head: false,
@@ -162,7 +181,7 @@ impl Builder {
     }
     fn footnote_number(&mut self, name: &str) -> usize {
         let next = self.footnotes.len() + 1;
-        *self.footnotes.entry(name.to_owned()).or_insert(next)
+        *self.footnotes.entry(name.to_lowercase()).or_insert(next)
     }
     fn text(&mut self, value: &str) {
         match self.image.as_mut() {
@@ -228,10 +247,16 @@ impl Builder {
             Tag::Item => self.open(TAG_LI),
             Tag::FootnoteDefinition(name) => {
                 let number = self.footnote_number(name).to_string();
+                let id = footnote_id(name);
                 self.open_with(
                     TAG_DIV,
-                    &[(ATTR_CLASS, "footnote-definition"), (ATTR_ID, name)],
+                    &[(ATTR_CLASS, "footnote-definition"), (ATTR_ID, &id)],
                 );
+                // Recorded after the open, so the offset lies inside the
+                // element even when text before it was flushed by the open.
+                let (id_offset, id_len) = self.enc.reference(&id);
+                let inside = self.enc.ops.len() as u32;
+                self.anchors.extend_from_slice(&[id_offset, id_len, inside]);
                 self.open_with(TAG_SUP, &[(ATTR_CLASS, "footnote-definition-label")]);
                 self.text(&number);
                 self.enc.close();
@@ -385,7 +410,7 @@ impl Builder {
             }
             Event::FootnoteReference(name) => {
                 let number = self.footnote_number(name).to_string();
-                let href = format!("#{name}");
+                let href = format!("#{}", footnote_id(name));
                 self.open_with(TAG_SUP, &[(ATTR_CLASS, "footnote-reference")]);
                 self.open_with(TAG_A, &[(ATTR_HREF, &href)]);
                 self.text(&number);
@@ -506,6 +531,7 @@ pub fn parse(source: &str) -> OpDocument {
             .extend_from_slice(&[heading.level, id_offset, id_len, heading.section]);
     }
     document.raw_html = builder.raw_html;
+    document.anchors = std::mem::take(&mut builder.anchors);
     document.blocks = std::mem::take(&mut builder.enc.blocks);
     document.ops = std::mem::take(&mut builder.enc.ops);
     document.strings = std::mem::take(&mut builder.enc.strings);
@@ -520,5 +546,6 @@ pub fn parse(source: &str) -> OpDocument {
     document.blocks.shrink_to_fit();
     document.sections.shrink_to_fit();
     document.headings.shrink_to_fit();
+    document.anchors.shrink_to_fit();
     document
 }

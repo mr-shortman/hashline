@@ -34,12 +34,32 @@ glib-compile-schemas --strict --targetdir=/tmp/hashline-test-schemas data
 
 Der explizite GTK-Integrationstest öffnet Testfenster. Er prüft
 Fensterwiederverwendung, Tabs samt Ctrl+W und Ctrl+Tab, Menüaktionen,
-Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen, die Textschnittstelle
-und den Leseanker über einen Neuladevorgang. Zum isolierten Betrieb kann
-`gtk4-broadwayd :9` in einem separaten Terminal laufen:
+Themenzustand, Escape-Reihenfolge, Auswahl nach Loslassen, die Textschnittstelle,
+den Leseanker über einen Neuladevorgang, die Leseposition über Zoom, schmalere
+Spalte und Tabwechsel, Links in andere Dateien samt `#fragment`, Fußnoten,
+GitHub-Anker und dass zwei Schreibweisen desselben Pfads einen Tab ergeben. Zum
+isolierten Betrieb kann `gtk4-broadwayd :9` in einem separaten Terminal laufen:
 
 ```sh
 dbus-run-session -- env GDK_BACKEND=broadway BROADWAY_DISPLAY=:9 GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory cargo test -p hashline -- --ignored --exact app::tests::native_ui
+```
+
+Broadway zeichnet ohne verbundenen Browser kaum Bilder, und alles, was erst ein
+gezeichnetes Bild setzt — ein gesetzter Block, eine gemessene Höhe —, bleibt
+dann aus; der Test scheitert daran, nicht am Leser. Verlässlich ist eine
+kopflose GNOME Shell mit virtuellem Monitor, ebenfalls ohne Fenster auf dem
+eigenen Bildschirm. Das Skript wartet auf den Socket und startet den Test
+dagegen:
+
+```sh
+dbus-run-session -- sh -c '
+  gnome-shell --headless --wayland --no-x11 --virtual-monitor 1280x900 \
+      --wayland-display=hashline-test >/dev/null 2>&1 & shell=$!
+  until [ -S "$XDG_RUNTIME_DIR/hashline-test" ]; do sleep 0.1; done
+  WAYLAND_DISPLAY=hashline-test GDK_BACKEND=wayland \
+      GSETTINGS_SCHEMA_DIR=/tmp/hashline-test-schemas GSETTINGS_BACKEND=memory \
+      cargo test -p hashline -- --ignored --exact app::tests::native_ui
+  status=$?; kill $shell; exit $status'
 ```
 
 Der zweite Fenstertest misst die **längste zusammenhängende Hauptthread-Aufgabe**

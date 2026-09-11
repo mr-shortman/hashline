@@ -85,7 +85,7 @@ impl BlockKind {
 }
 
 /// What estimating a height needs to know about the type.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Metrics {
     /// Mean advance of the body font, in logical pixels.
     pub char_width: f64,
@@ -447,6 +447,17 @@ impl BlockPlan {
         let first = &self.blocks[range.start];
         let last = &self.blocks[range.end - 1];
         (first.text_start, last.text_start + last.text_len)
+    }
+
+    /// The block whose operations contain the byte offset `op`, for an
+    /// element that sits somewhere inside a block — a footnote definition
+    /// inside a quote as much as one on its own. Every part of a cut-up block
+    /// carries the whole block's operations, so this is always the first part.
+    pub fn block_for_op(&self, op: u32) -> Option<usize> {
+        let index = self
+            .blocks
+            .partition_point(|block| block.op_start + block.op_count <= op);
+        (index < self.blocks.len() && self.blocks[index].op_start <= op).then_some(index)
     }
 
     /// The block whose text range contains `offset`, for a search hit or a

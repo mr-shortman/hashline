@@ -740,9 +740,22 @@ impl Ui {
     /// Reads and parses off the main thread, then applies the result if it is
     /// still the newest request (SPEC.md, sections 5 and 10).
     fn open(self: &Rc<Self>, path: &Path) {
-        if let Some(open) = self.tab_for(path) {
+        self.open_at(path, None);
+    }
+
+    /// Opens a file and, once it is in place, jumps to a `#fragment` in it.
+    ///
+    /// The jump has to wait for the load, which runs on a thread of its own:
+    /// scheduled as an idle callback instead, it ran against the tab that was
+    /// in front before the document had even been read.
+    fn open_at(self: &Rc<Self>, path: &Path, fragment: Option<String>) {
+        let path = document::normalize(path);
+        if let Some(open) = self.tab_for(&path) {
             if let Some(index) = self.notebook.page_num(&open.page) {
                 self.notebook.set_current_page(Some(index));
+            }
+            if let Some(fragment) = fragment {
+                self.follow_fragment(&open, &fragment);
             }
             return;
         }
@@ -750,7 +763,16 @@ impl Ui {
         if let Some(index) = self.notebook.page_num(&tab.page) {
             self.notebook.set_current_page(Some(index));
         }
-        self.load(&tab, path, None);
+        self.load(&tab, &path, None, fragment);
+    }
+
+    /// Jumps to a link's `#fragment` in one tab, or says that it is not there.
+    fn follow_fragment(self: &Rc<Self>, tab: &Tab, fragment: &str) -> bool {
+        let found = tab.view.scroll_to_anchor(fragment);
+        if !found {
+            self.note(&format!("Kein Abschnitt „{fragment}“ in diesem Dokument"));
+        }
+        found
     }
 
     /// The tab already showing `path`, if there is one.
@@ -767,7 +789,7 @@ impl Ui {
         let path = tab.path.borrow().clone();
         if let Some(path) = path {
             let anchor = tab.view.reading_anchor();
-            self.load(tab, &path, Some(anchor));
+            self.load(tab, &path, Some(anchor), None);
         }
     }
 
@@ -778,7 +800,15 @@ impl Ui {
         }
     }
 
-    fn load(self: &Rc<Self>, tab: &Rc<Tab>, path: &Path, anchor: Option<Anchor>) {
+    /// `anchor` is where the reader was, for a reload; `fragment` is where a
+    /// link into this file points, for a first load.
+    fn load(
+        self: &Rc<Self>,
+        tab: &Rc<Tab>,
+        path: &Path,
+        anchor: Option<Anchor>,
+        fragment: Option<String>,
+    ) {
         let path = path.to_path_buf();
         tab.request.set(tab.request.get() + 1);
         let request = tab.request.get();
@@ -819,7 +849,11 @@ impl Ui {
                         .flatten();
                     tab.digest.set(digest);
                     ui.show(&tab, loaded.path, parsed);
-                    if let Some(anchor) = loaded.anchor.or(stored) {
+                    // A link's target outranks where reading last stopped;
+                    // a target that is not there falls back to it.
+                    let jumped =
+                        fragment.is_some_and(|fragment| ui.follow_fragment(&tab, &fragment));
+                    if let Some(anchor) = loaded.anchor.or(stored).filter(|_| !jumped) {
                         tab.view.restore_anchor(&anchor);
                     }
                     release_free_memory();
@@ -936,13 +970,7 @@ impl Ui {
                 .unwrap_or_else(|| href.to_string());
 
             if let Some(fragment) = decoded.strip_prefix('#') {
-                // Markdown writes `#kapitel`; the generated ids are prefixed,
-                // so both spellings are tried before giving up.
-                if !tab.view.scroll_to_anchor(fragment)
-                    && !tab.view.scroll_to_anchor(&format!("doc-{fragment}"))
-                {
-                    ui.note(&format!("Kein Abschnitt „{fragment}“ in diesem Dokument"));
-                }
+                ui.follow_fragment(&tab, fragment);
                 return;
             }
 
@@ -966,22 +994,17 @@ impl Ui {
                         .unwrap_or_else(|| PathBuf::from("."));
                     // Relative paths resolve against the document, never
                     // against the process working directory.
+                    // `andere.md#` has nothing to jump to.
                     let (target, fragment) = match decoded.split_once('#') {
-                        Some((path, fragment)) => (path, Some(fragment.to_string())),
+                        Some((path, fragment)) => (
+                            path,
+                            Some(fragment.to_string()).filter(|fragment| !fragment.is_empty()),
+                        ),
                         None => (decoded.as_str(), None),
                     };
                     let resolved = base.join(target);
                     if is_markdown(&resolved) {
-                        ui.open(&resolved);
-                        if let Some(fragment) = fragment {
-                            // The jump happens once the document is in place.
-                            let ui = ui.clone();
-                            glib::idle_add_local_once(move || {
-                                if let Some(view) = ui.view() {
-                                    view.scroll_to_anchor(&format!("doc-{fragment}"));
-                                }
-                            });
-                        }
+                        ui.open_at(&resolved, fragment);
                     } else {
                         ui.note(&format!(
                             "Nur Markdown-Dateien werden geöffnet: {}",
@@ -1604,6 +1627,220 @@ mod tests {
         pump();
     }
 
+    /// Pumps until `done` holds, for work that finishes on another thread.
+    fn wait_for(what: &str, mut done: impl FnMut() -> bool) {
+        for _ in 0..50 {
+            pump();
+            if done() {
+                return;
+            }
+        }
+        panic!("gave up waiting for {what}");
+    }
+
+    /// The outline row of a heading id, which is what `active_section` names.
+    fn heading_index(view: &DocumentView, id: &str) -> Option<usize> {
+        let outline = view.outline();
+        (0..outline.len()).find(|&index| outline.id(index) == id)
+    }
+
+    fn sections_with_long_paragraphs(count: usize) -> String {
+        let paragraph = "Ein Absatz, der lang genug ist, um in einer schmalen Spalte \
+                         mehrmals umzubrechen, und in einer breiten seltener. "
+            .repeat(3);
+        (0..count)
+            .map(|index| format!("## Abschnitt {index}\n\n{paragraph}\n\n"))
+            .collect()
+    }
+
+    /// The line being read stays on screen through everything that sets the
+    /// document again without changing it: a zoom, a narrower column, and
+    /// another tab in front for a while. Each of them re-estimated the plan
+    /// and kept the scroll offset, which by then pointed at other text.
+    fn verify_reading_line_survives_a_reflow(ui: &Rc<Ui>) {
+        let tab = ui.new_tab();
+        tab.view
+            .set_document(hashline_markdown::parse(&sections_with_long_paragraphs(80)));
+        let other = ui.new_tab();
+        other
+            .view
+            .set_document(hashline_markdown::parse("# Anderes\n\nText.\n"));
+        let front = |tab: &Tab| {
+            let index = ui.notebook.page_num(&tab.page).expect("a page");
+            ui.notebook.set_current_page(Some(index));
+            pump();
+        };
+        front(&tab);
+        let target = tab
+            .view
+            .outline()
+            .block_for_id("doc-abschnitt-50")
+            .expect("the fifty-first heading");
+        tab.view.scroll_to_block(target);
+        pump();
+        // A little into the section, the way a reader sits in one: a line
+        // exactly on a block's edge belongs to either block by rounding.
+        let adjustment = tab.view.vadjustment().expect("a scrollable view");
+        adjustment.set_value(adjustment.value() + 20.0);
+        pump();
+        let section = tab.view.active_section();
+        assert_eq!(section, heading_index(&tab.view, "doc-abschnitt-50"));
+        let offset = || tab.view.scroll_offset() - tab.view.block_top(target);
+        // Where the heading sits against where it sat, within what re-setting
+        // the text at another size may fairly move a line inside its block.
+        let check = |what: &str, before: f64, tolerance: f64| {
+            assert_eq!(
+                tab.view.active_section(),
+                section,
+                "{what}: the reader must still be under the same heading"
+            );
+            let now = offset();
+            assert!(
+                (now - before).abs() < tolerance,
+                "{what}: the heading moved on screen, {now} against {before}"
+            );
+        };
+
+        let before = offset();
+        ui.set_zoom(150);
+        pump();
+        check("zoom in", before, 40.0);
+        ui.set_zoom(100);
+        pump();
+        check("zoom back", before, 40.0);
+
+        // Narrow enough that the column has to give way, however wide the
+        // test window came up.
+        let before = offset();
+        let width = tab.page.width();
+        tab.page.set_margin_end(width - (width * 3 / 5).min(420));
+        pump();
+        check("narrower column", before, 40.0);
+        tab.page.set_margin_end(0);
+        pump();
+        check("wider column", before, 40.0);
+
+        // Coming back to a tab re-sets the blocks on screen. It must not
+        // estimate them again, even when the tab comes back at another height:
+        // that is an allocation while its layout cache is still empty, which
+        // re-estimated the whole plan and moved the heading by 34 pixels.
+        // Nothing about the column changed, so nothing may move at all.
+        let before = offset();
+        front(&other);
+        assert!(!tab.view.holds_layouts());
+        tab.page.set_margin_bottom(1);
+        front(&tab);
+        check("tab switch", before, 1.0);
+        tab.page.set_margin_bottom(0);
+        pump();
+        check("height back", before, 1.0);
+
+        ui.close_tab(&other);
+        ui.close_tab(&tab);
+    }
+
+    /// Links into another file land on their target, a file reached by two
+    /// spellings of its path is one tab, and footnote and GitHub-style
+    /// fragments find what they name.
+    fn verify_links_between_files(ui: &Rc<Ui>, dir: &Path) {
+        let below = dir.join("unter");
+        std::fs::create_dir_all(&below).unwrap();
+        let mut source = sections_with_long_paragraphs(60);
+        source = source.replacen(
+            "## Abschnitt 2\n\n",
+            "## Abschnitt 2\n\nEin Satz mit Fußnote[^Quelle].\n\n",
+            1,
+        );
+        source = source.replacen(
+            "## Abschnitt 40\n\n",
+            "[^quelle]: Die Quelle, mitten im Dokument.\n\n## Abschnitt 40\n\n",
+            1,
+        );
+        source = source.replacen(
+            "## Abschnitt 45\n\n",
+            "## Kopf_zeile\n\nText.\n\n## Abschnitt 45\n\n",
+            1,
+        );
+        let target = dir.join("ziel.md");
+        std::fs::write(&target, source).unwrap();
+        let start = below.join("start.md");
+        std::fs::write(&start, "[weiter](../ziel.md#abschnitt-30)\n").unwrap();
+        let target = document::normalize(&target);
+        let count = ui.tabs.borrow().len();
+        let in_front = |path: &Path| {
+            ui.tab()
+                .is_some_and(|tab| tab.path.borrow().as_deref() == Some(path))
+        };
+
+        ui.open(&start);
+        wait_for("the start file", || in_front(&document::normalize(&start)));
+        let from = ui.tab().unwrap();
+
+        // Into a file that is not open yet: the jump waits for the load.
+        from.view.follow_link("../ziel.md#abschnitt-30");
+        wait_for("the linked file", || in_front(&target));
+        let ziel = ui.tab().unwrap();
+        pump();
+        assert_eq!(
+            ziel.view.active_section(),
+            heading_index(&ziel.view, "doc-abschnitt-30"),
+            "the link's fragment must be where the new tab opens"
+        );
+
+        // The same file by another path is the tab already open, and the
+        // GitHub spelling of an underscore heading finds it.
+        from.view.follow_link("../unter/../ziel.md#kopf_zeile");
+        pump();
+        assert_eq!(ui.tabs.borrow().len(), count + 2, "no second tab");
+        assert!(in_front(&target));
+        let kopf = heading_index(&ziel.view, "doc-kopf_zeile");
+        assert!(kopf.is_some(), "the heading keeps its underscore");
+        assert_eq!(ziel.view.active_section(), kopf);
+
+        // A footnote reference jumps to its definition, which is not a heading.
+        ziel.view.follow_link("#fn-quelle");
+        pump();
+        let footnote = ziel
+            .view
+            .outline()
+            .block_for_fragment("fn-quelle")
+            .expect("the definition");
+        assert!(
+            (ziel.view.scroll_offset() - (ziel.view.block_top(footnote) - tokens::PAD_TOP)).abs()
+                < 1.0,
+            "the definition must be at the top of the view"
+        );
+        ziel.view.follow_link("#gibt-es-nicht");
+        assert!(ui.notice.reveals_child());
+        assert!(ui.notice_label.text().contains("gibt-es-nicht"));
+
+        // Closing keeps the position under the one spelling of the path, and
+        // opening the file again by the other one finds it.
+        ziel.view.follow_link("#kopf_zeile");
+        pump();
+        ui.close_tab(&ziel);
+        ui.open(&below.join("../ziel.md"));
+        wait_for("the file again", || in_front(&target));
+        pump();
+        let again = ui.tab().unwrap();
+        // To the pixel, not to the section: a stored distance is whole pixels,
+        // and the heading sat exactly on the line that decides the section.
+        let kopf = again
+            .view
+            .outline()
+            .block_for_fragment("kopf_zeile")
+            .expect("the heading");
+        let wanted = again.view.block_top(kopf) - tokens::PAD_TOP;
+        assert!(
+            (again.view.scroll_offset() - wanted).abs() < 2.0,
+            "a file opened again must open where reading stopped: {} against {wanted}",
+            again.view.scroll_offset()
+        );
+        ui.close_tab(&again);
+        ui.close_tab(&from);
+        assert_eq!(ui.tabs.borrow().len(), count);
+    }
+
     /// Reads a benchmark fixture, if the generated ones are there. They are
     /// not in the repository (`benchmarks/fixtures.py` rebuilds them), so a
     /// check that needs one says so rather than passing on nothing.
@@ -1700,6 +1937,7 @@ mod tests {
         let probe = ui.new_tab();
         probe.view.verify_accessibility_and_selection();
         verify_reading_anchor_survives_a_reload(&probe.view);
+        verify_reading_line_survives_a_reflow(&ui);
         ui.fill_outline();
         assert!(ui.outline_list.model.n_items() > 0);
         assert_eq!(ui.outline_list.selected(), Some(0));
@@ -1772,6 +2010,7 @@ mod tests {
         assert!(!ui.menu_button.popover().unwrap().is_visible());
         let dir = std::env::temp_dir().join(format!("hashline-native-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
+        verify_links_between_files(&ui, &dir);
         let first = dir.join("eins.md");
         let second = dir.join("zwei.md");
         std::fs::write(&first, "# Eins\n\nText\n").unwrap();

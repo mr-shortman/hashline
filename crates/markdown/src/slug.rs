@@ -27,9 +27,10 @@ fn is_js_space(c: char) -> bool {
     )
 }
 
-// `\p{L}` and `\p{N}` are General_Category groups, not the Alphabetic and
-// Numeric_Type properties `char::is_alphabetic`/`is_numeric` expose.
-fn is_letter_or_number(c: char) -> bool {
+// `\p{L}`, `\p{M}`, `\p{N}` and `\p{Pc}` are General_Category groups, not the
+// Alphabetic and Numeric_Type properties `char::is_alphabetic`/`is_numeric`
+// expose. Together they are what GitHub's anchors keep of a heading's text.
+fn is_word(c: char) -> bool {
     matches!(
         get_general_category(c),
         GeneralCategory::UppercaseLetter
@@ -37,15 +38,27 @@ fn is_letter_or_number(c: char) -> bool {
             | GeneralCategory::TitlecaseLetter
             | GeneralCategory::ModifierLetter
             | GeneralCategory::OtherLetter
+            | GeneralCategory::NonspacingMark
+            | GeneralCategory::SpacingMark
+            | GeneralCategory::EnclosingMark
             | GeneralCategory::DecimalNumber
             | GeneralCategory::LetterNumber
             | GeneralCategory::OtherNumber
+            | GeneralCategory::ConnectorPunctuation
     )
 }
 
-/// Port of `slugBase` from the former `parser.ts`, kept bit-exact:
-/// NFKC, lowercase, drop everything outside `\p{L}\p{N}\s_-`, trim, collapse
-/// runs of whitespace and underscores into `-`, fall back to `section`.
+/// The anchor a heading's text gets, the way GitHub forms it: NFKC,
+/// lowercase, drop everything outside `\p{L}\p{M}\p{N}\p{Pc}\s-`, trim, and
+/// turn every whitespace character into `-`. An empty result falls back to
+/// `section`.
+///
+/// The underscore stays an underscore, and two spaces become two hyphens,
+/// because that is what a link written against GitHub's rendering says:
+/// `#foo_bar` for "foo_bar", `#a--b` for "a  b". The rule this replaced came
+/// from the former `parser.ts` and folded both into a single `-`, so such
+/// links found nothing. Marks are kept for the same reason: without them a
+/// Devanagari heading lost its vowel signs.
 pub fn slug_base(text: &str) -> String {
     // Lowercasing runs over the whole string, not per character: the final
     // sigma rule needs its context, exactly as `String.prototype.toLowerCase`
@@ -53,22 +66,13 @@ pub fn slug_base(text: &str) -> String {
     let lowered = text.nfkc().collect::<String>().to_lowercase();
     let kept: String = lowered
         .chars()
-        .filter(|&c| is_letter_or_number(c) || is_js_space(c) || c == '_' || c == '-')
+        .filter(|&c| is_word(c) || is_js_space(c) || c == '-')
         .collect();
-    let trimmed = kept.trim_matches(is_js_space);
-    let mut out = String::with_capacity(trimmed.len());
-    let mut in_run = false;
-    for c in trimmed.chars() {
-        if is_js_space(c) || c == '_' {
-            if !in_run {
-                out.push('-');
-                in_run = true;
-            }
-        } else {
-            out.push(c);
-            in_run = false;
-        }
-    }
+    let out: String = kept
+        .trim_matches(is_js_space)
+        .chars()
+        .map(|c| if is_js_space(c) { '-' } else { c })
+        .collect();
     if out.is_empty() {
         "section".to_owned()
     } else {
@@ -113,7 +117,22 @@ impl Slugs {
 
 #[cfg(test)]
 mod tests {
-    use super::Slugs;
+    use super::{slug_base, Slugs};
+
+    #[test]
+    fn anchors_are_spelled_the_way_github_spells_them() {
+        assert_eq!(slug_base("Kopf_zeile"), "kopf_zeile");
+        assert_eq!(slug_base("foo_bar()"), "foo_bar");
+        assert_eq!(
+            slug_base("Schritt 1:  Installieren"),
+            "schritt-1--installieren"
+        );
+        assert_eq!(slug_base("A - B"), "a---b");
+        assert_eq!(slug_base("  Grüße, Welt!  "), "grüße-welt");
+        // Vowel signs and the virama are marks, not letters.
+        assert_eq!(slug_base("हिन्दी"), "हिन्दी");
+        assert_eq!(slug_base("!!!"), "section");
+    }
 
     #[test]
     fn repeated_headings_are_numbered_in_order() {

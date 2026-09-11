@@ -157,13 +157,104 @@ pub fn base_of(path: &Path) -> Option<PathBuf> {
     path.parent().map(Path::to_path_buf)
 }
 
+/// The one spelling of a file's path that opening it, finding its tab and
+/// keeping its reading position all agree on.
+///
+/// A link resolves to `/a/b/../x.md`, which names the same file as
+/// `/a/x.md` and compares unequal to it — a second tab, and a second
+/// reading position that the first never sees. The directory is resolved on
+/// disk rather than by crossing out `..`, because after a symbolic link `..`
+/// leads to the parent of its target, and only the file system knows which
+/// components are links. The file name is kept as it was given: a link to a
+/// file is what the reader opened, and what the tab should be called.
+///
+/// A directory that cannot be resolved — it does not exist — is tidied up
+/// lexically instead, so that the error the load reports names a readable path.
+pub fn normalize(path: &Path) -> PathBuf {
+    let absolute = match std::env::current_dir() {
+        Ok(directory) if path.is_relative() => directory.join(path),
+        _ => path.to_path_buf(),
+    };
+    match (absolute.parent(), absolute.file_name()) {
+        (Some(directory), Some(name)) => match directory.canonicalize() {
+            Ok(directory) => directory.join(name),
+            Err(_) => lexical(&absolute),
+        },
+        _ => lexical(&absolute),
+    }
+}
+
+/// `.` dropped and `..` taken back, without asking the file system.
+fn lexical(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                // The parent of the root is the root.
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                _ => out.push(".."),
+            },
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
-    use super::digest;
+    use super::{digest, lexical, normalize};
+    use std::path::Path;
 
     #[test]
     fn identical_sources_have_identical_digests() {
         assert_eq!(digest("# Titel\n"), digest("# Titel\n"));
         assert_ne!(digest("# Titel\n"), digest("# Titel!\n"));
+    }
+
+    #[test]
+    fn a_path_through_a_parent_directory_is_the_same_path() {
+        let root = std::env::temp_dir().join(format!("hashline-normalize-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("b")).unwrap();
+        let root = root.canonicalize().unwrap();
+        let direct = root.join("x.md");
+        assert_eq!(normalize(&root.join("b/../x.md")), direct);
+        assert_eq!(normalize(&root.join("./b/./../x.md")), direct);
+        assert_eq!(normalize(&direct), direct);
+        // A file that does not exist yet is still spelled one way.
+        assert_eq!(
+            normalize(&root.join("b/../fehlt/../y.md")),
+            root.join("y.md")
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_directory_that_is_not_there_is_tidied_up_by_its_name() {
+        assert_eq!(
+            lexical(Path::new("/nirgends/a/./b/../../c.md")),
+            Path::new("/nirgends/c.md")
+        );
+        assert_eq!(lexical(Path::new("/../c.md")), Path::new("/c.md"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_parent_directory_after_a_symbolic_link_is_the_one_on_disk() {
+        let root = std::env::temp_dir().join(format!("hashline-symlink-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("echt/tief")).unwrap();
+        let root = root.canonicalize().unwrap();
+        std::os::unix::fs::symlink(root.join("echt/tief"), root.join("verweis")).unwrap();
+        // `verweis/..` is `echt`, not `root`: crossing out `..` by name would
+        // have named a file that is not the one this path reaches.
+        assert_eq!(
+            normalize(&root.join("verweis/../x.md")),
+            root.join("echt/x.md")
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }
