@@ -1,7 +1,8 @@
 # 014 — Wettbewerbsziel, erweiterter Umfang und zweiteilige Messsuite
 
 Status: Umfang beschlossen und umgesetzt, Zielwerte teils belegt. Stand:
-9. September 2026; siehe [Abschnitt 8](#8-stand-der-umsetzung).
+11. September 2026; siehe [Abschnitt 8](#8-stand-der-umsetzung) und
+[Abschnitt 9](#9-start-bis-lesbarer-text-wo-die-zeit-wirklich-lag).
 Bezug: [SPEC.md](../../SPEC.md) Abschnitte 2, 9 und 12,
 [009-native-renderer.md](009-native-renderer.md),
 [013-oversized-blocks.md](013-oversized-blocks.md),
@@ -360,6 +361,138 @@ das Setzen des ersten Schirms kostet bei 10 MiB 0,4 ms und der Blockplan
 1,3 ms, und ein Suchlauf über die 7,9 MiB Text der Datei 5–6 ms. Was die
 Budgets für Start, Öffnen und Suche im Wesentlichen enthält, ist damit weder
 das Parsen noch das Suchen, sondern das Warten des Fensters.
+
+## 9. Start bis lesbarer Text: wo die Zeit wirklich lag
+
+Stand: 11. September 2026. Die erste vollständige Reihe gegen
+[Abschnitt 3.1](#31-start-und-öffnen) lautete p95 **346,8 / 317,4 / 417,2 ms**
+gegen 120 / 150 / 300 ms — `bench --session nested-headless --renderers cairo
+--only content --fixtures small,medium,large --repetitions 30`. Das Parsen
+kostet bei der kleinen Datei 0,9 ms, der erste Schirm 17 ms und der Blockplan
+0,01 ms. Die Zeit lag also nicht im Dokumentweg, und wo sie stattdessen lag,
+konnte der Protokollmitschnitt nicht sagen: er beginnt bei der ersten
+Wayland-Nachricht, und die kam erst nach 240 ms.
+
+### 9.1 Sechs Marken, und was sie zeigten
+
+Der Betrachter meldet mit `HASHLINE_BENCH_STAGES=1` sechs Marken auf derselben
+Uhr, mit der libwayland stempelt, sodass Marke und Protokollnachricht auf einer
+Zeitachse liegen (`crates/hashline/src/view/stage.rs`). Damit zerfällt der
+Start — `cairo`, `small`, Median aus fünf Läufen:
+
+| Abschnitt | leerer Bus | Portal läuft bereits |
+| --- | ---: | ---: |
+| `exec` bis `main`, also der dynamische Binder | 7,5 ms | 7,4 ms |
+| `gtk_init` | **168,6 ms** | 6,2 ms |
+| `GApplication` registriert, `GtkApplication` startet | 13,7 ms | 13,6 ms |
+| Fensterbau, Laden, Dokument in die Ansicht | 10,9 ms | 10,9 ms |
+| Schriftschnitte vorwärmen | 28,6 ms | 28,5 ms |
+| erstes Zeichnen | 6,8 ms | 6,7 ms |
+| **erster Puffer beim Compositor** | **239,8 ms** | **76,9 ms** |
+
+Alles außer `gtk_init` ist in beiden Spalten dasselbe. Die 168 ms sind eine
+einzige synchrone D-Bus-Frage: GTK fragt beim Öffnen des Displays
+`org.freedesktop.portal.Settings` nach seiner Version — daher kommen unter
+Wayland Schriftart, Zeiger und Farbschema — und auf einem Bus, auf dem niemand
+den Namen hält, *aktiviert* diese Frage `xdg-desktop-portal` und wartet auf
+dessen Start. Im Mitschnitt: Nachricht raus nach 21,3 ms, Antwort da nach
+184,7 ms.
+
+### 9.2 Zwei Fehler des Messapparats
+
+**Der Kaltstart des Portals gehört nicht in diese Messung.** Jede Messzeile
+bekommt einen eigenen privaten Bus, auf dem nichts läuft, und zahlte den
+Kaltstart deshalb erneut. Eine Sitzung zahlt ihn einmal, und keiner der vier
+Vergleichskandidaten zahlt ihn überhaupt: keiner verwendet GTK 4. Ein
+zeitgemessener Start bekommt den Dienst jetzt vorher auf seinen Bus, so wie eine
+Sitzung ihn hat, bevor jemand etwas öffnet; `sessionPortal` hält in jeder Zeile
+fest, ob er lief. Sonst kommt nichts auf den Bus — gvfs, dconf und das
+Dokumentenportal bleiben draußen.
+
+**Die Bilder wurden nach dem Rückstand des Messprogramms datiert.** `readable*`
+zählte, wann der Verbraucher ein Bild abholte. Der kopiert, hasht und
+komprimiert sechs Megabyte je Bild, bleibt bei 60 Hz zurück, und `drop=false`
+behält jedes. Innerhalb einer Aufnahme des Vorher-Laufs wuchs der Abstand
+zwischen dem Zeitstempel eines Bildes und seinem Empfang um 58 ms; ein längerer
+Start sammelt mehr Rückstand und wird dafür ein zweites Mal belastet — bei
+`large` waren es 167,9 ms Aufschlag gegen 96,4 ms bei `small`. Gezählt wird
+jetzt der Zeitstempel, den das Bild selbst trägt, über die kleinste beobachtete
+Differenz auf `CLOCK_MONOTONIC` gelegt. Kein Bild wird dabei vor seinen Empfang
+datiert; die Grenzen bleiben obere Schranken.
+
+### 9.3 Eine Änderung am Programm, gemessen und verworfen
+
+Naheliegend war, Lesen und Parsen in `main` zu beginnen statt erst, wenn
+`GApplication` auf dem Bus ist — bei 10 MiB ist das Dokument dann nach 90 ms
+fertig, während das Toolkit noch hochfährt. Umgesetzt, gemessen, verworfen. Ein
+A/B im selben Binary und im selben Messapparat, n = 10, Median `readableUpperMs`:
+
+| Fixture | Datei erst nach dem Toolkit gelesen | Datei in `main` gelesen |
+| --- | ---: | ---: |
+| small | 154,7 ms | 155,7 ms |
+| medium | **122,4 ms** | 156,0 ms |
+| large | 188,4 ms | **172,3 ms** |
+
+Der Grund ist keine verlorene Rechenzeit, sondern eine verlorene Überlappung.
+Liegt das Dokument noch nicht vor, wenn der Frame-Takt zum ersten Mal schlägt,
+geht ein leeres Bild hinaus, und Parsen, Schriftschnitte und die Antwort des
+Compositors auf das Mapping laufen nebeneinander weiter; das Bild mit Text
+kommt beim nächsten Schlag. Liegt es vor, zahlt das erste Bild Layout und
+28 ms Schriftschnitte am Stück, und der Compositor sieht das Fenster 40 ms
+später zum ersten Mal — was der Aufnahmeweg mit weiteren rund 22 ms bestraft,
+weil eine eben erst eingeblendete Fläche langsamer im Aufnahmestrom erscheint.
+
+Das ist eine Klippe, kein Verlauf, und `medium` steht genau darauf: 7 ms
+früheres Dokument entscheiden, auf welcher Seite es landet. Die Änderung bleibt
+draußen, weil sie `medium` sicher auf die langsame Seite stellt und nur `large`
+etwas bringt. Dass `medium` heute auf der schnellen Seite steht, ist damit
+allerdings auch kein stabiler Befund: eine langsamere Maschine oder eine etwas
+größere Datei kippt es. Der eigentliche Hebel liegt in den 28 ms Vorwärmen vor
+dem ersten Bild; sie nach hinten zu schieben macht das erste Bild 20 ms teuer
+und verletzt das 16-ms-Budget für den Hauptthread, gemessen ebenfalls ohne
+Gewinn (157,2 / 156,5 / 171,2 ms).
+
+### 9.4 Ergebnis
+
+Dasselbe Kommando, n = 30 je Fixture, `cairo`, `nested-headless`:
+
+| Start bis lesbarer Text | vorher Median | vorher p95 | nachher Median | nachher p95 | Ziel |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 100 KiB | 338,7 ms | 346,8 ms | 155,8 ms | **172,0 ms** | ≤ 120 ms |
+| 1 MiB | 313,1 ms | 317,4 ms | 122,9 ms | **139,2 ms** | ≤ 150 ms |
+| 10 MiB | 382,4 ms | 417,2 ms | 187,9 ms | **205,9 ms** | ≤ 300 ms |
+
+1 MiB und 10 MiB halten ihr Ziel, 100 KiB verfehlt es um 52 ms. Dazu kommt, was
+in den Zahlen nicht steht: vorher waren alle 30 Zeilen bei 100 KiB und 1 MiB
+`diagnostic`, weil das Nachweisintervall mit 41 ms über der Auflösungsgrenze von
+40 ms lag und deshalb gar kein Budget tragen konnte. Jetzt sind alle 90 Zeilen
+`ok`, und das Intervall liegt bei 16,8 ms Median — ein Bild bei 60 Hz.
+
+Dass ausgerechnet die kleinste Datei am weitesten daneben liegt, ist kein
+Rauschen, sondern dieselbe Klippe aus [9.3](#93-eine-änderung-am-programm-gemessen-und-verworfen):
+bei 100 KiB ist das Dokument nach 44,7 ms in der Ansicht und damit vor dem
+ersten Schlag des Frame-Takts, also zahlt das erste Bild Layout und
+Schriftschnitte am Stück und kommt erst nach 79,9 ms. Bei 1 MiB ist das
+Dokument nach 53,2 ms da, das erste — leere — Bild war nach 51,8 ms schon
+draußen, und der Text folgt im nächsten Schlag. Der verbleibende Weg zum
+120-ms-Ziel führt deshalb über diese 28 ms Vorwärmen, nicht über den
+Dokumentweg.
+
+### 9.5 Was damit nicht behauptet ist
+
+- **Kein Budget ist gesenkt.** Abschnitt 3.1 steht unverändert.
+- Die Zahlen stammen von der Entwicklungsmaschine in `nested-headless`, nicht
+  von der Referenzmaschine.
+- Der Kaltstart des Portals ist nicht verschwunden, sondern nur nicht mehr in
+  dieser Messung. Das erste GTK-4-Programm einer Sitzung zahlt ihn weiterhin,
+  und der Betrachter kann nichts dagegen tun: die Frage stellt GTK selbst, und
+  `gtk_disable_portal_interfaces` ist laut GTK ausdrücklich nichts für
+  Anwendungen.
+- Bei `medium` und `large` erscheint das Fenster weiterhin, bevor das Dokument
+  darin steht. Der Inhaltsnachweis zählt erst das Bild mit Text, aber der erste
+  `attach` ist bei diesen beiden kein lesbares Bild — der Vorbehalt aus
+  [Abschnitt 1](#ein-vorbehalt-der-vor-jeder-zielsetzung-steht) gilt für den
+  `attach`-Wert weiter, nicht für `readableUpperMs`.
 
 ## 7. Was diese Entscheidung nicht tut
 

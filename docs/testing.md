@@ -85,6 +85,25 @@ nach `stderr`, jede Zeile ein neues Maximum:
 HASHLINE_BENCH mainThreadMaxMs=11.02 task=measure-visible
 ```
 
+## Wo ein Start seine Zeit lässt
+
+`HASHLINE_BENCH_STAGES=1` lässt das Programm sechs Marken nach `stderr`
+schreiben, auf derselben Uhr, mit der libwayland unter `WAYLAND_DEBUG=1` seine
+Nachrichten stempelt, sodass beide auf einer Zeitachse gelesen werden können:
+
+```text
+HASHLINE_STAGE main=146814.210
+```
+
+Die Marken sind `main` (Eintritt in `main`), `toolkit` (GTK steht und
+`GApplication` ist auf dem Bus), `parse` und `parsed` (Beginn und Ende von Lesen
+und Parsen auf dem Ladefaden), `document` (das Dokument liegt in der Ansicht)
+und `frame` (das erste Bild ist gezeichnet). Ein Protokollmitschnitt beginnt bei
+der ersten Wayland-Nachricht und kann über die Zeit davor nichts sagen; genau
+dort lagen 168 der 240 ms eines kalten Starts. `benchmarks/run.py` setzt die
+Variable für jeden zeitgemessenen Start und legt die Marken als `stages` in
+jeder Messzeile ab.
+
 Die tatsächliche AT-SPI-Anbindung benötigt X11 oder Wayland; Broadway unterstützt diesen GTK-Backendpfad nicht. Der folgende Test verwendet temporäre Dokumente, prüft Dokumentrolle, Unicode-Textoffsets, den zweiten Prozessaufruf mit demselben Fenster und den sichtbaren Mehrdatei-Hinweis und beendet seine Anwendung anschließend. Benötigt werden `python3-gi` und `gir1.2-atspi-2.0`:
 
 ```sh
@@ -237,8 +256,8 @@ Ein Fenster erscheint, bevor es Text zeigt; eine Startzeit ohne Inhaltsnachweis
 misst deshalb möglicherweise ein leeres Fenster. `benchmarks/content.py` nimmt
 den Monitor über `org.gnome.Mutter.ScreenCast` und PipeWire auf und sucht in den
 Einzelbildern per OCR nach Textstellen, die nur im geöffneten Dokument
-vorkommen. `readableUpperMs` ist die Empfangszeit des ersten solchen Bildes:
-eine konservative Obergrenze einschließlich Aufnahme- und Erkennungsweg, kein
+vorkommen. `readableUpperMs` ist die Aufnahmezeit des ersten solchen Bildes:
+eine konservative Obergrenze einschließlich Aufnahmeweg, kein
 Scanout-Zeitstempel. Vor dem Start wartet das Werkzeug, bis der Text **nicht**
 mehr auf dem Bildschirm steht — das Fenster der vorigen Messung kann noch
 gezeichnet sein —, und bricht ab, wenn er nicht verschwindet. Enthält danach ein
@@ -269,6 +288,14 @@ eingeblendeter PipeWire-Puffer ist einer, den der Compositor nicht nachfüllen
 kann; wer darin komprimiert, hungert den Erzeuger aus und verliert etwa zwei von
 fünf Bildern. Der Rückruf kopiert und gibt frei, das Packen läuft nebenläufig,
 und gleiche Bilder werden über ihre Prüfsumme nur einmal abgelegt.
+
+Datiert wird ein Bild danach, wann es aufgenommen wurde, nicht danach, wann der
+Verbraucher dazu kam. Er bleibt bei 60 Hz zurück, `drop=false` behält jedes
+Bild, und der Rückstand wächst mit der Dauer des Starts — innerhalb einer
+Aufnahme des Vorher-Laufs um 58 ms. Die Bilder tragen exakte relative Zeiten auf
+der Uhr der Aufnahmepipeline; deren Epoche wird über die kleinste beobachtete
+Differenz zwischen Empfang und Aufnahme auf `CLOCK_MONOTONIC` gelegt. Damit wird
+kein Bild vor seinen Empfang datiert, und die Grenzen bleiben obere Schranken.
 
 Die OCR ist auf einen genauen Paketstand festgelegt und wird nicht ins System
 installiert:

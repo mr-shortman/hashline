@@ -36,11 +36,22 @@ erneute Messung dieses Pakets.
   rohes HTML einschließlich `details`/`summary` bleibt Quelltext.
 - Die Entscheidung für einen sandboxenden Bilddecoder ist offen. Der jetzige
   Decoder verwendet gdk-pixbuf mit Verzeichnis- und Pixelgrenzen.
-- **Alle Budgets, deren Nachweis ein Einzelbild des Monitors ist, fehlen
-  weiterhin**: Start bis lesbarer Text, Öffnen in laufender Instanz, Suche und
-  Menü öffnen, Tabwechsel. Der Nachweis verlangt eine unbeaufsichtigte Sitzung,
-  in der das Fenster des Betrachters allein auf dem Schirm steht; auf einer
-  Arbeitssitzung misst er das, was sonst noch offen ist.
+- **Start bis lesbarer Text verfehlt bei 100 KiB das Ziel**: p95 172,0 ms gegen
+  120 ms, gemessen in `nested-headless` unter `cairo`, n = 30. 1 MiB (139,2 ms)
+  und 10 MiB (205,9 ms) halten ihr Ziel. Die kleinste Datei ist dabei die
+  langsamste, weil ihr Dokument vor dem ersten Schlag des Frame-Takts fertig ist
+  und das erste Bild deshalb 28 ms Schriftschnitte am Stück zahlt; bei 1 MiB
+  liegt es knapp dahinter und der Wert fällt um rund 34 ms
+  ([014 §9](decisions/014-competitive-targets.md#9-start-bis-lesbarer-text-wo-die-zeit-wirklich-lag)).
+  Der Wert bei 1 MiB steht damit dicht an dieser Klippe.
+- **Das erste GTK-4-Programm einer Sitzung wartet auf das Einstellungsportal.**
+  GTK fragt es beim Öffnen des Displays synchron nach seiner Version; läuft der
+  Dienst noch nicht, sind das 163 ms, die der Betrachter nicht abkürzen kann.
+- **Die übrigen Budgets, deren Nachweis ein Einzelbild des Monitors ist, fehlen
+  weiterhin**: Öffnen in laufender Instanz, Suche und Menü öffnen, Tabwechsel.
+  Der Nachweis verlangt eine unbeaufsichtigte Sitzung, in der das Fenster des
+  Betrachters allein auf dem Schirm steht; auf einer Arbeitssitzung misst er
+  das, was sonst noch offen ist.
 - Vollständiger visueller Vergleich, Orca-Bedienung und alle regulären
   Performancebudgets mit n=30 auf der vorgesehenen Referenzhardware sind
   noch nicht abgenommen. Bisherige Messungen stammen von Ubuntu 26.04;
