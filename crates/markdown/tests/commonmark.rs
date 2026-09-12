@@ -1,8 +1,8 @@
 //! The 652 CommonMark 0.31.2 examples, compared against the specification's
 //! own expected output.
 //!
-//! This is the conformance net decision 008 established and SPEC.md section 12
-//! requires in Cargo. It runs on the op buffer: the operations are replayed
+//! This is the conformance net (docs/architecture.md, "Parser correctness").
+//! It runs on the op buffer: the operations are replayed
 //! into HTML and compared with the specification's, so what is under test is
 //! the encoder, not `pulldown-cmark`'s HTML renderer.
 
@@ -39,8 +39,9 @@ fn parser_output_matches_commonmark() {
         let doc = support::parse(&markdown);
         if doc.document.raw_html {
             // Raw HTML is shown as source text and therefore cannot match the
-            // specification's output. That is the deliberate loss SPEC.md,
-            // section 6 accepts in exchange for having no HTML parser at all.
+            // specification's output. That is the deliberate loss
+            // docs/architecture.md accepts in exchange for having no HTML
+            // parser at all.
             raw += 1;
             continue;
         }

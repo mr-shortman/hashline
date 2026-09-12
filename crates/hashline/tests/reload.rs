@@ -1,5 +1,4 @@
-//! The live-reload contract (SPEC.md, section 7, and
-//! docs/decisions/014-competitive-targets.md, section 2.1).
+//! The live-reload contract (docs/architecture.md).
 //!
 //! The watcher was written and never tested. What follows are the cases an
 //! editor actually produces, and they are the reason the watch is on the
@@ -254,7 +253,7 @@ fn a_burst_of_writes_costs_one_reload_and_not_one_per_write() {
 fn a_write_that_changes_nothing_leaves_the_document_alone() {
     // The watch reports the touch; the digest is what keeps a re-render from
     // happening, which is the check the application makes before it reloads
-    // (SPEC.md, section 7).
+    // (docs/architecture.md).
     with_pump(|pump| {
         let sandbox = Sandbox::new("identical");
         let file = sandbox.file("doc.md");
@@ -306,7 +305,7 @@ fn reading_the_file_is_not_a_change_to_it() {
 #[test]
 fn a_reload_is_asked_for_within_the_time_the_budget_allows() {
     // The budget is p95 ≤ 250 ms from the save to *visible* text
-    // (docs/decisions/014-competitive-targets.md, section 3.3), and a rename
+    // (docs/metrics.md), and a rename
     // into place puts a whole file there in one step: there is nothing to wait
     // out, so what the watch spends here is what the parse, the layout and the
     // frame do not get.

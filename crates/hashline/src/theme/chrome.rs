@@ -17,7 +17,7 @@
 //! <https://docs.gtk.org/gtk4/css-overview.html>, not classes of our own, so a
 //! widget picks the rules up without being told about them.
 //!
-//! The reasoning is in `docs/decisions/018-chrome-stylesheet.md`.
+//! The reasoning is in `docs/architecture.md`.
 
 use std::cell::RefCell;
 

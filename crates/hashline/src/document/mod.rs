@@ -1,4 +1,4 @@
-//! Watching the open file (SPEC.md, section 7).
+//! Watching the open file (docs/architecture.md).
 //!
 //! The **parent directory** is watched rather than the file, because that is
 //! the only way a replacement survives: an editor that saves atomically writes
@@ -12,7 +12,7 @@ use notify::event::{AccessKind, AccessMode, ModifyKind};
 use notify::{EventKind, RecursiveMode, Watcher as _};
 
 /// Keeps a watch alive. Dropping it stops the watch, which is how a document
-/// switch releases the previous one (SPEC.md, section 5).
+/// switch releases the previous one (docs/architecture.md).
 pub struct Watch {
     _watcher: notify::RecommendedWatcher,
 }
@@ -115,7 +115,7 @@ pub fn watch(path: &Path, on_change: impl Fn() + 'static) -> Option<Watch> {
 }
 
 /// How long a write that is still running is waited out, and how long the
-/// reload afterwards coalesces what follows (SPEC.md, section 7).
+/// reload afterwards coalesces what follows (docs/architecture.md).
 const DEBOUNCE_MS: u64 = 150;
 /// How far the wait for an unfinished write may be extended by further events.
 const DEBOUNCE_CEILING_MS: u64 = 750;
@@ -126,7 +126,7 @@ const DEBOUNCE_CEILING_MS: u64 = 750;
 /// so it stays the same when paragraphs above it change, and the distance from
 /// it to the top of the viewport keeps the same line at the same height. When
 /// the heading is gone the block index is the fallback, and after that the top
-/// of the document (SPEC.md, section 7).
+/// of the document (docs/architecture.md).
 #[derive(Clone, Debug, Default)]
 pub struct Anchor {
     pub heading: Option<String>,
@@ -136,7 +136,7 @@ pub struct Anchor {
 }
 
 /// A digest of the source, so that a watch event that changed nothing does not
-/// cause a re-render (SPEC.md, section 7).
+/// cause a re-render (docs/architecture.md).
 pub fn digest(source: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();

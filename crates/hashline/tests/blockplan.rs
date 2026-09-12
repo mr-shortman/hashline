@@ -1,4 +1,4 @@
-//! The block plan's two load-bearing properties (SPEC.md, section 5).
+//! The block plan's two load-bearing properties (docs/architecture.md).
 //!
 //! Risk 1 of M0 is that a virtualized viewer jumps when an estimate is replaced
 //! by a measurement. These tests pin the arithmetic that prevents it; the view
@@ -138,7 +138,7 @@ fn a_text_offset_resolves_to_the_block_that_holds_it() {
 #[test]
 fn a_large_document_is_planned_without_measuring_anything() {
     // The stress fixture; the plan must exist before a single block is laid out
-    // (SPEC.md, sections 5 and 9).
+    // (docs/architecture.md).
     let source = "## Kapitel\n\nEin Absatz mit etwas Text darin.\n\n".repeat(60_000);
     let started = std::time::Instant::now();
     let document = hashline_markdown::parse(&source);
@@ -157,7 +157,7 @@ fn a_large_document_is_planned_without_measuring_anything() {
 }
 
 // Blocks the plan has to cut up, because setting them whole is what
-// virtualization exists to avoid (SPEC.md, sections 5 and 9).
+// virtualization exists to avoid (docs/architecture.md).
 
 /// One fenced code block of `lines` lines.
 fn code_document(lines: usize) -> String {

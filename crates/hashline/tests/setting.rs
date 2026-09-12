@@ -1,4 +1,4 @@
-//! Setting blocks with Pango, without a window (SPEC.md, section 12).
+//! Setting blocks with Pango, without a window (docs/development.md).
 
 use hashline::layout::{set_block, BlockKind, BlockPlan, Metrics, NoImages, Style};
 use hashline::theme::LIGHT;
@@ -378,7 +378,7 @@ fn a_picture_inside_running_text_stays_running_text() {
 }
 
 // Blocks the plan cut into parts. Setting a part has to give what the same
-// stretch of the block gives inside the whole (SPEC.md, section 5).
+// stretch of the block gives inside the whole (docs/architecture.md).
 
 fn piece_text(set: &hashline::layout::BlockLayout) -> String {
     set.pieces
@@ -498,7 +498,7 @@ fn setting_one_part_of_a_huge_code_block_is_not_setting_the_block() {
 /// This is the drift the startup budget depends on: a type style added to
 /// `set_block` and not to `faces` is a face the frame that shows the first
 /// screen has to instantiate itself, and one face is 1.4 to 2.6 ms of a 16 ms
-/// frame (docs/decisions/014-competitive-targets.md, section 3.3).
+/// frame (docs/metrics.md).
 ///
 /// Both sides are collected the same way — the faces Pango reports having
 /// used, not the descriptions it was handed — because a description names one

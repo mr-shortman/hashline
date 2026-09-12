@@ -1,6 +1,6 @@
 //! Times the stages a document goes through before it is readable, without a
-//! window (SPEC.md, section 9: "Parsen, Blockplan, Layout des Sichtbereichs und
-//! erstes Zeichnen separat instrumentieren").
+//! window: parsing, block plan, first-screen layout and first draw are
+//! instrumented separately, as docs/metrics.md asks for.
 //!
 //! This is not the acceptance measurement — that one is external, over the
 //! Wayland protocol and a monitor capture, and it measures the running
@@ -39,7 +39,7 @@ fn rss_kib() -> u64 {
         .unwrap_or(0)
 }
 
-/// Median and p95 of a set of samples, as SPEC.md section 9 asks for.
+/// Median and p95 of a set of samples, as docs/metrics.md asks for.
 fn quantiles(samples: &mut [Duration]) -> (f64, f64) {
     samples.sort();
     let millis = |value: Duration| value.as_secs_f64() * 1000.0;

@@ -1,9 +1,9 @@
-//! Design tokens (SPEC.md, section 3).
+//! Design tokens.
 //!
-//! The values are transcribed from `docs/design/styles.css`, which is the
-//! binding design reference. Nothing here is invented and nothing is invented
-//! at the point of use either: a colour or a spacing the view needs is added
-//! here first.
+//! This table is the source of truth; `docs/design.md` is its readable copy,
+//! and the two are changed together. Nothing here is invented and nothing is
+//! invented at the point of use either: a colour or a spacing the view needs
+//! is added here first.
 
 pub mod chrome;
 
@@ -42,7 +42,7 @@ pub enum Variant {
     Dark,
 }
 
-/// The token table from SPEC.md, section 3. Both variants come from this one
+/// The token table from docs/design.md. Both variants come from this one
 /// definition; neither is derived from the other by lightening or darkening.
 #[derive(Clone, Copy, Debug)]
 pub struct Palette {
@@ -121,7 +121,7 @@ pub const SPACING: f32 = 8.0;
 pub const MOTION_MS: u32 = 120;
 
 /// Type sizes and spacings for the document, in ems of the body size unless
-/// stated otherwise (SPEC.md, section 3, "Dokumentsatz").
+/// stated otherwise (docs/design.md).
 pub mod document {
     /// Body size in logical pixels at 100 % zoom.
     pub const BODY_PX: f64 = 17.0;
@@ -153,7 +153,7 @@ pub mod document {
     pub const INLINE_CODE_EM: f64 = 0.85;
     pub const TABLE_EM: f64 = 0.92;
 
-    // The block decoration, transcribed from `docs/design/styles.css`. Values
+    // The block decoration; see `docs/design.md`. Values
     // in em are relative to the size the block itself is set at, matching how
     // CSS resolves them.
     /// `ul, ol { padding-left: 1.6em }`
@@ -184,7 +184,7 @@ pub mod document {
     /// `a { text-underline-offset: 3px }`
     pub const LINK_UNDERLINE_OFFSET_PX: f64 = 3.0;
 
-    /// Zoom is 80..=200 % in steps of ten (SPEC.md, section 3, "Bedienung").
+    /// Zoom is 80..=200 % in steps of ten (docs/design.md).
     pub const ZOOM_MIN: i32 = 80;
     pub const ZOOM_MAX: i32 = 200;
     pub const ZOOM_STEP: i32 = 10;

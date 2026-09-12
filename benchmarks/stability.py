@@ -1,6 +1,6 @@
 """Settled PSS and CPU of the release reader after 50 real file switches.
 
-SPEC.md section 9: after fifty file changes no continuous growth may remain, and
+docs/metrics.md: after fifty file changes no continuous growth may remain, and
 once things have settled the consumption must be at most 20 % above the warmed
 baseline.
 

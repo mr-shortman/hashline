@@ -1,14 +1,13 @@
 //! Hashline's Markdown parser.
 //!
 //! It reads Markdown once and emits the op buffer the renderer replays
-//! (SPEC.md, section 6). No HTML string is
-//! produced at all: the native renderer has no HTML parser and no sanitizer, so
+//! (docs/architecture.md). No HTML string is produced at all: the native renderer has no HTML parser and no sanitizer, so
 //! raw HTML is shown as source text instead of being interpreted
-//! (SPEC.md, section 6). That removes DOMPurify and the whole class of
-//! sanitization bugs with it.
+//! (docs/architecture.md). That removes the whole class of sanitization bugs
+//! with it.
 //!
 //! The crate stays free of toolkit and platform dependencies
-//! (docs/decisions/008-parser-reference.md).
+//! (docs/architecture.md).
 
 mod opbuffer;
 mod slug;
@@ -20,7 +19,7 @@ use pulldown_cmark::{
 use std::collections::HashMap;
 
 // The op vocabulary is the contract between parser and renderer
-// (SPEC.md, section 6). The native view decodes the buffer with these.
+// (docs/architecture.md). The native view decodes the buffer with these.
 pub use opbuffer::{
     read_varint, ALLOWED_ATTR, ALLOWED_TAGS, BLOCK_WORDS, OP_ATTRS, OP_CLOSE, OP_TAG_MASK, OP_TEXT,
 };
@@ -52,12 +51,12 @@ pub struct OpDocument {
     pub strings: String,
     /// The document's text in document order, with a separator between blocks.
     /// TEXT operations index into this, and the search runs on it directly
-    /// (SPEC.md, section 8).
+    /// (docs/architecture.md).
     pub text: String,
     /// Top-level flow elements, `BLOCK_WORDS` words each: tag, opStart,
     /// opCount, textStart, textLen. The block plan is built straight from this
-    /// (SPEC.md, section 5), and the per-block text range is what maps a search
-    /// hit and a selection position onto a block (SPEC.md, section 8).
+    /// (docs/architecture.md), and the per-block text range is what maps a search
+    /// hit and a selection position onto a block (docs/architecture.md).
     pub blocks: Vec<u32>,
     /// `SECTION_WORDS` words per section.
     pub sections: Vec<u32>,
@@ -71,7 +70,7 @@ pub struct OpDocument {
     /// what finds its block even where the plan has cut that block up.
     pub anchors: Vec<u32>,
     /// Whether the document contained raw HTML shown as source text. The view
-    /// uses it for the single quiet notice SPEC.md, section 6 asks for.
+    /// uses it for the single quiet notice docs/architecture.md asks for.
     pub raw_html: bool,
 }
 
@@ -191,7 +190,7 @@ impl Builder {
     }
     /// Raw HTML is not expressible as operations and is not interpreted. It is
     /// shown verbatim, monospace and set apart, exactly like a code block
-    /// (SPEC.md, section 6). The class is what lets the view mark it as source
+    /// (docs/architecture.md). The class is what lets the view mark it as source
     /// rather than as the author's own code.
     fn raw_block(&mut self, value: &str) {
         let value = value.trim_end_matches('\n');
@@ -278,7 +277,7 @@ impl Builder {
             Tag::TableCell => {
                 // The html renderer emits `style="text-align: …"`, which is not
                 // in the attribute allowlist. `align` carries the same
-                // information (docs/decisions/008, section 7).
+                // information (docs/architecture.md).
                 let tag = if self.in_head { TAG_TH } else { TAG_TD };
                 let align = match self.aligns.get(self.cell) {
                     Some(Alignment::Left) => Some("left"),
@@ -538,8 +537,7 @@ pub fn parse(source: &str) -> OpDocument {
     document.text = std::mem::take(&mut builder.enc.text);
     // Every blob grew by doubling, so each can hold up to twice what it needs.
     // On the 10 MiB fixture that slack is several megabytes against a budget of
-    // twice the file size (docs/decisions/014-competitive-targets.md,
-    // section 3.2), and the document is never appended to again.
+    // twice the file size (docs/metrics.md), and the document is never appended to again.
     document.ops.shrink_to_fit();
     document.strings.shrink_to_fit();
     document.text.shrink_to_fit();

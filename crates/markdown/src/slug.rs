@@ -88,8 +88,8 @@ pub struct Slugs {
     /// out. Probing from `1` every time is quadratic in the number of equal
     /// headings, and documents repeat headings for a living — a changelog or a
     /// generated reference has thousands of identical ones. At 60 000 repeats
-    /// that pass alone runs for minutes, which the 10 MiB budget in SPEC.md,
-    /// section 9 does not have.
+    /// that pass alone runs for minutes, which the 10 MiB budget in
+    /// docs/metrics.md does not have.
     next: std::collections::HashMap<String, u32>,
 }
 

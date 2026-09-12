@@ -5,11 +5,11 @@
 //! six separate rows, and the two overlays that already have their own buttons
 //! in the header bar had rows as well. The design reference has neither: its
 //! settings panel is two commands, a segmented theme switch and one zoom row
-//! (`.menu-row`, `.theme-options`, `.zoom-options` in `docs/design/styles.css`).
+//! (`.menu-row`, `.theme-options`, `.zoom-options` in `docs/design.md`).
 //!
 //! That is what this builds. Every control is still an activation of a window
 //! action, so the menu, the keyboard and assistive technology continue to share
-//! one source (SPEC.md, section 3).
+//! one source (docs/design.md).
 
 use gtk::prelude::*;
 

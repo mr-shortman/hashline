@@ -1,6 +1,5 @@
 //! What the longest piece of main-thread work cost, for the budget that says
-//! there must not be one over 16 ms (SPEC.md, section 9, and
-//! docs/decisions/014-competitive-targets.md, section 3.3).
+//! there must not be one over 16 ms (docs/metrics.md).
 //!
 //! A budget without an observer is a wish. This one cannot be measured from
 //! outside the process: a compositor sees frames, not what happened between

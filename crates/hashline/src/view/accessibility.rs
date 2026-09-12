@@ -4,7 +4,7 @@
 //! blocks. Holding it as a second string was the obvious implementation and
 //! cost a full copy of the document — 8 MiB on the 10 MiB fixture, for an
 //! interface that is idle unless a screen reader is running
-//! (docs/decisions/014-competitive-targets.md, section 3.2). What is kept
+//! (docs/metrics.md). What is kept
 //! instead is one character offset per block; every string a caller asks for
 //! is cut out of the document's own text when it is asked for.
 use super::Position;

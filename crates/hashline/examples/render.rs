@@ -2,7 +2,7 @@
 //!
 //! It drives the same `layout` code the widget does, so what comes out is the
 //! real typography rather than a second implementation of it. That makes it
-//! usable for the visual acceptance in SPEC.md, section 12 — comparing the
+//! usable for the visual acceptance in docs/development.md — comparing the
 //! native setting against the reference captures — and for looking at the
 //! output at all on a machine where screenshots are not permitted.
 //!

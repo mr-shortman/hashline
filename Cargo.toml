@@ -1,4 +1,4 @@
-# Workspace root for the native stack (docs/decisions/009-native-renderer.md).
+# Workspace root for the native stack (docs/architecture.md).
 #
 # The WebView stack is gone: no Tauri shell, no WASM shim, no Node toolchain.
 [workspace]

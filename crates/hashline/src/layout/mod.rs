@@ -1,4 +1,4 @@
-//! The block plan (SPEC.md, section 5, "Das zentrale Layoutproblem").
+//! The block plan (docs/architecture.md).
 //!
 //! A virtualized viewer has to know a total height before it has set every
 //! block. The plan resolves that by estimating every block up front and
@@ -177,7 +177,7 @@ impl Block {
 /// Blocks above these limits are therefore cut into parts, and a part is an
 /// ordinary block of the plan: estimated, measured, cached and evicted on its
 /// own. The limits come from measuring what setting costs, and each keeps one
-/// part well inside the 16 ms budget of SPEC.md, section 9:
+/// part well inside the 16 ms budget of docs/metrics.md:
 ///
 /// * Text wraps, so its limit is a byte count, and 2 KiB is about one screen
 ///   of the reading column. Setting that much costs well under a millisecond
@@ -362,7 +362,7 @@ impl BlockPlan {
     }
 
     /// The blocks to lay out for a viewport, plus one screen of buffer in each
-    /// direction (SPEC.md, section 5).
+    /// direction (docs/architecture.md).
     pub fn visible_range(&self, top: f64, height: f64) -> std::ops::Range<usize> {
         if self.blocks.is_empty() {
             return 0..0;
@@ -375,7 +375,7 @@ impl BlockPlan {
     /// The blocks actually on screen, without the buffer around them. These are
     /// the ones a frame cannot do without; the buffer can wait for an idle
     /// moment, which is what keeps a jump inside the 16 ms budget
-    /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    /// (docs/metrics.md).
     pub fn onscreen_range(&self, top: f64, height: f64) -> std::ops::Range<usize> {
         if self.blocks.is_empty() {
             return 0..0;
@@ -390,7 +390,7 @@ impl BlockPlan {
     /// Returns how much everything below the block moved. The view adds this to
     /// its scroll offset when the block sits above the reading position, which
     /// is what keeps the visible text still — the single most common defect of
-    /// virtualized lists, and an acceptance failure here (SPEC.md, section 5).
+    /// virtualized lists, and an acceptance failure here (docs/architecture.md).
     pub fn set_measured(&mut self, index: usize, height: f64) -> f64 {
         let previous = self.blocks[index].height as f64;
         let delta = height - previous;
@@ -404,7 +404,7 @@ impl BlockPlan {
 
     /// Drops every measurement and estimates again, for a new width, zoom or
     /// font. The reading anchor is what restores the position afterwards
-    /// (SPEC.md, section 7).
+    /// (docs/architecture.md).
     pub fn reflow(&mut self, metrics: Metrics, width: f64) {
         self.metrics = metrics;
         self.width = width;

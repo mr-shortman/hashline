@@ -1,7 +1,7 @@
 # The parser. Deliberately free of Tauri and of any platform dependency: the
 # same code is linked into src-tauri for the desktop and compiled to
 # wasm32-unknown-unknown for the browser preview and the test suite
-# (docs/decisions/008-parser-reference.md).
+# (docs/architecture.md).
 [package]
 name = "hashline-markdown"
 version = "0.1.0"

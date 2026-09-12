@@ -1,12 +1,12 @@
 //! Test-only decoding of the op buffer.
 //!
 //! The suite this replaces lived in TypeScript and leaned on the browser DOM
-//! (docs/decisions/008-parser-reference.md). The method is carried over intact:
+//! (docs/architecture.md). The method is carried over intact:
 //! the parser's operations are replayed into HTML, both sides are parsed by the
-//! same HTML parser, and the resulting trees are compared after the
-//! normalizations 008 allows. What changes is only the host — Cargo instead of
-//! vitest — because the JavaScript toolchain goes away with the WebView
-//! (SPEC.md, section 13).
+//! same HTML parser, and the resulting trees are compared after the two
+//! normalizations that are allowed: whitespace at block boundaries, and
+//! heading IDs. What changed is only the host — Cargo instead of vitest —
+//! because the JavaScript toolchain went away with the WebView.
 
 // Each integration test binary compiles this module separately and uses only
 // the part it needs.
@@ -26,7 +26,7 @@ const VOID: [&str; 4] = ["br", "hr", "img", "input"];
 
 /// One of the two blobs, with the addressing the buffer promises.
 ///
-/// Offsets are UTF-8 byte offsets (SPEC.md, section 6). Slicing a `&str` by a
+/// Offsets are UTF-8 byte offsets (docs/architecture.md). Slicing a `&str` by a
 /// byte range panics unless the range lands on character boundaries, so this is
 /// itself the check that the encoder counted correctly.
 pub struct Blob {

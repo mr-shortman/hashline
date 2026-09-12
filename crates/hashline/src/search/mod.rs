@@ -1,4 +1,4 @@
-//! Document-wide text search (SPEC.md, section 8).
+//! Document-wide text search (docs/architecture.md).
 //!
 //! The search runs on the parser's text blob, not on laid-out type. That is
 //! what makes it independent of how much of the document has been set: a hit in
@@ -9,7 +9,7 @@
 //! whole blob to lower case and keeping an offset table beside it would be the
 //! obvious implementation and would cost, for the 10 MiB fixture, another
 //! 10 MiB of text plus 40 MiB of offsets — which is the entire memory budget
-//! from SPEC.md section 9 spent on a feature that is idle most of the time.
+//! from docs/metrics.md spent on a feature that is idle most of the time.
 //! Instead each candidate position is compared with folding applied on the fly.
 
 /// A hit, as byte offsets into the document text blob.
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn a_match_never_runs_across_a_block_separator() {
         // The blob separates blocks with a newline exactly so that this cannot
-        // happen (SPEC.md, section 6).
+        // happen (docs/architecture.md).
         assert_eq!(found("endeanfang", "Ende\nAnfang"), Vec::<String>::new());
         assert_eq!(found("ende", "Ende\nAnfang"), ["Ende"]);
     }

@@ -3,8 +3,8 @@
 //! Both sides are parsed by the same HTML parser and serialized back through
 //! the same walker, so element structure, attribute set, attribute values and
 //! text content are binding, while attribute order, whitespace between block
-//! elements and the choice of escape form are not — exactly the tolerance
-//! decision 008 grants. Whitespace inside `pre` and `code` is content and is
+//! elements and the choice of escape form are not — that is the tolerance the
+//! comparison grants. Whitespace inside `pre` and `code` is content and is
 //! preserved.
 
 use html5ever::driver::ParseOpts;

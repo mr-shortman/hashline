@@ -11,7 +11,7 @@
       <range min="80" max="200"/>
       <summary>Text zoom in percent</summary>
       <description>
-        Applies to the document only, in steps of ten (SPEC.md, section 3).
+        Applies to the document only, in steps of ten (docs/design.md).
       </description>
     </key>
     <key name="outline-visible" type="b">
@@ -35,7 +35,7 @@
       <summary>Recently read files and where reading stopped</summary>
       <description>
         Path, anchor heading id, and the distance from it to the top of the
-        viewport. At most 100 entries are kept (SPEC.md, section 7).
+        viewport. At most 100 entries are kept (docs/architecture.md).
       </description>
     </key>
   </schema>

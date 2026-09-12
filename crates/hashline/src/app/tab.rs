@@ -2,7 +2,7 @@
 //!
 //! Everything that belongs to a document rather than to the window lives here,
 //! which is what makes several of them at once possible at all
-//! (docs/decisions/014-competitive-targets.md, section 2.2). The window owns
+//! (docs/architecture.md). The window owns
 //! one search field, one outline and one header bar; each tab owns the state
 //! those show.
 
@@ -28,10 +28,10 @@ pub struct Tab {
     /// The watch on that file. Replacing it stops the previous one.
     pub watch: RefCell<Option<Watch>>,
     /// Digest of the source now showing, so a watch event that changed
-    /// nothing does not cost a re-render (SPEC.md, section 7).
+    /// nothing does not cost a re-render (docs/architecture.md).
     pub digest: Cell<u64>,
     /// Rising request id; only the newest load may replace this tab's document
-    /// (SPEC.md, section 5, "Zustandsmodell").
+    /// (docs/architecture.md).
     pub request: Cell<u64>,
     /// What the search field held for this tab, and whether its bar was open.
     /// A tab keeps its own search (decision 014, section 2.2).

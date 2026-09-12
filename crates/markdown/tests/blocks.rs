@@ -1,4 +1,4 @@
-//! The block plan's contract (SPEC.md, sections 5 and 6).
+//! The block plan's contract (docs/architecture.md).
 //!
 //! The renderer virtualizes over these blocks: it measures only the visible
 //! ones and trusts the recorded ranges for everything else. If a block's op
@@ -85,7 +85,7 @@ fn a_list_and_a_table_are_each_one_block() {
 #[test]
 fn a_large_document_yields_blocks_without_measuring_anything() {
     // The plan is built for the whole document in one pass; only the visible
-    // blocks are ever laid out (SPEC.md, section 5).
+    // blocks are ever laid out (docs/architecture.md).
     let doc = support::parse(&"Ein Absatz.\n\n".repeat(20_000));
     assert_eq!(doc.block_count(), 20_000);
     let last = doc.block(doc.block_count() - 1);

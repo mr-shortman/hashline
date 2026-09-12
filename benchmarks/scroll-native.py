@@ -5,7 +5,7 @@ script bridge, so the stimulus is real pointer input through
 `org.gnome.Mutter.RemoteDesktop`, exactly the way a user's wheel reaches it.
 That keeps the measurement external — nothing in the application is
 instrumented, and nothing about the run depends on the toolkit
-(SPEC.md, section 9).
+(docs/metrics.md).
 
 The monotonic boundaries written to `--output` are what lets
 `analyze-compositor.py` cut an interior window out of the surrounding Sysprof
@@ -86,7 +86,7 @@ class Pointer:
     def scroll(self, dy):
         # Continuous axis deltas, the same shape a wheel or touchpad produces,
         # so the toolkit's own kinetic handling is exercised rather than
-        # bypassed (SPEC.md, section 3).
+        # bypassed (docs/design.md).
         self.call('NotifyPointerAxis', '(ddu)', (0.0, dy, 0))
 
     def close(self):

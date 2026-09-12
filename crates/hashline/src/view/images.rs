@@ -1,7 +1,7 @@
 //! Local pictures: which ones may be shown, how large, and cached as textures.
 //!
 //! Decoding is the largest remaining attack surface, because it hands foreign
-//! binary data to a C decoder (SPEC.md, section 11). Two rules follow, and both
+//! binary data to a C decoder (docs/architecture.md). Two rules follow, and both
 //! are enforced here rather than at the call site:
 //!
 //! * the budget is checked from the file's **header**, before anything is
@@ -68,7 +68,7 @@ impl ImageCache {
     /// document's directory, or refuses it.
     fn resolve(&self, source: &str) -> Option<PathBuf> {
         // Remote pictures do not load in v1; the placeholder names the source
-        // (SPEC.md, section 7).
+        // (docs/architecture.md).
         if source.contains("://") {
             return None;
         }

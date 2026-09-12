@@ -48,7 +48,7 @@ def main():
     for tool in ("cargo", "dpkg", "dpkg-deb", "dpkg-shlibdeps",
                  "desktop-file-validate", "glib-compile-schemas", "update-mime-database"):
         if not shutil.which(tool):
-            parser.error(f"missing build tool: {tool} (see docs/installation.md)")
+            parser.error(f"missing build tool: {tool} (see docs/development.md)")
 
     version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
     package_version = f"{version}-{args.revision}"
@@ -96,12 +96,9 @@ def main():
         install(ROOT / f"data/icons/{APP_ID}.svg", f"usr/share/icons/hicolor/scalable/apps/{APP_ID}.svg")
         for size, source in ((32, "32x32.png"), (128, "128x128.png"), (256, "128x128@2x.png")):
             install(ROOT / "data/icons" / source, f"usr/share/icons/hicolor/{size}x{size}/apps/{APP_ID}.png")
-        for source in ("README.md", "SPEC.md", "docs/installation.md", "docs/limitations.md",
-                       "docs/development.md", "docs/testing.md", "docs/acceptance/M3.md",
-                       "benchmarks/results/native-current/REPORT.md"):
-            install(ROOT / source, f"usr/share/doc/hashline/{source}")
-        for source in sorted((ROOT / "docs/decisions").glob("*.md")):
-            install(source, f"usr/share/doc/hashline/docs/decisions/{source.name}")
+        install(ROOT / "README.md", "usr/share/doc/hashline/README.md")
+        for source in sorted((ROOT / "docs").glob("*.md")):
+            install(source, f"usr/share/doc/hashline/docs/{source.name}")
         man = stage / "usr/share/man/man1/hashline.1.gz"
         man.parent.mkdir(parents=True)
         man.write_bytes(gzip.compress((ROOT / "data/hashline.1").read_bytes(), mtime=0))
@@ -133,7 +130,7 @@ def main():
         files = sorted(path for path in stage.rglob("*") if path.is_file())
         size = sum(path.stat().st_size for path in files)
         if size > SIZE_LIMIT:
-            raise SystemExit(f"Installed payload {size} bytes exceeds SPEC's 20 MiB budget")
+            raise SystemExit(f"Installed payload {size} bytes exceeds the 20 MiB budget")
         control = stage / "DEBIAN"
         control.mkdir()
         (control / "control").write_text(

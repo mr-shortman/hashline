@@ -1,7 +1,8 @@
 //! Setting one block with Pango.
 //!
-//! This is the only place that turns operations into type (SPEC.md, section 6,
-//! "Datenfluss", step 6). A block becomes a handful of *pieces* — a paragraph
+//! This is the only place that turns operations into type
+//! (docs/architecture.md, step 6). A block becomes a handful of *pieces* — a
+//! paragraph
 //! is one, a list is one per item, a table is one per cell — plus flat
 //! decoration behind them: the rule under an H2, the bar beside a quote, the
 //! panel under a code block.
@@ -92,14 +93,14 @@ pub struct Piece {
     /// A control the view draws, not document text — the copy affordance on a
     /// code block. It is never a selection or hit-test target, because
     /// document content must not be able to imitate one either
-    /// (SPEC.md, section 11).
+    /// (docs/architecture.md).
     pub control: bool,
 }
 
 /// What the layout may ask about a picture. The layout itself never touches
 /// the file system: it needs the intrinsic size to reserve the right space,
 /// and the view — which owns the cache, the budget and the access rules —
-/// answers (SPEC.md, sections 7 and 11).
+/// answers (docs/architecture.md).
 pub trait ImageSource {
     /// Intrinsic size in logical pixels, or `None` when the picture will not
     /// be shown at all and a placeholder should take its place.
@@ -155,7 +156,7 @@ pub struct BlockLayout {
     pub content_height: f64,
     /// Width the content wants. Wider than the column for code and tables,
     /// which scroll inside their own block rather than making the document
-    /// scroll sideways (SPEC.md, section 3).
+    /// scroll sideways (docs/design.md).
     pub content_width: f64,
 }
 
@@ -418,7 +419,7 @@ impl Compose {
                     // padding are not expressible as a text attribute.
                     add(background(style.palette.code), from, to);
                     // Raw HTML is source text, not the author's code, and is
-                    // set apart more quietly (SPEC.md, section 6).
+                    // set apart more quietly (docs/architecture.md).
                     if span.raw_html {
                         add(foreground(style.palette.muted), from, to);
                     }
@@ -680,7 +681,7 @@ pub fn faces(style: &Style) -> Vec<Face> {
 /// otherwise pay for: the fontconfig match, the font file, and the scaled font
 /// at this exact size. Measured at 1.4 to 2.6 ms per face against 2181
 /// installed font files, and spent once per process
-/// (docs/decisions/014-competitive-targets.md, section 3.3).
+/// (docs/metrics.md).
 ///
 /// A document in another script still pays for its own fallback face when its
 /// first block is set: the fixtures' first paragraph ends in Japanese, and
@@ -1043,7 +1044,7 @@ struct Item {
 fn marker_for(ordered: bool, number: u64, depth: usize, task: Option<bool>) -> String {
     if let Some(checked) = task {
         // The reference uses a real checkbox input; a viewer that never writes
-        // renders its state instead (SPEC.md, section 2: task lists are
+        // renders its state instead (docs/architecture.md: task lists are
         // read-only).
         return if checked {
             "☑  ".into()
@@ -1308,7 +1309,7 @@ fn table(
     // per cell. A table's cells repeat — the 100×101 fixture holds two distinct
     // strings in ten thousand cells — and one Pango layout per cell was most of
     // the 53 ms this block used to cost against a 16 ms budget
-    // (docs/decisions/014-competitive-targets.md, section 3.3).
+    // (docs/metrics.md).
     let mut natural = vec![0.0f64; columns];
     let mut measured: std::collections::HashMap<(bool, &str), f64> =
         std::collections::HashMap::new();
@@ -1510,7 +1511,7 @@ fn picture(
 }
 
 /// `.image-placeholder`: an unobtrusive box with the alternative text, in the
-/// height the layout had reserved anyway (SPEC.md, section 3).
+/// height the layout had reserved anyway (docs/design.md).
 fn placeholder(
     context: &pango::Context,
     style: &Style,

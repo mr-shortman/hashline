@@ -8,7 +8,7 @@
 //! An entry holds no strings of its own. The parser already keeps every
 //! heading id and heading text in the document's string blob, and a copy of
 //! them costs about a megabyte on the 10 MiB fixture for no gain
-//! (docs/decisions/014-competitive-targets.md, section 3.2). An entry is
+//! (docs/metrics.md). An entry is
 //! therefore two ranges into that blob, and the outline holds the document
 //! alive for as long as it needs them.
 
@@ -170,7 +170,7 @@ impl Outline {
     }
 
     /// The heading a reader is currently under, from the scroll position alone
-    /// — no measuring while scrolling (SPEC.md, section 8).
+    /// — no measuring while scrolling (docs/architecture.md).
     pub fn active_for_block(&self, block: usize) -> Option<usize> {
         self.entries
             .iter()

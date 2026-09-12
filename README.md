@@ -12,11 +12,11 @@ Textsuche, Code-Kopieren, Syntaxhervorhebung, lokale Bilder, relative
 Markdown-Links, automatische Aktualisierung unter Erhalt der Leseposition,
 Lesepositionen, Themes und Textzoom.
 
-**Status:** Der native Reader hat die M3-Auslieferung nach [SPEC.md](SPEC.md),
-einschließlich `.deb` für Ubuntu 26.04 amd64. Die vollständige
-M3-/v1-Abnahme steht aus: bekannte Performance- und Darstellungslücken sind
-in [Einschränkungen](docs/limitations.md) und im
-[M3-Bericht](docs/acceptance/M3.md) festgehalten.
+**Status:** v1 ist abgeschlossen, einschließlich `.deb` für Ubuntu 26.04
+amd64. Was v1 nicht kann und wo es seine eigenen Ziele verfehlt, steht in
+[Einschränkungen](docs/limitations.md); die Zahlen in
+[Messwerte](docs/metrics.md). Woran als Nächstes gearbeitet wird, steht in der
+[Roadmap](docs/roadmap.md).
 
 Der Dokumentbereich ist ein eigenes Widget: es setzt den Op-Buffer des Parsers
 mit Pango und zeichnet mit GSK, blockweise virtualisiert. Für kein Dokument
@@ -24,7 +24,7 @@ existiert ein Zustand, in dem alles gesetzt ist — eine 10-MiB-Datei wird lesba
 indem 15 von rund 145 000 Blöcken gesetzt werden. Ein Block, der viel höher als
 ein Schirm ist, zerfällt dafür in Teile: ein Codeblock mit 70 000 Zeilen ist
 sonst genau ein Block, und Virtualisierung käme nicht an ihn heran
-([013](docs/decisions/013-oversized-blocks.md)).
+([Architektur](docs/architecture.md)).
 
 ## Entwickeln
 
@@ -33,8 +33,8 @@ sudo apt install libgtk-4-dev build-essential pkg-config
 cargo run -p hashline -- README.md
 ```
 
-Mehr in [docs/development.md](docs/development.md), Prüfungen in
-[docs/testing.md](docs/testing.md).
+Mehr in [docs/development.md](docs/development.md): Prüfungen, Fenstertests,
+Messungen und Paketbau.
 
 ## Installation
 
@@ -46,7 +46,7 @@ sudo apt install ./target/packages/hashline_0.1.0-1_amd64.deb
 ```
 
 Voraussetzungen, Entfernen und isolierter Installationstest stehen in
-[docs/installation.md](docs/installation.md). Hashline erscheint im
+[docs/development.md](docs/development.md). Hashline erscheint im
 Anwendungsmenü und unter „Öffnen mit“ für Markdown. Eine bestehende
 Standardzuordnung bleibt erhalten.
 
@@ -102,8 +102,9 @@ leer. Lesepositionen greifen beim erneuten Öffnen einer Datei.
   Dokumentinhalt entsteht kein Shell-Aufruf.
 - Keine Telemetrie.
 
-[Spezifikation](SPEC.md) ·
+[Architektur](docs/architecture.md) ·
+[Gestaltung](docs/design.md) ·
 [Entwicklung](docs/development.md) ·
-[Prüfungen](docs/testing.md) ·
-[Entscheidungen](docs/decisions/) ·
-[Gestaltungsreferenz](docs/design/README.md)
+[Messwerte](docs/metrics.md) ·
+[Einschränkungen](docs/limitations.md) ·
+[Roadmap](docs/roadmap.md)

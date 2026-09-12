@@ -1,7 +1,7 @@
-//! Persisted preferences and reading positions (SPEC.md, sections 3 and 7).
+//! Persisted preferences and reading positions (docs/design.md).
 //!
 //! Everything here is optional. A missing or damaged schema must not stop the
-//! program from opening a file — that is explicit in SPEC.md section 7 — so the
+//! program from opening a file — that is explicit in docs/architecture.md — so the
 //! store degrades to holding nothing rather than failing.
 
 use std::path::Path;
@@ -13,7 +13,7 @@ use crate::document::Anchor;
 
 pub const SCHEMA_ID: &str = "de.kalendium.Hashline";
 
-/// At most this many paths are remembered (SPEC.md, section 7).
+/// At most this many paths are remembered (docs/architecture.md).
 const MAX_POSITIONS: usize = 100;
 
 #[derive(Clone)]
@@ -58,7 +58,7 @@ impl Preferences {
     /// that key would abort the process rather than return a default — GIO
     /// treats it as a programming error. A build tree hits this whenever the
     /// schema source gains a key, so every access is guarded and a stale
-    /// schema degrades instead of killing the program (SPEC.md, section 7).
+    /// schema degrades instead of killing the program (docs/architecture.md).
     fn get(&self, key: &str) -> Option<&gio::Settings> {
         let schema = self.schema.as_ref()?;
         schema.has_key(key).then_some(())?;

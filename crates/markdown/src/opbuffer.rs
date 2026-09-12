@@ -1,5 +1,4 @@
-//! The op buffer (SPEC.md, section 6, and
-//! docs/decisions/010-op-buffer-for-the-native-renderer.md).
+//! The op buffer (docs/architecture.md).
 //!
 //! Offsets and lengths are **UTF-8 byte offsets** into `strings` and `text`.
 //! They counted UTF-16 code units for as long as the consumer was JavaScript
@@ -11,7 +10,7 @@
 //! Operations are a byte stream, not an array of four-word records. The record
 //! form cost 16 bytes per operation and 24 MiB on the 10 MiB fixture — more
 //! than the whole memory growth decision 014 allows for that document
-//! (docs/decisions/014-competitive-targets.md, section 3.2). A close is one
+//! (docs/metrics.md). A close is one
 //! byte here, an open one or two, a text run three to five.
 //!
 //! ```text
@@ -147,8 +146,7 @@ pub const ATTR_CHECKED: u32 = 8;
 pub const ATTR_DISABLED: u32 = 9;
 pub const ATTR_ALIGN: u32 = 12;
 
-/// FNV-1a. Used only for section identity (see 008, section 5), never for
-/// integrity or security.
+/// FNV-1a. Used only for section identity, never for integrity or security.
 #[derive(Clone, Copy)]
 pub struct Fnv(u64);
 impl Default for Fnv {
@@ -211,7 +209,7 @@ pub struct Encoder {
     /// The document's text in document order — what the search runs on.
     pub text: String,
     /// Top-level flow elements: what the block plan virtualizes over
-    /// (SPEC.md, section 5). `BLOCK_WORDS` words each.
+    /// (docs/architecture.md). `BLOCK_WORDS` words each.
     pub blocks: Vec<u32>,
     hash: Fnv,
     pending: String,

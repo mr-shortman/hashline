@@ -1,4 +1,4 @@
-//! Syntax highlighting for code blocks (SPEC.md, sections 4 and 10).
+//! Syntax highlighting for code blocks (docs/architecture.md).
 //!
 //! Only syntect's *parser* is used, not its theme machinery. Hashline's palette
 //! carries exactly three syntax colours — keyword, string and number — so a
@@ -30,7 +30,7 @@ pub struct Span {
 }
 
 /// Code longer than this stays uncoloured. A very large block would cost more
-/// than it is worth and SPEC.md section 10 says so explicitly.
+/// than it is worth and docs/architecture.md says so explicitly.
 pub const MAX_CODE_BYTES: usize = 128 * 1024;
 
 fn syntaxes() -> &'static SyntaxSet {
@@ -48,7 +48,7 @@ fn syntax_for(language: &str) -> Option<&'static SyntaxReference> {
 }
 
 /// Whether a language is known at all. Unknown languages get readable,
-/// uncoloured code rather than a guess (SPEC.md, section 6).
+/// uncoloured code rather than a guess (docs/architecture.md).
 pub fn is_supported(language: &str) -> bool {
     !language.is_empty() && syntax_for(language).is_some()
 }

@@ -1,4 +1,4 @@
-//! Selection across block boundaries (SPEC.md, section 8).
+//! Selection across block boundaries (docs/architecture.md).
 //!
 //! In the DOM this came for free; here it is ours to build, and it was risk 2
 //! of M0 for that reason. The whole trick is the representation: a position is
@@ -95,7 +95,7 @@ impl Selection {
     /// Blocks are separated by a blank line: a selection spanning paragraphs
     /// should paste as paragraphs. Separators *inside* a block — between list
     /// items or table cells — are already in the document text and come along
-    /// unchanged (SPEC.md, section 8).
+    /// unchanged (docs/architecture.md).
     pub fn text(&self, plan: &BlockPlan, document: &str) -> String {
         if self.is_empty() {
             return String::new();
