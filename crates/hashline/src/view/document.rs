@@ -1,9 +1,9 @@
 //! The document widget: virtualized block layout, scrolling, selection.
 //!
 //! It implements `GtkScrollable` rather than growing to the document's full
-//! height inside a viewport. That is what keeps the promise in SPEC.md,
-//! section 9: for no fixture does a state exist in which the whole document is
-//! laid out. The widget is always exactly the size of the viewport, and the
+//! height inside a viewport. That is what keeps the promise in
+//! docs/metrics.md: for no fixture does a state exist in which the whole
+//! document is laid out. The widget is always exactly the size of the viewport, and the
 //! adjustment describes a document it has mostly never measured.
 
 use std::cell::RefCell;
@@ -25,7 +25,7 @@ use crate::view::images::ImageCache;
 use crate::view::{Position, Selection};
 
 /// Everything the view owns. The layout cache lives here and nowhere else
-/// (SPEC.md, section 5, "Modulgrenzen").
+/// (docs/architecture.md).
 pub(crate) struct State {
     document: Rc<OpDocument>,
     plan: BlockPlan,
@@ -49,7 +49,7 @@ pub(crate) struct State {
     current_hit: Option<usize>,
     /// Syntax colours per code block, `None` while the worker is still
     /// running. Cached by block so scrolling back does not re-parse
-    /// (SPEC.md, section 10), and bounded like the layout cache beside it: a
+    /// (docs/architecture.md), and bounded like the layout cache beside it: a
     /// long reading session through a document of 28 931 code blocks must not
     /// end up holding the spans of all of them.
     highlights: std::collections::HashMap<usize, Option<Vec<Span>>>,
@@ -418,7 +418,7 @@ impl DocumentView {
     /// The document is taken by value so that the parts of it the plan has
     /// copied out can be released before it is shared: the block table is
     /// exactly what `BlockPlan` holds, and keeping both costs 2.8 MiB on the
-    /// 10 MiB fixture (docs/decisions/014-competitive-targets.md, section 3.2).
+    /// 10 MiB fixture (docs/metrics.md).
     pub fn set_document(&self, document: OpDocument) {
         super::mainthread::timed("set-document", || self.take_document(document));
     }
@@ -488,7 +488,7 @@ impl DocumentView {
     /// plan: the set blocks and their syntax colours.
     ///
     /// A tab that is not showing must not hold a layout cache
-    /// (docs/decisions/014-competitive-targets.md, section 2.2). What stays is
+    /// (docs/architecture.md). What stays is
     /// the document, the plan with its measured heights and the reading
     /// position, which is what makes coming back a few milliseconds rather
     /// than a reload.
@@ -558,7 +558,7 @@ impl DocumentView {
     }
 
     /// The reading column: 76 characters of the body font, centred, never a
-    /// fixed pixel count (SPEC.md, section 3).
+    /// fixed pixel count (docs/design.md).
     fn column_width(&self, width: f64) -> f64 {
         let state = self.imp().state.borrow();
         let context = self.pango_context();
@@ -684,7 +684,7 @@ impl DocumentView {
 
     /// Lays out every block the viewport needs, then folds the measurements
     /// into the plan. Measuring and drawing stay separate passes
-    /// (SPEC.md, section 10).
+    /// (docs/architecture.md).
     ///
     /// A block above the viewport whose measurement differs from its estimate
     /// moves everything below it; the scroll offset moves with it so the text
@@ -695,7 +695,7 @@ impl DocumentView {
     /// that the next scroll step has nothing to do. Setting all three screens
     /// in the frame that jumped there cost 22 ms on the 10 MiB fixture against
     /// a 16 ms budget, so only the screen that is actually shown is set here
-    /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    /// (docs/metrics.md).
     ///
     /// One screen still cost 21 ms at startup, and almost none of it was the
     /// document: it was the faces the screen's first block in each type style
@@ -749,7 +749,7 @@ impl DocumentView {
     /// five whether the document is 100 KiB or 10 MiB, because a screen holds
     /// about the same handful of type styles either way. Once the faces exist,
     /// setting a block costs 0.03 ms
-    /// (docs/decisions/014-competitive-targets.md, section 3.3).
+    /// (docs/metrics.md).
     ///
     /// The gap is real time, not a rearrangement of the metric: a parsed
     /// document reaches the main thread ten to eighty milliseconds before the
@@ -761,7 +761,7 @@ impl DocumentView {
     /// in one pass.
     ///
     /// The chain stops when the list is empty rather than rescheduling, so a
-    /// reader at rest has no idle source of its own (SPEC.md, section 10).
+    /// reader at rest has no idle source of its own (docs/architecture.md).
     fn schedule_warm(&self) {
         {
             let state = self.imp().state.borrow();
@@ -990,7 +990,7 @@ impl DocumentView {
             let block = state.plan.block(index);
             // Content wider than the column — a code block, a wide table —
             // scrolls inside its own block, so it is clipped to the column
-            // instead of spilling into the margins (SPEC.md, section 3).
+            // instead of spilling into the margins (docs/design.md).
             let clipped = set.content_width > column + 0.5;
             if clipped {
                 snapshot.push_clip(&gtk::graphene::Rect::new(
@@ -1501,7 +1501,7 @@ impl DocumentView {
             }
             // The original code text of the whole block — the control sits on
             // its first part, but a cut-up block is copied entire — without
-            // the newline that closed its last line (SPEC.md, section 8).
+            // the newline that closed its last line (docs/architecture.md).
             let (from, to) = state.plan.source_text_range(index);
             let text = &state.document.text[from as usize..to as usize];
             Some(text.strip_suffix('\n').unwrap_or(text).to_string())
@@ -1517,7 +1517,7 @@ impl DocumentView {
 
     /// Runs a search over the whole document text and returns the number of
     /// hits. Nothing is re-parsed and no layout is discarded: typing in the
-    /// search field must not cost a re-set (SPEC.md, sections 5 and 8).
+    /// search field must not cost a re-set (docs/architecture.md).
     pub fn search(&self, needle: &str) -> usize {
         let hits = match Query::new(needle) {
             Some(query) => {
@@ -1598,7 +1598,7 @@ impl DocumentView {
             state.plan.block_for_text(offset)
         };
         // The jump goes through the plan, so the target need never have been
-        // set before (SPEC.md, section 8).
+        // set before (docs/architecture.md).
         if let Some(block) = block {
             self.scroll_to_block_centred(block);
         }
@@ -1727,7 +1727,7 @@ impl DocumentView {
 
     /// Scrolls so that a block is in view, for an anchor or a search hit. It
     /// works from the plan, so the target need never have been set before
-    /// (SPEC.md, section 8).
+    /// (docs/architecture.md).
     pub fn scroll_to_block(&self, index: usize) {
         let y = {
             let state = self.imp().state.borrow();
@@ -1842,7 +1842,7 @@ fn selection_rects(layout: &pango::Layout, from: u32, to: u32) -> Vec<gtk::graph
 }
 
 /// The body font comes from the system; code uses the fontconfig `monospace`
-/// alias. Nothing is bundled and nothing is downloaded (SPEC.md, section 3).
+/// alias. Nothing is bundled and nothing is downloaded (docs/design.md).
 fn font_families() -> (String, String) {
     let body = gtk::Settings::default()
         .map(|settings| settings.gtk_font_name())

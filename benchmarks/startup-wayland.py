@@ -2,7 +2,7 @@
 """Startup from `exec` to pixels, over the Wayland protocol.
 
 `examples/measure` times Hashline's own stages without a window, so it cannot
-answer the question decision 009 was argued on: how long from starting the
+answer the question the native rewrite was argued on: how long from starting the
 process until the reader sees text. This driver answers it from outside the
 application, with no instrumentation in the program under test, so it measures
 any Wayland client the same way — Hashline and a reference viewer alike.

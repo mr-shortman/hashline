@@ -32,7 +32,7 @@ Arbeitsfortschritt, aber nicht zur statistischen Auswertung.
 
 Die Schätzung verwendet ab zwei Beobachtungen den Mittelwert je
 (Gruppe, Programm, Fixture) aus `.local/durations.json`. Zuvor gelten die
-Sekundenwerte aus Entscheidung 014 §5.2. Für dort nicht gemessene Gruppen
+Startwerte aus `timing.py`. Für dort nicht gemessene Gruppen
 stehen ausdrücklich abgeleitete Startwerte in `timing.py`. Es sind Schätzungen
 inklusive Messapparat und OCR, keine zugesicherten Laufzeiten.
 

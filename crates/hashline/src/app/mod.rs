@@ -1,5 +1,5 @@
 //! The application: window, header bar, actions, document loading
-//! (SPEC.md, sections 3, 5 and 7).
+//! (docs/design.md).
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -22,14 +22,14 @@ use tab::Tab;
 pub const APP_ID: &str = "de.kalendium.Hashline";
 
 /// A development ceiling on how much Markdown is read at all, so a stray file
-/// cannot pull the process over (SPEC.md, section 10).
+/// cannot pull the process over (docs/architecture.md).
 const SOURCE_LIMIT: u64 = 20 * 1024 * 1024;
 
-/// How long typing settles before a search runs (SPEC.md, section 8).
+/// How long typing settles before a search runs (docs/architecture.md).
 ///
 /// The budget is the whole distance from the last keystroke to the marks on
 /// screen: 100 ms for a medium document, 120 ms for a large one
-/// (docs/decisions/014-competitive-targets.md, section 3.3). Scanning the
+/// (docs/metrics.md). Scanning the
 /// 10 MiB fixture takes 5 ms, so nearly all of that budget is this wait, and
 /// 120 ms of it left nothing. Sixty milliseconds still collects a fast typist's
 /// keystrokes into one scan, and a scan that does happen per keystroke costs
@@ -37,7 +37,7 @@ const SOURCE_LIMIT: u64 = 20 * 1024 * 1024;
 const SEARCH_DEBOUNCE_MS: u64 = 60;
 
 /// Above this window width the outline gets its own column instead of
-/// floating over the text (SPEC.md, section 3).
+/// floating over the text (docs/design.md).
 const OUTLINE_SIDEBAR_WIDTH: i32 = 900;
 
 pub fn run() -> glib::ExitCode {
@@ -138,7 +138,7 @@ struct Loaded {
 
 struct Ui {
     window: gtk::ApplicationWindow,
-    /// One page per open document (docs/decisions/017-tabs.md).
+    /// One page per open document (docs/architecture.md).
     notebook: gtk::Notebook,
     tabs: RefCell<Vec<Rc<Tab>>>,
     /// The tab the window is currently showing, so that what belongs to it can
@@ -208,7 +208,7 @@ impl Ui {
         header.pack_start(&open_button);
 
         // The quiet empty view: what to do, and that dropping a file works
-        // (SPEC.md, section 3).
+        // (docs/design.md).
         let empty = gtk::Box::new(gtk::Orientation::Vertical, 12);
         empty.set_valign(gtk::Align::Center);
         empty.set_halign(gtk::Align::Center);
@@ -226,7 +226,7 @@ impl Ui {
         stack.set_visible_child_name("empty");
 
         // Search: a bar over the document, with the hit count beside the field
-        // and the usual next/previous (SPEC.md, section 3).
+        // and the usual next/previous (docs/design.md).
         let search_entry = gtk::SearchEntry::new();
         // GtkSearchEntry delays its own change notification by 150 ms, which
         // would come on top of the wait below and put every search over budget
@@ -255,7 +255,7 @@ impl Ui {
         // a number nothing here chose. Measured over 90 runs, the placeholder
         // is not legible for the first 62-68 ms after Ctrl+F and the proof
         // cannot read it before 89-92 ms, against a 25 ms budget for opening
-        // the search (docs/decisions/014-competitive-targets.md, section 1).
+        // the search (docs/metrics.md).
         // The bar is the answer to a keystroke, so it arrives with the frame
         // that answers it.
         if let Some(revealer) = search_bar.first_child().and_downcast::<gtk::Revealer>() {
@@ -263,7 +263,7 @@ impl Ui {
         }
 
         // The outline: an overlay over the document, given room as a sidebar
-        // once the window is wide enough (SPEC.md, section 3).
+        // once the window is wide enough (docs/design.md).
         let outline_list = outline_view::OutlineList::new();
         let outline_scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -280,7 +280,7 @@ impl Ui {
             .build();
 
         // A read failure leaves the document that is showing in place and says
-        // so above it (SPEC.md, section 7).
+        // so above it (docs/architecture.md).
         let banner_label = gtk::Label::new(None);
         banner_label.set_xalign(0.0);
         banner_label.set_wrap(true);
@@ -406,7 +406,7 @@ impl Ui {
             .build();
 
         // The stored view preferences take effect before anything is shown,
-        // so no wrong zoom or layout flashes (SPEC.md, section 3).
+        // so no wrong zoom or layout flashes (docs/design.md).
         let showing = ui.preferences.outline_visible();
         outline_button.set_active(showing);
         ui.outline_revealer.set_reveal_child(showing);
@@ -576,7 +576,7 @@ impl Ui {
 
     /// Debounced so that typing does not run a scan per keystroke, and the
     /// answer to an older query can never overwrite a newer one
-    /// (SPEC.md, section 8).
+    /// (docs/architecture.md).
     fn install_search(self: &Rc<Self>, previous: &gtk::Button, next: &gtk::Button) {
         let pending: Rc<Cell<u64>> = Rc::new(Cell::new(0));
         let ui = self.clone();
@@ -630,7 +630,7 @@ impl Ui {
             ui.update_search_count();
         });
         // Closing the bar clears the marks, and the document keeps the focus
-        // it had (SPEC.md, section 3).
+        // it had (docs/design.md).
         let ui = self.clone();
         self.search_bar
             .connect_search_mode_enabled_notify(move |bar| {
@@ -723,7 +723,7 @@ impl Ui {
 
     /// Every file opens in its own tab, and a file that is already open is
     /// brought to the front instead of read again
-    /// (docs/decisions/014-competitive-targets.md, section 2.2).
+    /// (docs/architecture.md).
     fn open_files(self: &Rc<Self>, files: &[gio::File]) {
         let mut refused = false;
         for file in files {
@@ -738,7 +738,7 @@ impl Ui {
     }
 
     /// Reads and parses off the main thread, then applies the result if it is
-    /// still the newest request (SPEC.md, sections 5 and 10).
+    /// still the newest request (docs/architecture.md).
     fn open(self: &Rc<Self>, path: &Path) {
         self.open_at(path, None);
     }
@@ -870,12 +870,12 @@ impl Ui {
         document: hashline_markdown::OpDocument,
     ) {
         // Relative picture paths resolve against the document's directory,
-        // never the process working directory (SPEC.md, section 7).
+        // never the process working directory (docs/architecture.md).
         tab.view
             .set_base_directory(path.parent().map(Path::to_path_buf));
         tab.view.set_document(document);
         // The shown name changes only once the new document is actually in
-        // place (SPEC.md, section 7).
+        // place (docs/architecture.md).
         tab.set_path(&path);
         self.start_watch(tab, &path);
         self.stack.set_visible_child_name("document");
@@ -889,12 +889,12 @@ impl Ui {
 
     /// Replaces the watch, which stops the previous one, and reloads on
     /// change. A failure to watch is not fatal: manual reload stays available
-    /// (SPEC.md, section 7).
+    /// (docs/architecture.md).
     fn start_watch(self: &Rc<Self>, tab: &Rc<Tab>, path: &Path) {
         let ui = Rc::downgrade(self);
         let weak = Rc::downgrade(tab);
         // Every tab watches its own file, whether or not it is the one in
-        // front (docs/decisions/014-competitive-targets.md, section 2.2).
+        // front (docs/architecture.md).
         let watch = document::watch(path, move || {
             if let (Some(ui), Some(tab)) = (ui.upgrade(), weak.upgrade()) {
                 ui.reload_tab(&tab);
@@ -957,7 +957,7 @@ impl Ui {
 
     /// What a clicked link means. The view resolves nothing itself; this is the
     /// single place a document's content can ask for anything
-    /// (SPEC.md, sections 7 and 11).
+    /// (docs/architecture.md).
     fn install_links(self: &Rc<Self>, tab: &Rc<Tab>) {
         let ui = self.clone();
         let weak = Rc::downgrade(tab);
@@ -1214,7 +1214,7 @@ impl Ui {
 
     /// Actions are registered once and bound to keys through the application,
     /// so menu, keyboard and accessibility share one source
-    /// (SPEC.md, section 3).
+    /// (docs/design.md).
     fn focused_editable(&self) -> Option<gtk::Editable> {
         gtk::prelude::GtkWindowExt::focus(&self.window)
             .and_then(|w| w.downcast::<gtk::Editable>().ok())
@@ -1391,7 +1391,7 @@ impl Ui {
 }
 
 /// Two allocator settings, both about giving memory back rather than keeping
-/// it (docs/decisions/014-competitive-targets.md, section 3.2).
+/// it (docs/metrics.md).
 ///
 /// glibc gives each thread that allocates its own arena and keeps that arena
 /// for reuse. The document is read and parsed on a worker thread, so the
@@ -1429,8 +1429,8 @@ fn tune_allocator() {
 /// the plan has copied out. glibc keeps those pages for reuse, and they count
 /// towards PSS whether or not the reader ever uses them again — 2 MiB on a
 /// 100 KiB document and far more on a large one, against a budget that allows
-/// twice the file size in total (docs/decisions/014-competitive-targets.md,
-/// section 3.2). This is called once per load, never while drawing.
+/// twice the file size in total (docs/metrics.md). This is called once per
+/// load, never while drawing.
 fn release_free_memory() {
     #[cfg(target_env = "gnu")]
     {
@@ -1543,8 +1543,7 @@ mod tests {
     }
 
     /// A reload must leave the reader where they were, even when the text
-    /// above them changed length (SPEC.md, section 7, and
-    /// docs/decisions/014-competitive-targets.md, section 3.3).
+    /// above them changed length (docs/architecture.md).
     ///
     /// It runs against a mapped window, because the scroll position only
     /// exists once the view has been given a size.
@@ -1852,8 +1851,7 @@ mod tests {
     }
 
     /// No single piece of main-thread work over 16 ms, on the fixtures that
-    /// used to produce one (SPEC.md, section 9, and
-    /// docs/decisions/014-competitive-targets.md, section 3.3).
+    /// used to produce one (docs/metrics.md).
     ///
     /// Scrolling is done by moving the adjustment, which is what a scroll event
     /// does, so this measures the reader's own work rather than the input

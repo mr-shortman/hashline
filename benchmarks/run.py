@@ -403,7 +403,7 @@ def main():
         parser.error('Existing rows are duplicated or outside the matrix')
     initial_estimate = sum(estimates.seconds(item) for item in matrix if identity(item) not in done)
     output['estimatedTotalSeconds'] = sum(estimates.seconds(item) for item in matrix)
-    output['estimateSource'] = 'Local cell means after two measurements; otherwise decision 014 section 5.2 priors (see timing.py)'
+    output['estimateSource'] = 'Local cell means after two measurements; otherwise the priors in timing.py'
     output.setdefault('segments', []).append({'startedAt': utcnow(), 'timeBudgetSeconds': args.time_budget})
     segment = output['segments'][-1]
     started = time.monotonic()

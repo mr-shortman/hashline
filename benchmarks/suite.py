@@ -443,7 +443,7 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
         # file, and a paragraph is added above everything so that every block
         # index below it moves. A frame that shows the change therefore proves
         # two things at once: how long the reload took, and that the reading
-        # position survived it (decision 014, section 3.3). A viewer that jumps
+        # position survived it (docs/metrics.md). A viewer that jumps
         # to the top after a reload shows the first section instead and fails.
         anchor = '\n\n## Ankerabschnitt\n\nAnkerzeile eins zwei drei.\n'
         changed = '\n\n## Ankerabschnitt\n\nAnkerzeile geaendert vier.\n'
@@ -518,7 +518,7 @@ def measure(group, command, fixture, renderer, spec, options, artifact, hz=None)
             result['metrics'] = {'tabSwitchUpperMs': result.get('readableUpperMs')}
             if result.get('contentVerified'):
                 # What a tab that is not showing costs, and what ten of them
-                # cost together (decision 014, section 3.2). Every tab needs
+                # cost together (docs/metrics.md). Every tab needs
                 # its own path: a viewer may bring an open file forward
                 # instead of opening it twice.
                 held = tab_memory(command, fixture, renderer, options, artifact)
