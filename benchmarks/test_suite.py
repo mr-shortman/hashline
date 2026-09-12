@@ -140,6 +140,42 @@ class ContentProof(unittest.TestCase):
         capture.frames = [dict(receivedMonotonicNs=t, ptsNs=t, sha256=f'sha-{t}', packed=zlib.compress(text.encode())) for t, text in payloads]
         return capture
 
+    def test_a_consumer_that_falls_behind_does_not_make_the_viewer_look_slow(self):
+        """The frames come in evenly; the reader gets to them ever later.
+
+        Timed by receipt, the last frame of this capture lands 60 ms after the
+        frame before it although the two were captured 16 ms apart, and every
+        launch that takes longer collects more of that. Alignment puts them
+        back where the pipeline saw them.
+        """
+        import threading
+        capture = object.__new__(content.Capture)
+        capture.error = None
+        capture.lock = threading.Lock()
+        # Even 16 ms frames on the pipeline clock, whose epoch is its own, and
+        # receipts that fall 20 ms further behind on every frame.
+        capture.frames = [{'pipelineNs': 500_000_000 + index * 16_000_000,
+                           'receivedMonotonicNs': 9_000_000_000 + index * 36_000_000,
+                           'ptsNs': index * 16_000_000} for index in range(5)]
+        capture.clock_offset = min(f['receivedMonotonicNs'] - f['pipelineNs'] for f in capture.frames)
+        record = capture.align()
+        self.assertEqual(record['alignedFrames'], 5)
+        spacing = [(b['capturedMonotonicNs'] - a['capturedMonotonicNs']) / 1e6
+                   for a, b in zip(capture.frames, capture.frames[1:])]
+        self.assertEqual(spacing, [16.0] * 4)
+        # No frame is ever claimed to have arrived after it was received, and
+        # the least delayed one keeps its receipt exactly.
+        late = [f['receivedMonotonicNs'] - f['capturedMonotonicNs'] for f in capture.frames]
+        self.assertEqual(min(late), 0)
+        self.assertTrue(all(value >= 0 for value in late))
+        self.assertEqual(record['backlogMsMax'], 80.0)
+
+    def test_frames_without_a_pipeline_clock_keep_their_receipt(self):
+        capture = self.capture([(1, 'wallpaper'), (2, 'window')])
+        record = capture.align()
+        self.assertEqual(record['alignedFrames'], 0)
+        self.assertEqual([content.observed(f) for f in capture.frames], [1, 2])
+
     def test_leftover_window_is_dropped_from_the_baseline(self):
         capture = self.capture([(1, 'Lesbarer Text mit'), (2, 'wallpaper')])
         with patch('content.ocr', side_effect=lambda data, psm=6: data.decode()):

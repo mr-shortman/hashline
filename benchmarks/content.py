@@ -110,6 +110,14 @@ def blank_rect(rows, width, rect=None):
     return b''.join(rows)
 
 
+def observed(frame):
+    """When a frame was captured, once `align` has put it on the stimulus
+    clock. Receipt where there is nothing better: a live capture that has not
+    been aligned yet, a manifest written before frames carried their own
+    timestamp, and the unit fixtures that build frame records by hand."""
+    return frame.get('capturedMonotonicNs', frame['receivedMonotonicNs'])
+
+
 def failure(kind, reason, frames=0, status='missing'):
     return {'status': status, 'reason': reason, 'contentVerified': False,
             'proofFailure': {'kind': kind, 'capturedFrames': frames}, 'metrics': {}}
@@ -244,6 +252,7 @@ class Capture:
         self.session = None
         self.subscription = None
         self.total_bytes = 0
+        self.clock_offset = None
         self.last_hash = None
         self.bounds = None
         self.closed = False
@@ -290,6 +299,23 @@ class Capture:
         except Exception as error:
             self.error = str(error)
 
+    def pipeline_ns(self, buffer):
+        """The frame's own timestamp, on the capture pipeline's clock.
+
+        `do-timestamp=true` stamps each buffer with the running time at which
+        the source pushed it; added to the pipeline's base time that is an
+        instant on the clock the pipeline runs on. Here that clock is
+        PipeWire's, whose epoch is its own — measured 1,53 s against
+        3.291,03 s of `CLOCK_MONOTONIC` — so the stamps are exact relative to
+        each other and mean nothing on their own. `align` turns them into the
+        stimulus clock.
+        """
+        pts = buffer.pts
+        if pts == self.Gst.CLOCK_TIME_NONE or self.pipeline is None:
+            return None
+        base = self.pipeline.get_base_time()
+        return None if base == self.Gst.CLOCK_TIME_NONE else base + pts
+
     def new_frame(self, sink):
         """Copy the buffer out and hand it on; never work while it is mapped."""
         sample = sink.emit('pull-sample')
@@ -307,8 +333,14 @@ class Capture:
             buffer.unmap(mapped)
         # Keep incoming timestamps, including identical frames. Geometry is
         # only known after mapping; window-only deduplication runs offline.
-        record = {'receivedMonotonicNs': received, 'ptsNs': buffer.pts}
+        pipeline_ns = self.pipeline_ns(buffer)
+        record = {'receivedMonotonicNs': received, 'ptsNs': buffer.pts,
+                  'pipelineNs': pipeline_ns}
         with self.lock:
+            if pipeline_ns is not None:
+                delta = received - pipeline_ns
+                if self.clock_offset is None or delta < self.clock_offset:
+                    self.clock_offset = delta
             if self.pending >= MAX_PENDING_FRAMES:
                 self.error = (f'Frame compression is more than {MAX_PENDING_FRAMES} frames behind; '
                               'no frames silently dropped')
@@ -429,7 +461,7 @@ class Capture:
         and the last thing on screen is the honest one.
         """
         with self.lock:
-            keep = [f for f in self.frames if f['receivedMonotonicNs'] >= monotonic_ns]
+            keep = [f for f in self.frames if observed(f) >= monotonic_ns]
             self.retain(keep or self.frames[-1:])
 
     def clear(self, expected, timeout=15):
@@ -463,18 +495,61 @@ class Capture:
             result.frames = [f for f in self.frames if 'packed' in f]
             result.error = self.error
             result.bounds = self.bounds
+            result.clock_offset = self.clock_offset
             result.heartbeat = getattr(self, 'heartbeat', None)
             return result
 
+    def align(self):
+        """Puts every frame's own timestamp on the clock the stimulus was taken
+        on, and says what that cost.
+
+        Receipt time is not capture time, and the difference is not a constant.
+        The consumer copies, hashes and deflates six megabytes per frame; at
+        sixty frames a second it falls behind, `drop=false` keeps every frame,
+        and the backlog shows up as ever later receipts. Measured inside one
+        eight-frame capture of the baseline run, the gap between a frame's own
+        timestamp and its receipt grew by 58 ms from the first frame to the
+        last: a launch that takes longer collects more backlog, so timing by
+        receipt charges the slow case twice over.
+
+        The frames carry exact relative times on the capture pipeline's clock;
+        what is unknown is the one offset between that clock's epoch and
+        `CLOCK_MONOTONIC`. Every receipt is after its own capture, so the
+        smallest observed difference is the largest offset that can be
+        justified, and the frame that showed it keeps its receipt time exactly.
+        Every other frame therefore lands no earlier than it was received minus
+        that frame's own backlog, and never earlier than it was captured: the
+        result is still an upper bound, only a much tighter one.
+        """
+        # Replays and unit fixtures carry frames that were aligned once
+        # already, or never had a pipeline clock to align against.
+        offset = getattr(self, 'clock_offset', None)
+        aligned = 0
+        for frame in self.frames:
+            if offset is None or frame.get('pipelineNs') is None:
+                continue
+            frame['capturedMonotonicNs'] = frame['pipelineNs'] + offset
+            aligned += 1
+        late = [frame['receivedMonotonicNs'] - frame['capturedMonotonicNs']
+                for frame in self.frames if 'capturedMonotonicNs' in frame]
+        return {'alignedFrames': aligned, 'frames': len(self.frames),
+                'clockOffsetNs': offset,
+                'backlogMsMedian': (sorted(late)[len(late) // 2] / 1e6) if late else None,
+                'backlogMsMax': (max(late) / 1e6) if late else None,
+                'method': 'Frames timed by the capture pipeline\'s own timestamps, shifted onto '
+                          'CLOCK_MONOTONIC by the smallest receipt-minus-capture difference in '
+                          'the capture; receipt time where a frame carries no timestamp'}
+
     def archive(self, started_ns, expected, directory, persist=True):
         directory.mkdir(parents=True, exist_ok=True)
+        self.clock = self.align()
         frames, last_hash = [], None
         for frame in self.frames:
             pixels = zlib.decompress(frame['packed'])
             if getattr(self, 'bounds', None):
                 pixels = crop_ppm(pixels, self.bounds)
             digest = hashlib.sha256(pixels).hexdigest()
-            delay = frame['receivedMonotonicNs'] - started_ns
+            delay = observed(frame) - started_ns
             protected = abs(delay) <= PROTECTED_NS
             if protected or digest != last_hash:
                 record = {k: v for k, v in frame.items() if k != 'packed'}
@@ -483,11 +558,12 @@ class Capture:
             elif frames:
                 # Keep the last observation time of an identical run, so a
                 # slow (>500 ms) response still gets the nearest lower bound.
-                frames[-1][0]['lastReceivedMonotonicNs'] = frame['receivedMonotonicNs']
+                frames[-1][0]['lastObservedMonotonicNs'] = observed(frame)
             last_hash = digest
         # Persist the whole cropped capture before any expensive recognition.
-        manifest = {'schemaVersion': 1, 'startedMonotonicNs': started_ns, 'expected': expected,
-                    'windowBounds': getattr(self, 'bounds', None), 'frames': []}
+        manifest = {'schemaVersion': 2, 'startedMonotonicNs': started_ns, 'expected': expected,
+                    'windowBounds': getattr(self, 'bounds', None),
+                    'captureClock': self.clock, 'frames': []}
         for index, (record, pixels) in enumerate(frames):
             if persist:
                 path = f'frames/{index:06}.ppm.z'
@@ -542,20 +618,21 @@ class Capture:
                   # manifest may exist even here; a replay writes none at all.
                   'captureManifest': str(directory / 'capture.json') if (directory / 'capture.json').is_file() else None,
                   'heartbeat': getattr(self, 'heartbeat', None),
-                  'method': 'Mutter ScreenCast receipt timestamps; target-window crop; offline OCR psm 6 then 11. Receipt bounds include capture latency and are not presentation timestamps.',
+                  'captureClock': getattr(self, 'clock', None),
+                  'method': 'Mutter ScreenCast frame timestamps (pipeline base time plus buffer PTS, receipt only where a buffer carries no usable stamp); target-window crop; offline OCR psm 6 then 11. Bounds include capture latency and are not presentation timestamps.',
                   'evidence': str(directory / 'first-readable.ppm') if first else str(directory / 'last-frame.ppm')}
         if first:
-            observed = (last_negative.get('lastReceivedMonotonicNs', last_negative['receivedMonotonicNs']) - started_ns) / 1e6
+            last_seen = (last_negative.get('lastObservedMonotonicNs', observed(last_negative)) - started_ns) / 1e6
             # An effect cannot precede its stimulus: the document text is on
             # screen because the file changed or the viewer started, so the
             # earliest moment it can be readable is the stimulus itself. A
             # baseline frame older than that bounds nothing further, and the
             # stream falls silent before every stimulus that follows an
             # animation, because a still monitor produces no frames at all.
-            lower = max(observed, 0.0)
+            lower = max(last_seen, 0.0)
             gap = first['delayMs'] - lower
             result.update(readableLowerMs=lower, readableUpperMs=first['delayMs'], proofGapMs=gap,
-                          lastNegativeFrameMs=observed,
+                          lastNegativeFrameMs=last_seen,
                           lastWithoutText=last_negative, firstWithText=first, ocrPsm=first['ocrPsm'],
                           proofResolutionValid=gap <= MAX_PROOF_GAP_MS,
                           maximumProofGapMs=MAX_PROOF_GAP_MS)

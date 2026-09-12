@@ -207,7 +207,7 @@ def accepted(summary, eligible):
 def report(output):
     counted = '; '.join(f'{group} n={n}' for group, n in sorted(output['repetitions'].items()))
     lines = ['# Hashline benchmark report', '', f"Mode: {output['mode']}; {counted}; acceptance: **{str(output['acceptance']).lower()}**.",
-             '', 'Times with content proof are conservative ScreenCast receipt bounds. Missing, unsupported and diagnostic results never pass budgets.', '']
+             '', 'Times with content proof are conservative ScreenCast capture bounds. Missing, unsupported and diagnostic results never pass budgets.', '']
     if output.get('progress'):
         progress = output['progress']
         lines += [f"Progress: {progress['done']}/{progress['total']}; remaining ~{human(progress['estimatedRemainingSeconds'])}; session: {output.get('conditions', {}).get('sessionKind', 'unknown')}; stoppedBy: {output.get('stoppedBy', '—')}.", '']

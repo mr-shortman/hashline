@@ -67,9 +67,25 @@ des Fensters zählen dabei nicht. Eine Aufnahmequelle, die selbst keine Bilder
 liefert, lässt sich dadurch nicht in eine höhere zeitliche Auflösung verwandeln:
 es werden keine Frames oder Zeitstempel interpoliert.
 
-`readableLowerMs` bezeichnet den Empfang des letzten Bildes ohne Text,
-`readableUpperMs` den Empfang des ersten Bildes mit Text; `proofGapMs` ist ihr
-Abstand. Das sind Empfangsgrenzen mit Aufnahmelatenz, keine Monitor-Präsentationszeiten.
+`readableLowerMs` bezeichnet das letzte Bild ohne Text, `readableUpperMs` das
+erste Bild mit Text; `proofGapMs` ist ihr Abstand. Das sind obere Schranken
+einschließlich Aufnahmelatenz, keine Monitor-Präsentationszeiten.
+
+Gezählt wird dabei, wann ein Bild aufgenommen wurde, nicht wann dieses Programm
+dazu kam, es abzuholen. Beides ist nicht dasselbe, und der Unterschied ist keine
+Konstante: der Verbraucher kopiert, hasht und komprimiert sechs Megabyte je
+Bild, bleibt bei 60 Hz zurück, und `drop=false` behält jedes Bild. Innerhalb
+einer Aufnahme des Vorher-Laufs wuchs der Abstand zwischen dem Zeitstempel eines
+Bildes und seinem Empfang von Bild zu Bild um insgesamt 58 ms — ein längerer
+Start sammelt mehr Rückstand und wird dafür ein zweites Mal belastet. Die Bilder
+tragen über `do-timestamp=true` exakte relative Zeiten auf der Uhr der
+Aufnahmepipeline; unbekannt ist allein deren Epoche gegenüber `CLOCK_MONOTONIC`.
+Jeder Empfang liegt nach der zugehörigen Aufnahme, deshalb ist die kleinste
+beobachtete Differenz die größte vertretbare Verschiebung: das Bild, das sie
+zeigt, behält seinen Empfangszeitpunkt genau, und kein Bild wird je vor seinen
+Empfang datiert. `captureClock` in `proof.json` und `capture.json` nennt
+Verschiebung, Anzahl ausgerichteter Bilder sowie Median und Maximum des
+Rückstands; Bilder ohne verwertbaren Zeitstempel behalten ihren Empfang.
 Ein Intervall über 40 ms ist `diagnostic`, und `proofResolutionValid: false`
 verhindert jede Budgetabnahme dieser Bildmessung. Die Grenze sind zwei
 60-Hz-Intervalle (33,33 ms) plus ein weiteres als Aufnahme-Spielraum: der
