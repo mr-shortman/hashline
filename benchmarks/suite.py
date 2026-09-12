@@ -30,8 +30,67 @@ from content import EXPECTED
 
 
 
+# The one session service a launch cannot avoid. GTK asks the settings portal
+# for its version while it opens the display, and waits for the answer: that is
+# where the user's font, cursor and colour scheme come from on Wayland. On a bus
+# where nothing owns the name, the question *activates* xdg-desktop-portal and
+# the client blocks until it has started.
+#
+# Measured here on 2026-09-11, cairo, small fixture, five launches each:
+# gtk_init took 168 ms on an empty bus against 6 ms with the portal already on
+# it, and the first buffer reached the compositor after 240 ms against 77 ms.
+# Every launch paid the portal's cold start again, because every launch gets a
+# bus of its own. No session pays it twice, and no competitor pays it at all —
+# none of the four uses GTK 4. Timing it as part of "start to readable text"
+# measures a desktop service starting, not the viewer.
+#
+# So a launch that is going to be timed gets the portal first, the way a session
+# has it before the user opens anything. Nothing else is put on the bus: gvfs,
+# dconf and the document portal stay out, as ISOLATION says.
+PORTAL = Path('/usr/libexec/xdg-desktop-portal')
+PORTAL_NAME = 'org.freedesktop.portal.Desktop'
+
+
+def owns_name(name):
+    from gi.repository import Gio, GLib
+    from session import connection
+    bus = connection(os.environ['DBUS_SESSION_BUS_ADDRESS'])
+    return bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus',
+                         'NameHasOwner', GLib.Variant('(s)', (name,)), None,
+                         Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()[0]
+
+
 @contextlib.contextmanager
-def isolated(renderer, connector):
+def settings_portal(timeout=15):
+    """Runs the settings portal on the private bus for the length of a launch.
+
+    Absence is recorded, never fatal: a machine without the portal installed
+    still measures, and the record says the launch carried its cold start.
+    """
+    if not PORTAL.is_file():
+        yield {'running': False, 'reason': f'{PORTAL} is not installed'}
+        return
+    process = subprocess.Popen([str(PORTAL)], env=dict(os.environ), stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, start_new_session=True)
+    started = time.monotonic()
+    try:
+        deadline = started + timeout
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                yield {'running': False, 'reason': f'{PORTAL.name} exited {process.returncode}'}
+                return
+            if owns_name(PORTAL_NAME):
+                yield {'running': True, 'binary': str(PORTAL), 'name': PORTAL_NAME,
+                       'readySeconds': time.monotonic() - started}
+                return
+            time.sleep(.02)
+        yield {'running': False, 'reason': f'{PORTAL_NAME} unclaimed after {timeout:g} s'}
+    finally:
+        stop(process)
+
+
+@contextlib.contextmanager
+def isolated(renderer, connector, services=False):
     old = dict(os.environ)
     bus = PrivateBus()
     with tempfile.TemporaryDirectory(prefix='hashline-bench-') as home:
@@ -47,7 +106,12 @@ def isolated(renderer, connector):
                 os.environ.pop('GSK_RENDERER', None)
             else:
                 os.environ['GSK_RENDERER'] = renderer
-            yield bus, home
+            if not services:
+                yield bus, home
+                return
+            with settings_portal() as portal:
+                bus.portal = portal
+                yield bus, home
         finally:
             os.environ.clear(); os.environ.update(old)
             bus.stop()
@@ -109,7 +173,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             # 200 ms, so half a second is again enough; it was raised to three
             # only to outwait a ramp that the starved consumer was causing.
             time.sleep(.5)  # Keep a real pre-launch baseline; recognize only after termination.
-        with isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
+        with isolated(renderer, options.connector, services=True) as (bus, home), trace.open('w+') as sink:
             # Six stderr lines, and the only view from inside the process of
             # where a startup spends its time; the protocol trace starts at the
             # first message and can say nothing about what came before it.
@@ -138,6 +202,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             trace_text = sink.read()
             marks = startup.parse(trace_text, started_ms, 150)
             stages = startup.stages(trace_text, started_ms)
+            portal = getattr(bus, 'portal', None)
             metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', trace_text)
         if capture:
             beat.stop()
@@ -158,6 +223,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
                       'method': 'Wayland protocol marks only; nothing proves the frame showed the document'}
         result['protocol'] = marks
         result['stages'] = stages
+        result['sessionPortal'] = portal
         result['exitBeforeTermination'] = exited
         if exited is not None:
             result.update(failure('program-exited', f'Viewer exited before termination: {exited}', len(capture.frames) if capture else 0))
@@ -251,7 +317,7 @@ def interaction(command, fixture, renderer, options, artifact):
         width, height = module('scroll-native').monitor_geometry(options.connector)
         pointer.to(width / 2, height / 2)
         with tempfile.TemporaryDirectory(prefix='hashline-interaction-') as temp, \
-                isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
+                isolated(renderer, options.connector, services=True) as (bus, home), trace.open('w+') as sink:
             document = Path(temp) / fixture.name
             document.write_text(f'Ablenkung {decoy} oben.\n\n' + fixture.read_text()
                                 + f'\n\nSuchziel {needle} Ende.\n')

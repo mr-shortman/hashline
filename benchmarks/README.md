@@ -100,6 +100,20 @@ Wayland-Compositor. `mainthread` liest die vom Programm protokollierten Aufgaben
 bei Start und Dateiübergabe; Tastatur- und Menüaufgaben erfasst zusätzlich
 `interaction`.
 
+Jeder zeitgemessene Start bekommt vorab den Einstellungs-Portaldienst auf
+seinem privaten Bus, so wie eine Sitzung ihn hat, bevor jemand etwas öffnet.
+GTK fragt beim Öffnen des Displays synchron nach dessen Version — daher kommen
+unter Wayland Schriftart, Zeiger und Farbschema —, und auf einem Bus, auf dem
+niemand den Namen hält, aktiviert diese Frage `xdg-desktop-portal` und wartet
+auf dessen Start. Gemessen am 11. September 2026, `cairo`, `small`, je fünf
+Starts: `gtk_init` brauchte 168 ms auf leerem Bus gegen 6 ms mit bereits
+laufendem Portal, der erste Puffer 240 ms gegen 77 ms. Jeder Start zahlte den
+Kaltstart erneut, weil jeder Start einen eigenen Bus bekommt; keine Sitzung
+zahlt ihn zweimal, und keiner der vier Vergleichskandidaten zahlt ihn
+überhaupt, weil keiner GTK 4 verwendet. `sessionPortal` in jeder Zeile hält
+fest, ob der Dienst lief. Sonst kommt nichts auf den Bus: gvfs, dconf und das
+Dokumentenportal bleiben draußen, wie `ISOLATION` es sagt.
+
 `stages` in jeder Startzeile nennt die sechs Marken, die das Programm selbst
 meldet (`HASHLINE_BENCH_STAGES`): `main`, `toolkit`, `parse`, `parsed`,
 `document` und `frame`, in Millisekunden seit `exec` und auf derselben Uhr wie
