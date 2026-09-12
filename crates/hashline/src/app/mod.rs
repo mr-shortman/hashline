@@ -16,7 +16,7 @@ mod tab;
 use crate::document::{self, Anchor};
 use crate::preferences::Preferences;
 use crate::theme::{document as tokens, DARK, LIGHT};
-use crate::view::DocumentView;
+use crate::view::{stage, DocumentView};
 use tab::Tab;
 
 pub const APP_ID: &str = "de.kalendium.Hashline";
@@ -41,6 +41,7 @@ const SEARCH_DEBOUNCE_MS: u64 = 60;
 const OUTLINE_SIDEBAR_WIDTH: i32 = 900;
 
 pub fn run() -> glib::ExitCode {
+    stage::mark("main");
     tune_allocator();
     glib::set_application_name("Hashline");
     let application = gtk::Application::builder()
@@ -68,7 +69,10 @@ pub fn run() -> glib::ExitCode {
             std::ops::ControlFlow::Continue(())
         }
     });
-    application.connect_startup(|_| gtk::Window::set_default_icon_name(APP_ID));
+    application.connect_startup(|_| {
+        stage::mark("toolkit");
+        gtk::Window::set_default_icon_name(APP_ID);
+    });
     install_application(&application);
     application.run()
 }
@@ -816,7 +820,9 @@ impl Ui {
         let (sender, receiver) = async_channel::bounded(1);
         let for_thread = path.clone();
         std::thread::spawn(move || {
+            stage::mark("parse");
             let result = read_and_parse(&for_thread);
+            stage::mark("parsed");
             // The parse ran on this thread's own allocation arena, and what it
             // allocated and freed on the way — the source text, the parser's
             // events, the interning table — is returned here rather than left

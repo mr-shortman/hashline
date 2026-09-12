@@ -100,6 +100,12 @@ Wayland-Compositor. `mainthread` liest die vom Programm protokollierten Aufgaben
 bei Start und Dateiübergabe; Tastatur- und Menüaufgaben erfasst zusätzlich
 `interaction`.
 
+`stages` in jeder Startzeile nennt die sechs Marken, die das Programm selbst
+meldet (`HASHLINE_BENCH_STAGES`): `main`, `toolkit`, `parse`, `parsed`,
+`document` und `frame`, in Millisekunden seit `exec` und auf derselben Uhr wie
+die Protokollmarken. Ein Protokollmitschnitt beginnt bei der ersten Nachricht
+und kann über die Zeit davor nichts sagen; genau dort lagen 168 der 240 ms.
+
 `content`, `interaction`, `tabs`, `reload` und `scroll` brauchen Bildnachweise.
 Auf dem physischen Desktop prüft ein Eingabe-Ruhefenster vorab
 `desktopUnattendedVerified`; ein Fehlschlag liefert begründete fehlende Messungen.

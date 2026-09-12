@@ -95,6 +95,25 @@ def parse(trace: str, started_ms: float, quiet_ms: float) -> dict:
     return marks
 
 
+# `HASHLINE_STAGE toolkit=146814.210` — the reader's own marks, on the same
+# truncated CLOCK_REALTIME libwayland stamps its messages with.
+STAGE = re.compile(r"^HASHLINE_STAGE (\S+)=(\d+\.\d{3})$", re.MULTILINE)
+
+
+def stages(trace: str, started_ms: float) -> dict:
+    """Delays since `exec` for the marks the reader reports about itself.
+
+    Empty unless the reader ran with `HASHLINE_BENCH_STAGES`. These are the
+    only numbers in a startup that come from inside the process; everything
+    else here is protocol traffic, and a protocol trace cannot say what the
+    program was doing between `exec` and its first message.
+    """
+    marks: dict[str, float] = {}
+    for name, stamp in STAGE.findall(trace):
+        marks.setdefault(name, (float(stamp) - started_ms) % WRAP_MS)
+    return marks
+
+
 def run(command: list[str], bus: str, hold: float, quiet_ms: float) -> dict:
     environment = dict(os.environ, WAYLAND_DEBUG="1")
     if bus:

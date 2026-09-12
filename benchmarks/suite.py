@@ -110,7 +110,11 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             # only to outwait a ramp that the starved consumer was causing.
             time.sleep(.5)  # Keep a real pre-launch baseline; recognize only after termination.
         with isolated(renderer, options.connector) as (bus, home), trace.open('w+') as sink:
-            env = dict(os.environ, WAYLAND_DEBUG='1', HASHLINE_BENCH_METADATA='1')
+            # Six stderr lines, and the only view from inside the process of
+            # where a startup spends its time; the protocol trace starts at the
+            # first message and can say nothing about what came before it.
+            env = dict(os.environ, WAYLAND_DEBUG='1', HASHLINE_BENCH_METADATA='1',
+                       HASHLINE_BENCH_STAGES='1')
             if proof:
                 env.pop('NO_AT_BRIDGE', None)
                 env['GTK_A11Y'] = 'atspi'
@@ -133,6 +137,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             sink.seek(0)
             trace_text = sink.read()
             marks = startup.parse(trace_text, started_ms, 150)
+            stages = startup.stages(trace_text, started_ms)
             metadata = re.search(r'HASHLINE_BENCH renderer=(\S+) backend=(\S+)', trace_text)
         if capture:
             beat.stop()
@@ -152,6 +157,7 @@ def readable(command, fixture, renderer, options, artifact, action=None, proof=T
             result = {'status': 'ok', 'contentVerified': False, 'metrics': {'presentedMs': marks['presented']},
                       'method': 'Wayland protocol marks only; nothing proves the frame showed the document'}
         result['protocol'] = marks
+        result['stages'] = stages
         result['exitBeforeTermination'] = exited
         if exited is not None:
             result.update(failure('program-exited', f'Viewer exited before termination: {exited}', len(capture.frames) if capture else 0))

@@ -327,6 +327,8 @@ mod imp {
 
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
             crate::view::mainthread::timed("snapshot", || self.obj().draw(snapshot));
+            static FIRST: std::sync::Once = std::sync::Once::new();
+            crate::view::stage::once(&FIRST, "frame");
         }
     }
 
@@ -421,6 +423,7 @@ impl DocumentView {
     /// 10 MiB fixture (docs/metrics.md).
     pub fn set_document(&self, document: OpDocument) {
         super::mainthread::timed("set-document", || self.take_document(document));
+        super::stage::mark("document");
     }
 
     fn take_document(&self, mut document: OpDocument) {
